@@ -1,0 +1,25 @@
+[package]
+name = "occt-sys"
+version = { workspace = true }
+edition = { workspace = true }
+links = "occt"
+
+# [features]
+# default = []
+# build-native-shim = ["dep:cc"]
+# loader-fixtures = ["dep:cc"]
+
+[dependencies]
+error-location = { workspace = true }
+goblin         = { workspace = true }
+libloading     = { workspace = true }
+thiserror      = { workspace = true }
+
+[dev-dependencies]
+tempfile       = { workspace = true }
+
+[build-dependencies]
+cc = { workspace = true }
+
+[lints]
+workspace = true

@@ -1,0 +1,2 @@
+[env]
+OCCT_PREFIX = { value = "dist/x86_64-linux", relative = true }

@@ -1,0 +1,11 @@
+# OCCT
+tmp/
+
+# dist
+dist/
+
+# Build
+target/
+
+# IDE
+.idea/

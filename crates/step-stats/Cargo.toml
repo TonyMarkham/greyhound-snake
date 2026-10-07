@@ -1,0 +1,17 @@
+[package]
+name     = "step-stats"
+version  = { workspace = true }
+edition  = { workspace = true }
+
+[dependencies]
+clap     = { workspace = true }
+occt-sys = { workspace = true }
+serde     = { workspace = true }
+toml      = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

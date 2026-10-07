@@ -1,0 +1,3 @@
+[occt]
+library_dir = "dist/x86_64-linux/lib"
+shim_path = "target/release/build/occt-sys-4f46328a9ce38e4f/out/libgreyhound_occt.so"
