@@ -42,6 +42,57 @@ this integration, not a finished Unity package.
 - `tmp/`: disposable OCCT source and build scaffolding; currently gitignored.
 - `assets/`: sample assets, including a STEP file.
 
+Design reference docs (source of truth for their facts; consult before
+mesh/projection work instead of re-deriving):
+
+- `occt-mesh.md`: OCCT 8.0.1 mesh data model and tessellation API facts,
+  read from the installed headers (`Poly_Triangulation`, `BRepMesh`,
+  extraction, parameter tables); includes the no-own-mesh-format conclusion
+  and available interchange writers.
+- `unity-mesh.md`: Unity 6.0 `Mesh` API facts — advanced/data-oriented API
+  call order, vertex-layout rules, submesh descriptors, index format,
+  winding conventions; source doc for the C# side.
+- `occt-to-unity.md`: the OCCT→Unity transformation pipeline with the
+  derivation (axis map, winding flip, scale, vertex layout), an audit of
+  current shim/Rust state, the gap list **G1–G12 (the working backlog)**,
+  and the import verification checklist.
+- `perf.md`: benchmark plan (criterion, micro/macro layers, assets),
+  the scalar-first SIMD decision and its revisit trigger, and rules for
+  recording timings.
+
+## Decided architecture direction
+
+Decisions below are settled; the referenced docs hold the rationale. Do not
+re-litigate them without new information, and keep them consistent when
+implementing.
+
+- The host-neutral mesh abstraction is a **Rust core mesh model** (not built
+  yet, gap G3): flat `f32` positions + `u32` indices + per-face ranges, in
+  OCCT coordinates (mm), triangles outward-CCW in OCCT algebra.
+  `Poly_Triangulation` is an internal detail behind the C++ shim, not the
+  abstraction; no OCCT type crosses an ABI.
+- Layering: OCCT knowledge stays in the C++ shim (1-based→0-based indices,
+  `TopLoc_Location` transforms, `TopAbs_REVERSED` fix); host-specific work
+  (axis permutation, Unity winding flip, scale, submesh assembly, buffer
+  layout) lives in a Rust Unity projection (gap G4) so the C# side is a
+  pure blit. Blender later consumes the same core model through its own
+  projection — never through Unity assumptions.
+- Coordinate map: `Unity = (x, z, y)` of OCCT (det −1; the non-mirroring
+  map). The projection flips two indices per triangle as a consequence;
+  normals are permuted but never negated. Never mirror by negating an axis.
+- Scale is baked into vertices by the projection (recommended default
+  0.001, mm→m); GameObject transform stays identity. Core model stays mm.
+- Unity C# side targets the advanced Mesh API
+  (`SetVertexBufferParams` → data → `SetIndexBufferParams` → data →
+  `SetSubMeshes` → bounds), `UInt32` indices, interleaved
+  pos+normal stream, no `TexCoord0` for v1 (OCCT UVs are surface
+  parameters, gap G2).
+- The Unity projection is scalar first; SIMD only if profiling shows it
+  matters (`perf.md` revisit trigger).
+- Remaining open decisions (G2, G5, G6, G11) and deferred items are tracked
+  in the `occt-to-unity.md` gap table — consult it before proposing mesh or
+  projection work.
+
 ## Native distribution requirements
 
 - Plan for the OCCT libraries to ship with the UPM package, rather than
@@ -67,8 +118,28 @@ this integration, not a finished Unity package.
   consistent. Make prerequisites and the configure → build → install order
   explicit.
 - Follow the existing Rust/C++ structure and workspace lint settings.
+- Cargo.toml pattern: all dependencies are declared once in the workspace
+  `[workspace.dependencies]` (versions live only there); member crates
+  reference them as `name = { workspace = true }`, inherit
+  `version`/`edition` from `[workspace.package]`, and set
+  `[lints] workspace = true`. Never pin a version inside a member crate.
 - Use explicit Rust imports. Never use glob imports in a `use` statement.
-- Put Rust test modules under each crate's `src/tests/` directory, registered
-  through `src/tests/mod.rs` and a `#[cfg(test)] mod tests;` in the crate root.
+  Write one `use` statement per source crate (`crate`, `std`, and each
+  external crate), grouping all imported items from that crate into nested
+  braces instead of scattered single-item lines (see
+  `crates/occt-sys/src/step_doc.rs` for the pattern).
+  Order: `crate::` first, blank line, workspace crate(s) (`{crate-name}::`),
+  blank line, then all other crates (`std`, externals).
+- One Rust type per file. For grouped/related types, create a module
+  directory with a `mod.rs` re-exporting its members (see
+  `crates/occt-sys/src/error/` for the pattern).
+- Unit tests are never inlined in source files. They always live in a
+  `src/tests/` module directory, registered through `src/tests/mod.rs` and a
+  `#[cfg(test)] mod tests;` in the crate root.
+- Tests may use `unwrap`/`panic` and generic `Result` types. Library source
+  code uses the thiserror + error-location pattern implemented in
+  `crates/occt-sys/src/error/`: a crate-local `Result<T>` alias, a
+  `thiserror` enum whose variants carry an `ErrorLocation` captured via
+  `#[track_caller]` constructors, so every error reports where it was raised.
 - Keep early-stage changes focused on the requested task; do not invent an
   unrequested package layout or architecture.
