@@ -1,0 +1,11 @@
+[package]
+name = "mesh"
+version        = { workspace = true }
+edition        = { workspace = true }
+
+[dependencies]
+error-location = { workspace = true }
+thiserror      = { workspace = true }
+
+[lints]
+workspace      = true

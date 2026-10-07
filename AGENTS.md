@@ -130,6 +130,12 @@ implementing.
   `crates/occt-sys/src/step_doc.rs` for the pattern).
   Order: `crate::` first, blank line, workspace crate(s) (`{crate-name}::`),
   blank line, then all other crates (`std`, externals).
+- Numeric conversions: `From` exists only for lossless-on-every-target
+  widenings — `u8`/`u16` → `u32`/`u64`/`usize`, and `u32` → `u64`. There is
+  no `From<u32> for usize` and no `From<usize> for u64`. Convert `usize`
+  lengths to numeric domains via `u32::try_from(len)` with a real error
+  (they are index-bound semantics), and do mixed-domain arithmetic in `u64`
+  via `u64::from(u32)`; never use `as` casts to paper over the gap.
 - One Rust type per file. For grouped/related types, create a module
   directory with a `mod.rs` re-exporting its members (see
   `crates/occt-sys/src/error/` for the pattern).
