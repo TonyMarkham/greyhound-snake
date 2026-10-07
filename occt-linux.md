@@ -8,7 +8,7 @@ users should not need a separate OCCT installation.
 These are instructions for you to run on an **x86_64 Linux** build machine.
 They build **OCCT 8.0.1** (tag `V8.0.1`) from source, with a small CMake change
 to produce unversioned shared libraries without symlinks. The install goes
-into `dist/x86_64-linux`, which the existing Rust/C++ integration uses for
+into `dist/occt/x86_64-linux`, which the existing Rust/C++ integration uses for
 development. Building this dist does not by itself create or validate the
 Unity importer or its UPM package.
 
@@ -89,7 +89,7 @@ corresponding source and build information needed for redistribution.
 ## 2. Configure, build, install to the repo's dist
 
 Run from the repo root. OCCT installs **directly into the repo's vendored
-dist** — the same directory `.cargo/config.toml` points `OCCT_PREFIX` at —
+dist** — the directory `OCCT_PREFIX` in `.cargo/config.toml` must point at —
 so there is no external install and no copy step afterwards.
 
 **Disable library versioning in the source** before configuring. In
@@ -126,7 +126,7 @@ There is no stock OCCT 8.0.1 configure flag that disables both properties.
 
 ```
 cmake -S tmp/occt/OCCT -B tmp/occt/build -G Ninja -DCMAKE_BUILD_TYPE=Release \
-      -DINSTALL_DIR="$PWD/dist/x86_64-linux" \
+      -DINSTALL_DIR="$PWD/dist/occt/x86_64-linux" \
       -DINSTALL_DIR_LAYOUT=Unix -DINSTALL_DIR_WITH_VERSION=OFF \
       -DBUILD_LIBRARY_TYPE=Shared -DBUILD_SHARED_LIBRARY_NAME_POSTFIX=""
 ```
@@ -140,7 +140,7 @@ The switches:
 - `-G Ninja` — generate for the Ninja build system (`ninja-build` package);
   faster and quieter than `make`.
 - `-DCMAKE_BUILD_TYPE=Release` — explicitly select an optimized build.
-- `-DINSTALL_DIR="$PWD/dist/x86_64-linux"` — OCCT's own name for the install
+- `-DINSTALL_DIR="$PWD/dist/occt/x86_64-linux"` — OCCT's own name for the install
   prefix (same as `CMAKE_INSTALL_PREFIX`): where `cmake --install` puts the
   final files. Here: the repo's vendored dist.
 - `-DINSTALL_DIR_LAYOUT=Unix -DINSTALL_DIR_WITH_VERSION=OFF` — use the
@@ -172,7 +172,7 @@ relink the new unversioned libraries.
 
 Run this only after the build has completed successfully. If reusing a
 dist from an older versioned installation, first remove its obsolete
-`libTK*.so*` files from `dist/x86_64-linux/lib` so stale symlinks and old
+`libTK*.so*` files from `dist/occt/x86_64-linux/lib` so stale symlinks and old
 libraries cannot survive alongside the new files. CMake does not remove
 obsolete installed files.
 
@@ -201,7 +201,7 @@ Useful switches (add to the `cmake -S` line):
 
 Build time: roughly 10–30 minutes depending on machine and `-j` level.
 
-Installed layout (= the repo's `dist/x86_64-linux/`):
+Installed layout (= the repo's `dist/occt/x86_64-linux/`):
 
 ```
 <prefix>/
@@ -220,9 +220,9 @@ Installed layout (= the repo's `dist/x86_64-linux/`):
 Check that the libraries are real, unversioned files:
 
 ```bash
-test -f dist/x86_64-linux/lib/libTKernel.so && \
-    test ! -L dist/x86_64-linux/lib/libTKernel.so
-find dist/x86_64-linux -type l
+test -f dist/occt/x86_64-linux/lib/libTKernel.so && \
+    test ! -L dist/occt/x86_64-linux/lib/libTKernel.so
+find dist/occt/x86_64-linux -type l
 ```
 
 The `test` command must succeed and `find` must print nothing. The source
@@ -234,7 +234,7 @@ libraries must also be packaged as real files.
 This section applies when `BUILD_MODULE_Draw` is enabled (the default).
 
 ```
-dist/x86_64-linux/bin/draw.sh
+dist/occt/x86_64-linux/bin/draw.sh
 ```
 
 `draw.sh` sources `env.sh` next to it (sets `CASROOT`, resource paths,
@@ -254,8 +254,8 @@ an X display, including XWayland on a Wayland desktop. Type `exit` to leave.
 For a headless check, start DRAW in batch mode instead:
 
 ```bash
-source dist/x86_64-linux/bin/env.sh
-dist/x86_64-linux/bin/DRAWEXE -b
+source dist/occt/x86_64-linux/bin/env.sh
+dist/occt/x86_64-linux/bin/DRAWEXE -b
 ```
 
 Then run `pload MODELING`, `box b 10 20 30`, and `bprops b`; omit `vinit`
@@ -296,8 +296,9 @@ crates/occt-sys/
 └── examples/box_volume.rs
 ```
 
-`.cargo/config.toml` already sets `OCCT_PREFIX` to the repo-relative
-`dist/x86_64-linux`. `build.rs` uses `include/opencascade` and `lib` under
+`OCCT_PREFIX` in `.cargo/config.toml` must point at the repo-relative
+`dist/occt/x86_64-linux` — the install prefix from step 2 (update the value if it
+differs). `build.rs` uses `include/opencascade` and `lib` under
 that prefix, compiles both C++ shims as C++17, and links these nine toolkits:
 
 ```
@@ -343,7 +344,7 @@ library count from another build.
 To inspect the current integration's dependencies after installation:
 
 ```bash
-occt_lib_dir="$PWD/dist/x86_64-linux/lib"
+occt_lib_dir="$PWD/dist/occt/x86_64-linux/lib"
 for tk in TKernel TKMath TKGeomBase TKBRep TKPrim TKTopAlgo TKMesh TKXSBase TKDESTEP; do
     LD_LIBRARY_PATH="$occt_lib_dir${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
         ldd "$occt_lib_dir/lib${tk}.so"
@@ -395,7 +396,7 @@ be implemented; the build in this guide does not provide them.
 ### Resolve external resources from the installed package
 
 The installation contains resources in
-`dist/x86_64-linux/share/opencascade/resources`. OCCT 8.0.1 embeds some
+`dist/occt/x86_64-linux/share/opencascade/resources`. OCCT 8.0.1 embeds some
 defaults, messages, and other resource content; do not assume that every
 installed file is required, or that every resource lookup is embedded.
 Retain the external resources used by the importer's chosen APIs.
@@ -423,7 +424,7 @@ developer path is a substitute for package-relative initialization.
 ### Include licenses and corresponding source
 
 The Unix installation places `LICENSE_LGPL_21.txt` and
-`OCCT_LGPL_EXCEPTION.txt` in `dist/x86_64-linux/share/doc/opencascade`.
+`OCCT_LGPL_EXCEPTION.txt` in `dist/occt/x86_64-linux/share/doc/opencascade`.
 Include both in the UPM distribution, retain applicable copyright notices,
 and give prominent notice that the importer uses OCCT. Record the exact
 release tag, the local CMake modification, and the build configuration.
@@ -449,7 +450,7 @@ rm -rf tmp/occt
 ```
 
 This deletes both the modified source checkout and the build output, but
-leaves `dist/x86_64-linux`. Re-cloning the stock tag alone will not restore
+leaves `dist/occt/x86_64-linux`. Re-cloning the stock tag alone will not restore
 the local CMake modification.
 
 ## Swapping versions
@@ -490,7 +491,7 @@ offline documentation.
 - **`file cannot create directory: /usr/local/include/opencascade`** (or
   headers land in `/usr/local` despite `--prefix`) — the prefix was not set at
   configure time. Re-run the configure step with
-  `-DINSTALL_DIR="$PWD/dist/x86_64-linux"`, then
+  `-DINSTALL_DIR="$PWD/dist/occt/x86_64-linux"`, then
   `cmake --build tmp/occt/build --parallel` and
   `cmake --install tmp/occt/build`. Use the same build directory throughout.
 - **`libTK*.so` not found at runtime** — confirm installation succeeded and

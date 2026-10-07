@@ -9,7 +9,8 @@ use std::{
 pub(crate) struct NativeApi {
     pub(crate) box_volume: unsafe extern "C" fn(f64, f64, f64, *mut f64) -> i32,
     pub(crate) step_open: unsafe extern "C" fn(*const c_char) -> *mut c_void,
-    pub(crate) step_info: unsafe extern "C" fn(*mut c_void, *mut i32, *mut i32, *mut i32, *mut GreyBbox) -> i32,
+    pub(crate) step_info:
+        unsafe extern "C" fn(*mut c_void, *mut i32, *mut i32, *mut i32, *mut GreyBbox) -> i32,
     pub(crate) mesh_counts: unsafe extern "C" fn(*mut c_void, f64, f64, *mut u32, *mut u32) -> i32,
     pub(crate) mesh_fill: unsafe extern "C" fn(*mut c_void, *mut f32, *mut u32) -> i32,
     pub(crate) step_close: unsafe extern "C" fn(*mut c_void),

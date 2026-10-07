@@ -109,9 +109,20 @@ fn build_native_shim() -> Result<(), Box<dyn std::error::Error>> {
     for header in ["greyhound_abi.h", "native_guard.h"] {
         println!("cargo:rerun-if-changed={}", cpp.join(header).display());
     }
-    let output =
-        PathBuf::from(env::var_os("OUT_DIR").ok_or_else(|| io::Error::other("missing OUT_DIR"))?)
-            .join("libgreyhound_occt.so");
+    let workspace = root
+        .ancestors()
+        .nth(2)
+        .ok_or_else(|| io::Error::other("cannot locate workspace root"))?;
+    let platform = format!(
+        "{}-{}",
+        env::var("CARGO_CFG_TARGET_ARCH")?,
+        env::var("CARGO_CFG_TARGET_OS")?,
+    );
+    let output = workspace
+        .join("dist")
+        .join("shim")
+        .join(platform)
+        .join("libgreyhound_occt.so");
     let mut args = vec![
         OsString::from("-L"),
         lib.as_os_str().to_owned(),
