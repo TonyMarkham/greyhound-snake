@@ -75,8 +75,9 @@ Implement each bite (vertical slice) through the established loop:
   UPM package in `dist/package/`; currently gitignored.
 - `package/com.greyhound.step/`: tracked UPM package skeleton — authored
   sources (`package.json`, `Third Party Notices.md`, and the C# code: the
-  `Runtime/` P/Invoke layer with struct mirrors and the
-  `StepMassProperties` component, the `Editor/` `ScriptedImporter`).
+  `Runtime/` P/Invoke layer with struct mirrors, the
+  `StepMassProperties` component and the `StepAssemblyMassProperties`
+  aggregator, the `Editor/` `ScriptedImporter`).
   `just assemble-package` stages it with the native
   payload into `dist/package/com.greyhound.step/`; `just verify-package`
   checks the staged package from a copied layout
@@ -98,6 +99,9 @@ mesh/projection work instead of re-deriving):
   derivation (axis map, winding flip, scale, vertex layout), an audit of
   current shim/Rust state, the gap list **G1–G12 (the working backlog)**,
   and the import verification checklist.
+- `unity-mujoco.md`: MuJoCo/MJCF export and joint authoring facts and
+  plan (the core model's second consumer; naive rigid-tree exporter, then
+  joint annotation + UX bites).
 - `perf.md`: benchmark plan (criterion, micro/macro layers, assets),
   the scalar-first SIMD decision and its revisit trigger, and rules for
   recording timings.

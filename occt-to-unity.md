@@ -118,6 +118,30 @@ Why this map, and why det −1 is *required* rather than incidental:
 > conversion is done by the permutation above; winding is fixed by swapping
 > triangle indices (below), not by coordinates.
 
+### Handedness map across consumers
+
+- **Right-handed, like the core model:** binary STL (CCW-outward right-hand
+  rule), MuJoCo (Z-up), Blender, glTF. These consume the core model
+  **identity-mapped** — their only transform is the mm→m scale. Baking that
+  scale is each projection's own choice (`unity-mujoco.md`).
+- **Left-handed: Unity is the only one in our set** (Y-up). The `(x, z, y)`
+  reflection plus the two-index winding flip are confined to the Unity
+  projection; every other consumer skips both.
+- **Data source of truth is domain-partitioned.** Geometry — meshes, part
+  structure, exact-BRep mass properties — belongs to the **STEP file**,
+  read through the core model: a reimport regenerates it and never carries
+  authored edits. Articulation — joints, root mobility — belongs to
+  **Unity**: STEP carries no joint semantics (AP242 kinematics is
+  essentially never present in real files and unread by XCAF), so the
+  `StepJointSet` asset (`unity-mujoco.md`) is the sole authority; it must
+  survive reimports, and exporters merge it with the geometry. Neither
+  domain edits the other: reimporting refreshes geometry and re-applies
+  joints; editing joints never touches geometry.
+- **Debugging rule:** STL written from the core model must look identical to
+  the STEP in any right-handed viewer (CAD viewer, Blender,
+  `mujoco.simulate`). If something appears mirrored, the bug is in the Unity
+  projection — never in the data.
+
 Normals transform with the same permutation (`n' = P·n`): it is orthogonal,
 so unit length and outward direction are preserved; no renormalization
 needed for permutation + uniform positive scale.
