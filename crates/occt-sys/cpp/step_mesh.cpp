@@ -10,6 +10,7 @@
 #include <TopoDS.hxx>
 #include <TopLoc_Location.hxx>
 #include <gp_Pnt.hxx>
+#include <gp_Dir.hxx>
 #include "native_guard.h"
 #include <cmath>
 #include <limits>

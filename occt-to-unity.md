@@ -164,7 +164,7 @@ planned Unity vertex struct:
 |---|---|---|---|
 | `Node(i)` position | f64 (or f32) | `P·p`, then × scale | `Position` Float32 ×3 |
 | `Normal(i)` | f32, unit | `P·n` | `Normal` Float32 ×3 |
-| `UVNode(i)` | f64 | **none defined yet** | `TexCoord0` Float32 ×2 (or omitted) |
+| `UVNode(i)` | f64 | — | omitted for v1 (G2 decided) |
 
 - Target layout, single stream: interleaved
   `[pos: 12 B][normal: 12 B][uv: 8 B]` = 32 B, or `[pos][normal]` = 24 B if
