@@ -15,6 +15,8 @@ namespace Greyhound.Step
         private const double AngleRadians = 0.5;
         private const double Scale = 0.001;
 
+        private const string UrpLitShaderName = "Universal Render Pipeline/Lit";
+
         private static readonly VertexAttributeDescriptor[] VertexLayout =
         {
             new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float32, 3, 0),
@@ -23,35 +25,33 @@ namespace Greyhound.Step
 
         public override void OnImportAsset(AssetImportContext ctx)
         {
-            Mesh mesh;
             try
             {
-                mesh = Import(ctx.assetPath);
+                Import(ctx);
             }
             catch (Exception exception)
             {
                 ctx.LogImportError($"{ctx.assetPath}: {exception.Message}");
-                return;
             }
-            ctx.AddObjectToAsset("mesh", mesh);
-            ctx.SetMainObject(mesh);
         }
 
-        private static Mesh Import(string assetPath)
+        private static void Import(AssetImportContext ctx)
         {
             StepHost host = StepHost.GetShared();
-            using (StepDocument doc = host.OpenStep(assetPath))
+            using (StepDocument doc = host.OpenStep(ctx.assetPath))
             {
                 HostMeshCounts counts = doc.MeshCounts(Deflection, AngleRadians, Scale);
 
                 UnityVertex[] vertices = new UnityVertex[counts.VertexCount];
                 uint[] indices = new uint[counts.IndexCount];
                 UnitySubMesh[] submeshes = new UnitySubMesh[counts.SubmeshCount];
-                doc.MeshFill(vertices, indices, submeshes);
+                uint[] submeshColors = new uint[counts.SubmeshCount];
+                float[] colors = new float[counts.ColorCount * 4];
+                doc.MeshFill(vertices, indices, submeshes, submeshColors, colors);
 
                 Mesh mesh = new Mesh
                 {
-                    name = Path.GetFileNameWithoutExtension(assetPath),
+                    name = Path.GetFileNameWithoutExtension(ctx.assetPath),
                 };
                 // Advanced data-oriented API order (unity-mesh.md): vertex
                 // buffer, index buffer, submeshes, bounds, upload. Bounds
@@ -63,8 +63,70 @@ namespace Greyhound.Step
                 mesh.SetSubMeshes(BuildSubMeshes(submeshes), MeshUpdateFlags.DontRecalculateBounds);
                 mesh.bounds = counts.Bounds.ToBounds();
                 mesh.UploadMeshData(false);
-                return mesh;
+
+                Material[] materials = BuildMaterials(mesh.name, submeshColors, colors);
+                for (int i = 0; i < materials.Length; i++)
+                {
+                    ctx.AddObjectToAsset($"material{i}", materials[i]);
+                }
+                ctx.AddObjectToAsset("mesh", mesh);
+
+                // A bare Mesh cannot hold materials; the imported object is a
+                // GameObject root so the renderer carries the submesh colors.
+                GameObject root = new GameObject(mesh.name);
+                root.AddComponent<MeshFilter>().sharedMesh = mesh;
+                root.AddComponent<MeshRenderer>().sharedMaterials = materials;
+                ctx.AddObjectToAsset("root", root);
+                ctx.SetMainObject(root);
             }
+        }
+
+        private static Material[] BuildMaterials(string assetName, uint[] submeshColors, float[] colors)
+        {
+            // STEP colors decode as sRGB on the native side; a linear-color-space
+            // project converts material colors on upload. One material per distinct
+            // submesh color, in first-appearance order.
+            var distinct = new System.Collections.Generic.List<uint>();
+            foreach (uint colorIndex in submeshColors)
+            {
+                if (!distinct.Contains(colorIndex))
+                {
+                    distinct.Add(colorIndex);
+                }
+            }
+
+            Shader shader = Shader.Find(UrpLitShaderName)
+                ?? Shader.Find("Standard")
+                ?? throw new InvalidOperationException("no Lit shader available");
+
+            var materials = new Material[distinct.Count];
+            for (int i = 0; i < distinct.Count; i++)
+            {
+                uint colorIndex = distinct[i];
+                Color color = Color.white;
+                if ((int)colorIndex * 4 + 3 < colors.Length)
+                {
+                    color = new Color(
+                        colors[colorIndex * 4],
+                        colors[colorIndex * 4 + 1],
+                        colors[colorIndex * 4 + 2],
+                        colors[colorIndex * 4 + 3]);
+                }
+                materials[i] = new Material(shader)
+                {
+                    name = $"{assetName}_color{i}",
+                    hideFlags = HideFlags.HideInHierarchy,
+                };
+                if (materials[i].HasProperty("_BaseColor"))
+                {
+                    materials[i].SetColor("_BaseColor", color);
+                }
+                else
+                {
+                    materials[i].SetColor("_Color", color);
+                }
+            }
+            return materials;
         }
 
         private static SubMeshDescriptor[] BuildSubMeshes(UnitySubMesh[] submeshes)

@@ -9,15 +9,16 @@ gaps between what exists today and what the importer needs. Companion to:
 Both transformations sections below rest on conventions verified in those two
 docs; this document adds the derivation and the concrete rules. Current-state
 claims are checked against the actual code (`step_mesh.cpp`, `step_doc.rs`,
-`native_api.rs`). Written 2026-10-07.
+`native_api.rs`). Written 2026-10-07; updated 2026-10-08 for the XCAF/colors
+bite (solid+color attribution, submesh grouping, G5/G13).
 
 ## Pipeline overview
 
 ```
 STEP file
-  │  STEPControl_Reader (mm, per session unit)
+  │  STEPCAFControl_Reader → XCAF document → free shapes (mm, per session unit)
   ▼
-TopoDS_Shape (BRep: faces/edges, locations)
+TopoDS_Shape (BRep: faces/edges, locations) + per-face colors
   │  BRepMesh_IncrementalMesh (deflection, angle)      [shim]
   ▼
 Poly_Triangulation per TopoDS_Face
@@ -27,26 +28,35 @@ Poly_Triangulation per TopoDS_Face
   │    • 1-based → 0-based indices
   │    • per-node normals: location transform,
   │      TopAbs_REVERSED negation
+  │    • solid-ordered walk: per-face (solid, color)
+  │      attribution; non-solid faces merge into one
+  │      GREYHOUND_NO_SOLID group
   ▼
 Greyhound core mesh model (Rust)                      [crates/mesh]
   │  neutral: flat f32 positions + u32 indices,
-  │  per-face ranges, normals; OCCT coords (mm),
-  │  all triangles outward-CCW in OCCT algebra
+  │  per-face ranges, normals, per-face FaceAttrib
+  │  (solid, color) + sRGB RGBA color table;
+  │  OCCT coords (mm), all triangles outward-CCW
+  │  in OCCT algebra
   ▼
 Unity projection (Rust)                               [crates/unity-projection]
   │  • axis permutation (Z-up RH → Y-up LH)
   │  • winding flip (det −1 consequence)
   │  • uniform scale (mm → m, import setting)
-  │  • submesh grouping + interleaved vertex layout
+  │  • per-(solid, color) submesh grouping
+  │    (index-buffer reorder) + color table +
+  │    interleaved vertex layout
   ▼
 Greyhound host ABI (Rust cdylib)                      [crates/importer-host]
   │  flat C ABI over occt-sys + the projection;
   │  two-phase counts/fill into C#-pinned buffers
   ▼
-C# blit → UnityEngine.Mesh                            [package/com.greyhound.step]
+C# blit → UnityEngine.Mesh + GameObject root          [package/com.greyhound.step]
      SetVertexBufferParams → SetVertexBufferData →
      SetIndexBufferParams → SetIndexBufferData →
-     SetSubMeshes → RecalculateBounds
+     SetSubMeshes → RecalculateBounds;
+     MeshFilter/MeshRenderer with one URP Lit
+     material per distinct submesh color
 ```
 
 Layering rule: **OCCT knowledge stays in the shim; host knowledge stays in the
@@ -106,7 +116,7 @@ the imported GameObject keeps Unity scale (1, 1, 1).
   Unity physics, lighting and camera defaults behave sanely at (1, 1, 1).
 - Keep the core model in native mm — no scale there; tessellation deflection
   is specified in model units (mm) and applied before any scaling
-  (`step_mesh.cpp:84`), so nothing changes for the shim. Changing the scale
+  (`step_mesh.cpp:238`), so nothing changes for the shim. Changing the scale
   factor is a re-projection of the core model (cheap buffer math), never a
   re-tessellation.
 - Baking mm → m before the f64→f32 cast also improves f32 relative precision:
@@ -123,7 +133,7 @@ user-configurable as an import setting.
 - **OCCT:** front faces are wound so that the right-hand-rule normal
   `(v1−v0)×(v2−v0)` points **outward** (counter-clockwise seen from outside).
   Faces flagged `TopAbs_REVERSED` store inverted order; the shim already
-  swaps two indices for them (`step_mesh.cpp:152`), so the core model is
+  swaps two indices for them (`step_mesh.cpp:307`), so the core model is
   uniformly outward-CCW in OCCT algebra. The shim's emitted normals are
   negated the same way, so they point outward too and agree with the winding
   (gap G1).
@@ -152,7 +162,7 @@ Two notes:
   is what lighting wants. The winding flip only affects facing/culling.
 - Edge case — negative-scale `TopLoc_Location`: `gp_Trsf` may carry a
   negative uniform scale (a mirror). The shim transforms positions and
-  normals with the full trsf (`step_mesh.cpp:131-147`) but does not flip
+  normals with the full trsf (`step_mesh.cpp:296-298`) but does not flip
   winding or normals for such faces, so a mirrored instance would render
   inside-out. Standard STEP
   placements (`AXIS2_PLACEMENT_3D`) are rotation+translation frames and never
@@ -176,7 +186,7 @@ planned Unity vertex struct:
   rule; the matching C# struct needs
   `[StructLayout(LayoutKind.Sequential)]` (`unity-mesh.md`).
 - Precision: positions/normals converted to f32 at extraction (shim already
-  casts positions, `step_mesh.cpp:133-135`). Same limit Unity itself has; the
+  casts positions, `step_mesh.cpp:288-290`). Same limit Unity itself has; the
   f64→f32 loss is the importer's only precision loss (gap G10 for huge
   models).
 
@@ -184,7 +194,7 @@ planned Unity vertex struct:
 
 - OCCT gives one `Poly_Triangulation` per face with 1-based node indices; the
   shim already concatenates faces into one global 0-based `u32` buffer
-  (`step_mesh.cpp:119-164`). Faces share **no** vertices (each face owns its
+  (`step_mesh.cpp` `mesh_fill`). Faces share **no** vertices (each face owns its
   node array; UV-seam nodes are duplicated by design), so concatenation is
   lossless.
 - Unity consumes one shared index buffer + `SubMeshDescriptor`s
@@ -194,11 +204,49 @@ planned Unity vertex struct:
 - `IndexFormat.UInt32` is mandatory: CAD tessellation regularly exceeds the
   16-bit limit (65,535 vertices; and the max index value itself is unusable
   on some GPUs). All counts in the Rust model/ABI are already `u32`.
-- Grouping (open decision, gap G5): Unity assigns materials per submesh, so
-  per-face grouping (one submesh per OCCT face) means one material slot per
-  face — unmanageable for complex parts. Recommended: one submesh per solid
-  for v1; keep per-face ranges in the core model so any grouping stays a
-  projection-time choice.
+- Grouping (gap G5, done): one submesh per `(solid_index, color_index)` pair,
+  in first-appearance order. The shim walks solids first and attributes each
+  face occurrence to its solid; faces outside any solid (open shells, sheet
+  bodies, loose faces) merge into one trailing group carrying the
+  `GREYHOUND_NO_SOLID` sentinel. The projection reorders the index buffer so
+  each group owns a contiguous range (Unity submesh descriptors need
+  contiguous slices); per-face ranges stay in the core model so any grouping
+  remains a projection-time choice.
+
+## Colors
+
+Verified against the OCCT 8.0.1 sources (`STEPCAFControl_Reader.cxx`,
+`XCAFPrs.cxx`, `STEPConstruct_Styles.cxx`):
+
+- Reading uses `STEPCAFControl_Reader` (ColorMode on by default) into an
+  `XCAFApp_Application` document; free shapes come from
+  `XCAFDoc_ShapeTool::GetFreeShapes`. Style/color lookup goes through
+  `XCAFPrs::CollectStyleSettings(label, loc, map)` per free-shape label — the
+  same function OCCT's own glTF/mesh exporters use.
+- `XCAFDoc_ColorTool::GetColor(label, type, …)` is a direct TreeNode lookup
+  with **no** upward inheritance. The resolution instead happens in
+  `CollectStyleSettings` top-down: recurse referred shapes (cumulative
+  locations), components, then the label's subshape labels and the label
+  itself; **later entries overwrite earlier ones**, so instance styles beat
+  referred-shape styles and SHUO beats instance. Per label, `fillStyleColors`
+  applies Gen (sets surf+curv defaults) then Surf/Curv overrides.
+- `STEPCAFControl_Reader::ReadColors` additionally propagates assembly-level
+  colors down to parts that have none, and applies root styles before leaf
+  styles so leaf (overriding) styles win.
+- Face colors are resolved by expanding each style key onto its located
+  faces (first-wins, mirroring `RWMesh_ShapeIterator::dispatchStyles`).
+- **Color space:** `STEPConstruct_Styles::DecodeColor` decodes STEP
+  `COLOUR_RGB` as sRGB (`Quantity_TOC_sRGB`, with >1.0 normalization);
+  `Quantity_Color` stores linear internally. The shim emits **sRGB** floats
+  via `Values(r, g, b, Quantity_TOC_sRGB)`; Unity converts material colors
+  sRGB→linear on upload in linear-color-space projects (verify visually in
+  the editor once).
+- Fallback for faces with no color anywhere: sRGB `0.72` gray.
+- Visibility (`XCAFPrs_Style::IsVisible`) is not consumed yet — hidden
+  entities still mesh (deferred).
+- C# side: one material per distinct submesh color (`Universal Render
+  Pipeline/Lit`, `_BaseColor`); the imported object is a GameObject root with
+  `MeshFilter` + `MeshRenderer` because a bare `Mesh` cannot hold materials.
 
 ## Bounds
 
@@ -243,18 +291,19 @@ Status: **shim** = exists in C++ shim today; **planned** = agreed next step;
 
 | # | Area | Status | Note |
 |---|---|---|---|
-| G1 | Normal extraction | done | Shim emits per-vertex unit normals (ABI v3): `BRepLib_ToolTriangulatedShape::ComputeNormals()` when `HasNormals()` is false, location transform, `TopAbs_REVERSED` negation — matching OCCT's own exporters (`RWMesh_FaceIterator::NormalTransformed` reverses the same way; stored normals follow surface-natural orientation, not the face flag). Empirically verified on `rod-clamp-16mm.stp`: 0/5580 vertex normals oppose their triangle winding with the negation, 4572/5580 without (`step_mesh.cpp:141-147`) |
+| G1 | Normal extraction | done | Shim emits per-vertex unit normals (ABI v3): `BRepLib_ToolTriangulatedShape::ComputeNormals()` when `HasNormals()` is false, location transform, `TopAbs_REVERSED` negation — matching OCCT's own exporters (`RWMesh_FaceIterator::NormalTransformed` reverses the same way; stored normals follow surface-natural orientation, not the face flag). Empirically verified on `rod-clamp-16mm.stp`: 0/5580 vertex normals oppose their triangle winding with the negation, 4572/5580 without (`step_mesh.cpp:296-298`) |
 | G2 | UVs | decided | Omit `TexCoord0` for v1 (24 B `[pos][normal]` layout). OCCT UVs are surface *parameters* (arbitrary ranges, per-face space, seam-duplicated), not normalized texture coords, and CAD STEP has no textures to map. Decided 2026-10-07; the shim never reads `UVNode`, the mesh model keeps its `uvs` field for a future texturing pass |
 | G3 | Core mesh model + per-face ranges | done | `crates/mesh` model validated at the ABI boundary; shim reports per-face counts (`greyhound_mesh_counts`/`greyhound_mesh_fill`, ABI v2); two-phase tuple return retired |
 | G4 | Unity projection | done | `crates/unity-projection` consumes the core model: permutes positions and normals (`(x, z, y)`), bakes the scale parameter into positions, swaps two indices per triangle, emits one submesh per face with `firstVertex`/`vertexCount` from the face ranges, maps the OCCT bbox to Unity bounds; all output types are `repr(C)` for the future C# blit (gap G11). Scalar loops only (`perf.md`) |
-| G5 | Submesh grouping | open | Per-face / per-solid / single. Recommend per-solid for v1 (material slots scale). The projection groups per-face today (identity with the core model's ranges); per-solid needs face→solid attribution from the shim — a future ABI addition |
+| G5 | Submesh grouping | done | One submesh per `(solid_index, color_index)` in first-appearance order; shim walks `TopExp_Explorer` solids first (occurrence semantics), non-solid faces merge into one `GREYHOUND_NO_SOLID` group (decided 2026-10-08). Shim emits per-face `(solid, color)` attribution (ABI v4); the projection reorders the index buffer so each group is contiguous. Non-solid policy: merge into one group; free-edge shells are not diagnosed yet |
 | G6 | Unit scale policy | open | Mechanism decided: bake into vertices, GameObject (1,1,1). The projection takes the factor as `ProjectionSettings` (default 0.001) and `step-stats --unity` uses the default; still open: default factor (0.001 vs 1.0) and import-setting configurability |
 | G7 | Vertex welding | deferred | Edge nodes are duplicated across faces; welding by (position, normal) pairs could cut memory but is unnecessary for correctness. Unity `Optimize*` methods are a cheaper post-step |
-| G8 | Assembly/instance hierarchy | deferred | `STEPControl_Reader.OneShape()` bakes everything into one compound with locations applied. Unity children-per-instance mapping needs the XCAF reader (`TKDESTEP` has it) — later |
+| G8 | Assembly/instance hierarchy | deferred | The XCAF reader is now in place (`STEPCAFControl_Reader`, free-shape labels); instance colors already flow through `XCAFPrs::CollectStyleSettings` locations. Unity children-per-instance mapping stays deferred |
 | G9 | Negative-scale locations | deferred | Defensive `det(trsf) < 0` winding flip; theoretical for STEP (see Winding section) |
 | G10 | f32 precision for huge models | deferred | Re-origination (subtract pivot before f32, restore via GameObject position) if parts far from origin show jitter |
-| G11 | C# buffer bridging | done | Pinned `T[]` P/Invoke: blittable `UnityVertex[]`/`uint[]`/`UnitySubMesh[]` pin for the duration of `mesh_fill`; `NativeArray` copy rejected for v1. Implemented in `package/com.greyhound.step/Runtime/NativeMethods.cs` |
+| G11 | C# buffer bridging | done | Pinned `T[]` P/Invoke: blittable `UnityVertex[]`/`uint[]`/`UnitySubMesh[]`/`uint[]`/`float[]` pin for the duration of `mesh_fill`; `NativeArray` copy rejected for v1. Implemented in `package/com.greyhound.step/Runtime/NativeMethods.cs` |
 | G12 | Progress/cancel, threading | deferred | `BRepMesh` supports `Message_ProgressRange`; unused today. Large assemblies tessellate for seconds |
+| G13 | Colors + materials | done | XCAF path in the shim (ABI v4): `STEPCAFControl_Reader` + `XCAFPrs::CollectStyleSettings` per free shape; per-face sRGB RGBA color table + `(solid, color)` attribution. C# builds one URP Lit material per distinct color, GameObject root carries `MeshRenderer`. Color space: shim emits sRGB; Unity converts on upload (verify visually). Visibility/`XCAFPrs_Style::IsVisible` not consumed (deferred); SHUO instance colors follow `CollectStyleSettings` but the instance-hierarchy split stays G8 |
 
 ## Verification checklist (once implemented)
 

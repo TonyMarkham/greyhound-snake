@@ -8,6 +8,7 @@ namespace Greyhound.Step
         public uint VertexCount;
         public uint IndexCount;
         public uint SubmeshCount;
+        public uint ColorCount;
         public UnityBounds Bounds;
     }
 }

@@ -82,6 +82,8 @@ fn build_native_shim() -> Result<(), Box<dyn std::error::Error>> {
         "TKMesh",
         "TKXSBase",
         "TKDESTEP",
+        "TKLCAF",
+        "TKXCAF",
     ];
     for toolkit in toolkits {
         let file = lib.join(format!("lib{toolkit}.so"));

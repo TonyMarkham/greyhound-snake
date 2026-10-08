@@ -19,8 +19,14 @@ type HostFreeFn = unsafe extern "C" fn(*mut c_void);
 type OpenStepFn = unsafe extern "C" fn(*mut c_void, *const c_char) -> *mut c_void;
 type CloseStepFn = unsafe extern "C" fn(*mut c_void);
 type MeshCountsFn = unsafe extern "C" fn(*mut c_void, f64, f64, f64, *mut HostMeshCounts) -> i32;
-type MeshFillFn =
-    unsafe extern "C" fn(*mut c_void, *mut UnityVertex, *mut u32, *mut UnitySubMesh) -> i32;
+type MeshFillFn = unsafe extern "C" fn(
+    *mut c_void,
+    *mut UnityVertex,
+    *mut u32,
+    *mut UnitySubMesh,
+    *mut u32,
+    *mut [f32; 4],
+) -> i32;
 
 fn workspace_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
@@ -92,7 +98,7 @@ fn given_real_occt_when_importing_through_the_host_abi_then_buffers_match_the_di
         let mesh_fill: Symbol<MeshFillFn> = library.get(b"greyhound_host_mesh_fill\0").unwrap();
 
         // when
-        assert_eq!(version(), 1);
+        assert_eq!(version(), 2);
         assert!(last_error().is_null());
 
         let host = host_new(c_string(&occt_dir).as_ptr(), c_string(&shim_path).as_ptr());
@@ -105,6 +111,7 @@ fn given_real_occt_when_importing_through_the_host_abi_then_buffers_match_the_di
             vertex_count: 0,
             index_count: 0,
             submesh_count: 0,
+            color_count: 0,
             bounds: UnityBounds {
                 min: [0.0; 3],
                 max: [0.0; 3],
@@ -129,12 +136,16 @@ fn given_real_occt_when_importing_through_the_host_abi_then_buffers_match_the_di
             };
             counts.submesh_count.try_into().unwrap()
         ];
+        let mut submesh_colors = vec![0u32; counts.submesh_count.try_into().unwrap()];
+        let mut colors = vec![[0.0f32; 4]; counts.color_count.try_into().unwrap()];
         assert_eq!(
             mesh_fill(
                 doc,
                 verts.as_mut_ptr(),
                 indices.as_mut_ptr(),
-                submeshes.as_mut_ptr()
+                submeshes.as_mut_ptr(),
+                submesh_colors.as_mut_ptr(),
+                colors.as_mut_ptr()
             ),
             0
         );
@@ -145,7 +156,8 @@ fn given_real_occt_when_importing_through_the_host_abi_then_buffers_match_the_di
         // then
         assert_eq!(counts.vertex_count, 1744);
         assert_eq!(counts.index_count, 5580);
-        assert_eq!(counts.submesh_count, 26);
+        assert_eq!(counts.submesh_count, 1);
+        assert_eq!(counts.color_count, 1);
         assert!((counts.bounds.min[0] - -0.010).abs() < 1e-6);
         assert!(counts.bounds.min[1] < 0.0 && counts.bounds.min[1] > -0.001);
         assert!((counts.bounds.min[2] - -0.025).abs() < 1e-6);
@@ -170,6 +182,8 @@ fn given_real_occt_when_importing_through_the_host_abi_then_buffers_match_the_di
         assert_eq!(verts, projected.vertices());
         assert_eq!(indices, projected.indices());
         assert_eq!(submeshes, projected.submeshes());
+        assert_eq!(submesh_colors, projected.submesh_colors());
+        assert_eq!(colors, projected.colors());
     }
 }
 
@@ -222,12 +236,16 @@ fn given_host_abi_when_calls_fail_then_status_and_error_report_the_cause() {
             first_vertex: 0,
             vertex_count: 0,
         }];
+        let mut submesh_colors = vec![0u32; 1];
+        let mut colors = vec![[0.0f32; 4]; 1];
         assert_eq!(
             mesh_fill(
                 doc,
                 verts.as_mut_ptr(),
                 indices.as_mut_ptr(),
-                submeshes.as_mut_ptr()
+                submeshes.as_mut_ptr(),
+                submesh_colors.as_mut_ptr(),
+                colors.as_mut_ptr()
             ),
             1
         );

@@ -131,7 +131,7 @@ implementing.
   pos+normal stream, no `TexCoord0` for v1 (G2 decided: UVs omitted).
 - The Unity projection is scalar first; SIMD only if profiling shows it
   matters (`perf.md` revisit trigger).
-- Remaining open decisions (G5, G6) and deferred items are tracked
+- Remaining open decisions (G6) and deferred items are tracked
   in the `occt-to-unity.md` gap table — consult it before proposing mesh or
   projection work.
 

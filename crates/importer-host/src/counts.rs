@@ -6,5 +6,6 @@ pub struct HostMeshCounts {
     pub vertex_count: u32,
     pub index_count: u32,
     pub submesh_count: u32,
+    pub color_count: u32,
     pub bounds: UnityBounds,
 }

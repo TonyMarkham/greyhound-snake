@@ -1,14 +1,14 @@
 use crate::{FaceRange, Mesh, MeshBuilder};
 
-fn vertices() -> Vec<[f32; 3]> {
+pub(crate) fn vertices() -> Vec<[f32; 3]> {
     vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
 }
 
-fn triangles() -> Vec<[u32; 3]> {
+pub(crate) fn triangles() -> Vec<[u32; 3]> {
     vec![[0, 1, 2]]
 }
 
-fn faces() -> Vec<FaceRange> {
+pub(crate) fn faces() -> Vec<FaceRange> {
     vec![FaceRange {
         vertex_start: 0,
         vertex_count: 3,

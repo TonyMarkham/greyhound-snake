@@ -10,7 +10,7 @@ use std::{
     path::PathBuf,
 };
 
-const HOST_ABI_VERSION: u32 = 1;
+const HOST_ABI_VERSION: u32 = 2;
 
 fn path_from(pointer: *const c_char, what: &str) -> HostResult<PathBuf> {
     if pointer.is_null() {
@@ -143,17 +143,25 @@ pub extern "C" fn greyhound_host_mesh_fill(
     verts: *mut UnityVertex,
     indices: *mut u32,
     submeshes: *mut UnitySubMesh,
+    submesh_colors: *mut u32,
+    colors: *mut [f32; 4],
 ) -> i32 {
     guard(1, || {
         last_error::clear_error();
-        if doc.is_null() || verts.is_null() || indices.is_null() || submeshes.is_null() {
+        if doc.is_null()
+            || verts.is_null()
+            || indices.is_null()
+            || submeshes.is_null()
+            || submesh_colors.is_null()
+            || colors.is_null()
+        {
             last_error::set_error("mesh fill handle or output pointer is null");
             return 1;
         }
         // SAFETY: the document was created by greyhound_host_open_step and
         // stays alive for the duration of this call; this call takes the
         // fill-only mutable access.
-        let result = unsafe { (*doc).fill(verts, indices, submeshes) };
+        let result = unsafe { (*doc).fill(verts, indices, submeshes, submesh_colors, colors) };
         match result {
             Ok(()) => 0,
             Err(failure) => {

@@ -49,6 +49,8 @@ impl Doc {
                 .map_err(|_| HostError::host("index count exceeds the u32 ABI range"))?,
             submesh_count: u32::try_from(projected.submeshes().len())
                 .map_err(|_| HostError::host("submesh count exceeds the u32 ABI range"))?,
+            color_count: u32::try_from(projected.colors().len())
+                .map_err(|_| HostError::host("color count exceeds the u32 ABI range"))?,
             bounds: projected.bounds(),
         };
         self.mesh = Some(projected);
@@ -60,6 +62,8 @@ impl Doc {
         verts: *mut UnityVertex,
         indices: *mut u32,
         submeshes: *mut UnitySubMesh,
+        submesh_colors: *mut u32,
+        colors: *mut [f32; 4],
     ) -> HostResult<()> {
         let Some(mesh) = self.mesh.as_ref() else {
             return Err(HostError::host(
@@ -77,6 +81,12 @@ impl Doc {
                 submeshes,
                 mesh.submeshes().len(),
             );
+            std::ptr::copy_nonoverlapping(
+                mesh.submesh_colors().as_ptr(),
+                submesh_colors,
+                mesh.submesh_colors().len(),
+            );
+            std::ptr::copy_nonoverlapping(mesh.colors().as_ptr(), colors, mesh.colors().len());
         }
         Ok(())
     }

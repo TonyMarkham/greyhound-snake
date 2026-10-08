@@ -205,10 +205,10 @@ Unity importer or its UPM package.
 > assets/rod-clamp-16mm.stp        # validation asset
 > ```
 
-> `OCCT_PREFIX` in `.cargo/config.toml` must point at the repo-relative `dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64` — the install prefix from step 2 — and `OCCT_SHIM_DIR` at `dist/package/com.greyhound.step/Runtime/Plugins/shim/x86_64` (update the values if they differ). `build.rs` uses `include/opencascade` and `lib` under `OCCT_PREFIX`, compiles the three C++ shims as C++17, and links these nine toolkits:
+> `OCCT_PREFIX` in `.cargo/config.toml` must point at the repo-relative `dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64` — the install prefix from step 2 — and `OCCT_SHIM_DIR` at `dist/package/com.greyhound.step/Runtime/Plugins/shim/x86_64` (update the values if they differ). `build.rs` uses `include/opencascade` and `lib` under `OCCT_PREFIX`, compiles the three C++ shims as C++17, and links these eleven toolkits (the XCAF pair carry the color/assembly document layer):
 >
 > ```
-> TKernel TKMath TKGeomBase TKBRep TKPrim TKTopAlgo TKMesh TKXSBase TKDESTEP
+> TKernel TKMath TKGeomBase TKBRep TKPrim TKTopAlgo TKMesh TKXSBase TKDESTEP TKLCAF TKXCAF
 > ```
 >
 > It writes the shim to `dist/package/com.greyhound.step/Runtime/Plugins/shim/x86_64/libgreyhound_occt.so` — its own first-party plugins directory beside the third-party OCCT tree — with `RPATH=$ORIGIN`, using `--disable-new-dtags`. `$ORIGIN` means the directory of the ELF object carrying that path; the shim's real dependency resolution happens through the loader's explicit pre-dlopen below, so the split directories need no rpath setup. Nothing links the shim into a Rust binary. At runtime the loader reads `config.toml`, which points `library_dir` at `Runtime/Plugins/occt/x86_64/lib` and `shim_path` at the shim (values resolve relative to the config file's directory), preloads every OCCT library reachable through the shim's `DT_NEEDED` chain, and then opens the shim and resolves the C ABI symbols. This config-driven loading already matches the package layout; Unity still needs the managed Scripted Importer on top.

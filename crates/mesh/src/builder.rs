@@ -1,9 +1,11 @@
-use crate::{FaceRange, Mesh, MeshError, MeshResult};
+use crate::{FaceAttrib, FaceRange, Mesh, MeshError, MeshResult};
 
 pub(crate) type Parts = (
     Vec<[f32; 3]>,
     Vec<[u32; 3]>,
     Vec<FaceRange>,
+    Option<Vec<FaceAttrib>>,
+    Option<Vec<[f32; 4]>>,
     Option<Vec<[f32; 2]>>,
     Option<Vec<[f32; 3]>>,
 );
@@ -14,6 +16,8 @@ pub struct Builder {
     vertices: Option<Vec<[f32; 3]>>,
     triangles: Option<Vec<[u32; 3]>>,
     faces: Option<Vec<FaceRange>>,
+    face_attribs: Option<Vec<FaceAttrib>>,
+    colors: Option<Vec<[f32; 4]>>,
     uvs: Option<Vec<[f32; 2]>>,
     normals: Option<Vec<[f32; 3]>>,
 }
@@ -34,6 +38,16 @@ impl Builder {
         self
     }
 
+    pub fn with_face_attribs(mut self, face_attribs: Vec<FaceAttrib>) -> Self {
+        self.face_attribs = Some(face_attribs);
+        self
+    }
+
+    pub fn with_colors(mut self, colors: Vec<[f32; 4]>) -> Self {
+        self.colors = Some(colors);
+        self
+    }
+
     pub fn with_uvs(mut self, uvs: Vec<[f32; 2]>) -> Self {
         self.uvs = Some(uvs);
         self
@@ -49,11 +63,20 @@ impl Builder {
         let triangles = validate_triangles(self.triangles)?;
         let faces = validate_faces(self.faces, vertices.len(), triangles.len() * 3)?;
 
+        validate_face_attribs(&self.face_attribs, &self.colors, faces.len())?;
         validate_uvs(&self.uvs, vertices.len())?;
         validate_normals(&self.normals, vertices.len())?;
         validate_indices(&triangles, vertices.len())?;
 
-        Ok((vertices, triangles, faces, self.uvs, self.normals))
+        Ok((
+            vertices,
+            triangles,
+            faces,
+            self.face_attribs,
+            self.colors,
+            self.uvs,
+            self.normals,
+        ))
     }
 
     pub fn build(self) -> MeshResult<Mesh> {
@@ -148,6 +171,37 @@ fn validate_faces(
     }
 
     Ok(faces)
+}
+
+fn validate_face_attribs(
+    face_attribs: &Option<Vec<FaceAttrib>>,
+    colors: &Option<Vec<[f32; 4]>>,
+    face_count: usize,
+) -> MeshResult<()> {
+    let Some(face_attribs) = face_attribs else {
+        return Ok(());
+    };
+
+    if face_attribs.len() != face_count {
+        let count = face_attribs.len();
+        return Err(MeshError::mesh(format!(
+            "face attrib count {count} does not match {face_count} faces"
+        )));
+    }
+
+    let color_count = colors.as_ref().map_or(0, |colors| colors.len());
+    let color_count = u32::try_from(color_count)
+        .map_err(|_| MeshError::mesh("color count exceeds the u32 index range"))?;
+    for (face, attrib) in face_attribs.iter().enumerate() {
+        if attrib.color >= color_count {
+            return Err(MeshError::mesh(format!(
+                "face {face} references color {} of {color_count}",
+                attrib.color
+            )));
+        }
+    }
+
+    Ok(())
 }
 
 fn validate_uvs(uvs: &Option<Vec<[f32; 2]>>, vertex_count: usize) -> MeshResult<()> {

@@ -2,7 +2,7 @@ use crate::{
     OcctError, OcctResult, grey_box::GreyBbox, native_api::NativeApi, step_info::StepInfo,
 };
 
-use mesh::{FaceRange, Mesh, MeshBuilder};
+use mesh::{FaceAttrib, FaceRange, Mesh, MeshBuilder};
 
 use std::{
     ffi::{CString, c_void},
@@ -59,7 +59,7 @@ impl StepDoc {
     }
 
     pub fn mesh(&self, deflection: f64, angle_rad: f64) -> OcctResult<Mesh> {
-        let (mut nverts, mut nindices, mut nfaces) = (0, 0, 0);
+        let (mut nverts, mut nindices, mut nfaces, mut ncolors) = (0, 0, 0, 0);
         // SAFETY: valid handle and live count outputs; the operation finishes
         // meshing synchronously before returning the buffer sizes.
         let status = unsafe {
@@ -70,6 +70,7 @@ impl StepDoc {
                 &mut nverts,
                 &mut nindices,
                 &mut nfaces,
+                &mut ncolors,
             )
         };
         if status != 0 {
@@ -87,6 +88,9 @@ impl StepDoc {
             .ok()
             .and_then(|n| n.checked_mul(2))
             .ok_or_else(|| OcctError::step("face count buffer length overflow"))?;
+        let attrib_len = face_len;
+        let color_len =
+            usize::try_from(ncolors).map_err(|_| OcctError::step("color count overflow"))?;
 
         let mut vertices = Vec::<[f32; 3]>::new();
         vertices
@@ -109,6 +113,16 @@ impl StepDoc {
             .try_reserve_exact(face_len)
             .map_err(|error| OcctError::step(format!("face count allocation: {error}")))?;
         face_counts.resize(face_len, 0);
+        let mut face_attribs = Vec::<u32>::new();
+        face_attribs
+            .try_reserve_exact(attrib_len)
+            .map_err(|error| OcctError::step(format!("face attrib allocation: {error}")))?;
+        face_attribs.resize(attrib_len, 0);
+        let mut colors = Vec::<[f32; 4]>::new();
+        colors
+            .try_reserve_exact(color_len)
+            .map_err(|error| OcctError::step(format!("color allocation: {error}")))?;
+        colors.resize(color_len, [0.0; 4]);
 
         // SAFETY: buffers match the counts for this same document. No native
         // operation mutates it between counts and fill; ownership stays Rust's.
@@ -120,6 +134,8 @@ impl StepDoc {
                 normals.as_mut_ptr().cast::<f32>(),
                 triangles.as_mut_ptr().cast::<u32>(),
                 face_counts.as_mut_ptr(),
+                face_attribs.as_mut_ptr(),
+                colors.as_mut_ptr().cast::<f32>(),
             )
         };
         if status != 0 {
@@ -127,14 +143,24 @@ impl StepDoc {
         }
 
         let mut faces = Vec::with_capacity(face_len / 2);
+        let mut attribs = Vec::with_capacity(face_len / 2);
         let (mut vertex_start, mut index_start) = (0u32, 0u32);
-        for pair in face_counts.as_chunks::<2>().0 {
+        for (pair, attrib) in face_counts
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .zip(face_attribs.as_chunks::<2>().0)
+        {
             let (vertex_count, index_count) = (pair[0], pair[1]);
             faces.push(FaceRange {
                 vertex_start,
                 vertex_count,
                 index_start,
                 index_count,
+            });
+            attribs.push(FaceAttrib {
+                solid: attrib[0],
+                color: attrib[1],
             });
             vertex_start = vertex_start
                 .checked_add(vertex_count)
@@ -149,6 +175,8 @@ impl StepDoc {
             .with_normals(normals)
             .with_triangles(triangles)
             .with_faces(faces)
+            .with_face_attribs(attribs)
+            .with_colors(colors)
             .build()
             .map_err(|error| OcctError::step(format!("mesh build: {error}")))
     }

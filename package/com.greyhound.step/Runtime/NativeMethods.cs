@@ -10,7 +10,7 @@ namespace Greyhound.Step
     {
         private const string Library = "importer_host";
 
-        public const int AbiVersion = 1;
+        public const int AbiVersion = 2;
 
         public static string OcctLibraryDirectory()
         {
@@ -58,7 +58,9 @@ namespace Greyhound.Step
             IntPtr doc,
             UnityVertex[] vertices,
             uint[] indices,
-            UnitySubMesh[] submeshes);
+            UnitySubMesh[] submeshes,
+            uint[] submeshColors,
+            float[] colors);
 
         public static string TakeLastError()
         {

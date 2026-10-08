@@ -23,13 +23,15 @@ PACKAGE_NAME = "com.greyhound.step"
 
 EXPECTED_VERTEX_COUNT = 1744
 EXPECTED_INDEX_COUNT = 5580
-EXPECTED_SUBMESH_COUNT = 26
+EXPECTED_SUBMESH_COUNT = 1
+EXPECTED_COLOR_COUNT = 1
+EXPECTED_COLOR_SRGB = (0.976470577825, 0.678431390124, 0.121568629232)
 
 DEFLECTION = 0.01
 ANGLE_RAD = 0.5
 SCALE = 0.001
 
-HOST_ABI_VERSION = 1
+HOST_ABI_VERSION = 2
 
 
 class UnityBounds(ctypes.Structure):
@@ -41,6 +43,7 @@ class HostMeshCounts(ctypes.Structure):
         ("vertex_count", ctypes.c_uint32),
         ("index_count", ctypes.c_uint32),
         ("submesh_count", ctypes.c_uint32),
+        ("color_count", ctypes.c_uint32),
         ("bounds", UnityBounds),
     ]
 
@@ -115,6 +118,8 @@ def verify(package, asset):
         ctypes.POINTER(UnityVertex),
         ctypes.POINTER(ctypes.c_uint32),
         ctypes.POINTER(UnitySubMesh),
+        ctypes.POINTER(ctypes.c_uint32),
+        ctypes.POINTER(ctypes.c_float),
     ]
     lib.greyhound_host_close_step.argtypes = [ctypes.c_void_p]
     lib.greyhound_host_free.argtypes = [ctypes.c_void_p]
@@ -140,10 +145,12 @@ def verify(package, asset):
         counts.vertex_count != EXPECTED_VERTEX_COUNT
         or counts.index_count != EXPECTED_INDEX_COUNT
         or counts.submesh_count != EXPECTED_SUBMESH_COUNT
+        or counts.color_count != EXPECTED_COLOR_COUNT
     ):
         fail(
             f"unexpected counts: {counts.vertex_count} verts, "
-            f"{counts.index_count} indices, {counts.submesh_count} submeshes"
+            f"{counts.index_count} indices, {counts.submesh_count} submeshes, "
+            f"{counts.color_count} colors"
         )
     print(
         f"counts: {counts.vertex_count} verts, {counts.index_count} indices, "
@@ -157,13 +164,25 @@ def verify(package, asset):
     verts = (UnityVertex * counts.vertex_count)()
     indices = (ctypes.c_uint32 * counts.index_count)()
     submeshes = (UnitySubMesh * counts.submesh_count)()
-    status = lib.greyhound_host_mesh_fill(doc, verts, indices, submeshes)
+    submesh_colors = (ctypes.c_uint32 * counts.submesh_count)()
+    colors = (ctypes.c_float * (counts.color_count * 4))()
+    status = lib.greyhound_host_mesh_fill(doc, verts, indices, submeshes, submesh_colors, colors)
     if status != 0:
         fail(f"greyhound_host_mesh_fill: {lib.greyhound_host_last_error().decode()}")
 
     covered = sum(submesh.index_count for submesh in submeshes)
     if covered != counts.index_count:
         fail(f"submesh index ranges cover {covered} of {counts.index_count} indices")
+
+    if counts.submesh_count > 0 and counts.color_count > 0:
+        color_index = submesh_colors[0]
+        actual = tuple(colors[color_index * 4 + component] for component in range(3))
+        if any(abs(a - e) > 1e-3 for a, e in zip(actual, EXPECTED_COLOR_SRGB)):
+            fail(f"unexpected submesh color: {actual}, expected {EXPECTED_COLOR_SRGB}")
+        print(
+            f"colors: submesh 0 -> color {color_index} sRGB "
+            f"({actual[0]:.3f} {actual[1]:.3f} {actual[2]:.3f})"
+        )
 
     first = verts[0]
     magnitude = sum(component * component for component in first.normal) ** 0.5

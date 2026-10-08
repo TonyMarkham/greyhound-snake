@@ -24,9 +24,15 @@ namespace Greyhound.Step
 
         // The blittable element types keep these arrays pinned for the
         // duration of the native call; no explicit GCHandle is required.
-        public void MeshFill(UnityVertex[] vertices, uint[] indices, UnitySubMesh[] submeshes)
+        public void MeshFill(
+            UnityVertex[] vertices,
+            uint[] indices,
+            UnitySubMesh[] submeshes,
+            uint[] submeshColors,
+            float[] colors)
         {
-            int status = NativeMethods.MeshFill(handle, vertices, indices, submeshes);
+            int status = NativeMethods.MeshFill(
+                handle, vertices, indices, submeshes, submeshColors, colors);
             if (status != 0)
             {
                 throw new InvalidOperationException(NativeMethods.TakeLastError());
