@@ -43,7 +43,7 @@ Greyhound host ABI (Rust cdylib)                      [crates/importer-host]
   │  flat C ABI over occt-sys + the projection;
   │  two-phase counts/fill into C#-pinned buffers
   ▼
-C# blit → UnityEngine.Mesh                            [to be built]
+C# blit → UnityEngine.Mesh                            [package/com.greyhound.step]
      SetVertexBufferParams → SetVertexBufferData →
      SetIndexBufferParams → SetIndexBufferData →
      SetSubMeshes → RecalculateBounds
@@ -231,12 +231,10 @@ mesh.bounds = bounds; // mapped from GreyBbox
 
 - Flags policy: start with `Default` (Unity validates indices/ranges); move to
   `DontValidateIndices` once the projection is trusted.
-- Buffer bridging from Rust (open decision, gap G11): `SetVertexBufferData`
-  has no `IntPtr` overload — the source must be `T[]`, `List<T>` or
-  `NativeArray<T>`. Simplest correct path: declare the P/Invoke fill functions
-  with `float[]`/`uint[]` parameters; the marshaler pins the blittable array
-  for the call, and Rust writes directly into it (no extra copy). Revisit
-  `NativeArray`/Burst paths if import time ever matters.
+- Buffer bridging from Rust (gap G11, decided): blittable `UnityVertex[]`,
+  `uint[]` and `UnitySubMesh[]` P/Invoke parameters — the marshaler pins the
+  arrays for the call and Rust writes directly into them (no extra copy).
+  `NativeArray`/Burst paths remain a revisit-if-profiling-matters item.
 
 ## Gaps
 
@@ -255,7 +253,7 @@ Status: **shim** = exists in C++ shim today; **planned** = agreed next step;
 | G8 | Assembly/instance hierarchy | deferred | `STEPControl_Reader.OneShape()` bakes everything into one compound with locations applied. Unity children-per-instance mapping needs the XCAF reader (`TKDESTEP` has it) — later |
 | G9 | Negative-scale locations | deferred | Defensive `det(trsf) < 0` winding flip; theoretical for STEP (see Winding section) |
 | G10 | f32 precision for huge models | deferred | Re-origination (subtract pivot before f32, restore via GameObject position) if parts far from origin show jitter |
-| G11 | C# buffer bridging | open | The host ABI (`crates/importer-host`) takes raw pointers sized by counts — the pinned `T[]` P/Invoke shape. Remaining: the C# marshaling form (pinned `T[]` recommended vs `NativeArray` copy), decided when the Unity package exists |
+| G11 | C# buffer bridging | done | Pinned `T[]` P/Invoke: blittable `UnityVertex[]`/`uint[]`/`UnitySubMesh[]` pin for the duration of `mesh_fill`; `NativeArray` copy rejected for v1. Implemented in `package/com.greyhound.step/Runtime/NativeMethods.cs` |
 | G12 | Progress/cancel, threading | deferred | `BRepMesh` supports `Message_ProgressRange`; unused today. Large assemblies tessellate for seconds |
 
 ## Verification checklist (once implemented)

@@ -30,6 +30,33 @@ this integration, not a finished Unity package.
 - Preserve existing user changes. Do not commit, stage, or discard changes
   unless explicitly requested.
 
+## Bite workflow (worktree prototype + guided implementation)
+
+Implement each bite (vertical slice) through the established loop:
+
+1. **Prototype in a worktree.** Create a detached worktree at HEAD
+   (`git worktree add --detach ../<repo>-<bite> HEAD`) with a `dist`
+   symlink to the main checkout's `dist`. Implement and validate there —
+   build, tests, recipes — without touching main repo source.
+2. **Write the implementation doc from the diff.** Capture the complete
+   diff (`git add -N` for untracked files, then `git diff`) and write a
+   bite doc in the repo root mechanically from it, in the guided-implement
+   skill's step formats: one atomic action per step (`Target`/`Intent`/
+   `Run Manually` or `Find`/`Replace With` with exact landmarks / `Why`),
+   each step ending with its `Stop after …` line. Verification steps carry
+   expected output. Steps the user already applied by hand go into a
+   verified "Current state" note instead of re-derived steps.
+3. **The user applies via the guided-implement skill** and commits. Under
+   that skill the agent never edits main repo source; it verifies each
+   applied step against the doc's landmarks and stops on mismatch. If the
+   user takes over direct application mid-bite (including agent-edited
+   fixes on request), main becomes the source of truth: keep all synced
+   copies consistent and say so explicitly.
+4. **Clean up on request.** Diff the worktree against committed main for
+   parity (main wins on the user's formatting choices; fix only real
+   omissions such as missing EOF newlines), then remove the `dist` symlink
+   and `git worktree remove --force`.
+
 ## Repository map
 
 - `occt-linux.md`, `occt-mac.md`, `occt-win.md`: user-facing OCCT build,
@@ -46,10 +73,12 @@ this integration, not a finished Unity package.
 - `dist/`: repo-local native distributions, including the fully assembled
   UPM package in `dist/package/`; currently gitignored.
 - `package/com.greyhound.step/`: tracked UPM package skeleton — authored
-  sources only (`package.json`, `Third Party Notices.md`; later the C#
-  code). `just assemble-package` stages it with the native payload into
-  `dist/package/com.greyhound.step/`; `just verify-package` checks the
-  staged package from a copied layout (`tools/verify-package.py`).
+  sources (`package.json`, `Third Party Notices.md`, and the C# code: the
+  `Runtime/` P/Invoke layer with struct mirrors, the `Editor/`
+  `ScriptedImporter`). `just assemble-package` stages it with the native
+  payload into `dist/package/com.greyhound.step/`; `just verify-package`
+  checks the staged package from a copied layout
+  (`tools/verify-package.py`).
 - `tmp/`: disposable OCCT source and build scaffolding; currently gitignored.
 - `assets/`: sample assets, including a STEP file.
 
@@ -102,7 +131,7 @@ implementing.
   pos+normal stream, no `TexCoord0` for v1 (G2 decided: UVs omitted).
 - The Unity projection is scalar first; SIMD only if profiling shows it
   matters (`perf.md` revisit trigger).
-- Remaining open decisions (G5, G6, G11) and deferred items are tracked
+- Remaining open decisions (G5, G6) and deferred items are tracked
   in the `occt-to-unity.md` gap table — consult it before proposing mesh or
   projection work.
 

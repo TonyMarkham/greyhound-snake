@@ -17,14 +17,12 @@ assemble-package:
         fi
     done
 
-    # Clear only the files this recipe owns. The OCCT install tree is a
-    # cmake artifact and must survive assembly.
-    rm -f "$package/package.json" "$package/Third Party Notices.md"
+    # Stage the authored skeleton sources wholesale; the OCCT install tree
+    # (cmake) and the shim (cargo build output) survive untouched.
     rm -f "$host/libimporter_host.so"
     mkdir -p "$shim" "$host"
 
-    cp package/com.greyhound.step/package.json "$package/package.json"
-    cp "package/com.greyhound.step/Third Party Notices.md" "$package/Third Party Notices.md"
+    cp -r package/com.greyhound.step/. "$package/"
 
     touch crates/occt-sys/build.rs
     cargo build --release -p importer-host

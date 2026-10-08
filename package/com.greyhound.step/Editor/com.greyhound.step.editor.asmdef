@@ -1,0 +1,10 @@
+{
+    "name": "com.greyhound.step.editor",
+    "rootNamespace": "Greyhound.Step",
+    "references": [
+        "com.greyhound.step.runtime"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ]
+}

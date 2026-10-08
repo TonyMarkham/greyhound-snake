@@ -1,0 +1,7 @@
+{
+    "name": "com.greyhound.step.runtime",
+    "rootNamespace": "Greyhound.Step",
+    "internalsVisibleTo": [
+        "com.greyhound.step.editor"
+    ]
+}
