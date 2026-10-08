@@ -39,6 +39,10 @@ Unity projection (Rust)                               [crates/unity-projection]
   │  • uniform scale (mm → m, import setting)
   │  • submesh grouping + interleaved vertex layout
   ▼
+Greyhound host ABI (Rust cdylib)                      [crates/importer-host]
+  │  flat C ABI over occt-sys + the projection;
+  │  two-phase counts/fill into C#-pinned buffers
+  ▼
 C# blit → UnityEngine.Mesh                            [to be built]
      SetVertexBufferParams → SetVertexBufferData →
      SetIndexBufferParams → SetIndexBufferData →
@@ -251,7 +255,7 @@ Status: **shim** = exists in C++ shim today; **planned** = agreed next step;
 | G8 | Assembly/instance hierarchy | deferred | `STEPControl_Reader.OneShape()` bakes everything into one compound with locations applied. Unity children-per-instance mapping needs the XCAF reader (`TKDESTEP` has it) — later |
 | G9 | Negative-scale locations | deferred | Defensive `det(trsf) < 0` winding flip; theoretical for STEP (see Winding section) |
 | G10 | f32 precision for huge models | deferred | Re-origination (subtract pivot before f32, restore via GameObject position) if parts far from origin show jitter |
-| G11 | C# buffer bridging | open | Pinned `T[]` P/Invoke (recommended) vs `NativeArray` copy — decide when the Unity package exists |
+| G11 | C# buffer bridging | open | The host ABI (`crates/importer-host`) takes raw pointers sized by counts — the pinned `T[]` P/Invoke shape. Remaining: the C# marshaling form (pinned `T[]` recommended vs `NativeArray` copy), decided when the Unity package exists |
 | G12 | Progress/cancel, threading | deferred | `BRepMesh` supports `Message_ProgressRange`; unused today. Large assemblies tessellate for seconds |
 
 ## Verification checklist (once implemented)

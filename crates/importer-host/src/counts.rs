@@ -1,0 +1,10 @@
+use unity_projection::UnityBounds;
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[repr(C)]
+pub struct HostMeshCounts {
+    pub vertex_count: u32,
+    pub index_count: u32,
+    pub submesh_count: u32,
+    pub bounds: UnityBounds,
+}

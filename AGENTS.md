@@ -36,6 +36,9 @@ this integration, not a finished Unity package.
   installation, validation, and distribution instructions.
 - `crates/occt-sys/`: Rust OCCT integration with C++ shims, including STEP
   loading, document information, and tessellation.
+- `crates/importer-host/`: Unity-facing cdylib — a flat, version-gated C ABI
+  (open STEP, two-phase mesh counts/fill) that loads OCCT via `occt-sys` and
+  emits projected Unity buffers.
 - `.cargo/config.toml`: currently points `OCCT_PREFIX` at the repo-local
   Linux installation in `dist/x86_64-linux`.
 - `dist/`: repo-local native distributions; currently gitignored.
@@ -77,6 +80,9 @@ implementing.
   layout) lives in a Rust Unity projection (gap G4 done) so the C# side is a
   pure blit. Blender later consumes the same core model through its own
   projection — never through Unity assumptions.
+- The Unity-facing surface is the `importer-host` cdylib: a flat,
+  version-gated C ABI (two-phase counts/fill into caller-provided buffers).
+  C# P/Invokes it and contains no OCCT or projection logic.
 - Coordinate map: `Unity = (x, z, y)` of OCCT (det −1; the non-mirroring
   map). The projection flips two indices per triangle as a consequence;
   normals are permuted but never negated. Never mirror by negating an axis.

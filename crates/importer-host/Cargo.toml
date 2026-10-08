@@ -1,0 +1,19 @@
+[package]
+name             = "importer-host"
+version          = { workspace = true }
+edition          = { workspace = true }
+
+[lib]
+crate-type       = ["cdylib", "rlib"]
+
+[dependencies]
+error-location   = { workspace = true }
+occt-sys         = { workspace = true }
+unity-projection = { workspace = true }
+thiserror        = { workspace = true }
+
+[dev-dependencies]
+libloading       = { workspace = true }
+
+[lints]
+workspace        = true
