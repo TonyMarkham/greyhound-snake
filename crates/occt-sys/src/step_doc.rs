@@ -3,7 +3,7 @@ use crate::{
     step_info::StepInfo,
 };
 
-use mesh::{FaceAttrib, FaceRange, Mesh, MeshBuilder, Node, Scene as NodeScene};
+use mesh::{FaceAttrib, FaceRange, Mesh, MeshBuilder, MeshProperties, Node, Scene as NodeScene};
 
 use std::{
     ffi::{CString, c_char, c_void},
@@ -157,6 +157,31 @@ impl StepDoc {
         }
 
         Ok(Scene::new(forest, built_meshes))
+    }
+
+    /// The exact BRep mass properties of one unique mesh (local frame,
+    /// density-free; see `MeshProperties`).
+    pub fn mesh_properties(&self, mesh: u32) -> OcctResult<MeshProperties> {
+        let mut out = [0.0f64; 17];
+        // SAFETY: valid handle, live flat output buffer matching the ABI
+        // header's documented 17-double layout.
+        let status = unsafe {
+            (self.api.mesh_properties)(self.handle.as_ptr(), mesh, 0.0, out.as_mut_ptr())
+        };
+        if status != 0 {
+            return Err(self.api.native_error("mesh properties"));
+        }
+        Ok(MeshProperties {
+            volume_mm3: out[0],
+            centre_of_gravity: [out[1], out[2], out[3]],
+            principal_axes: [
+                [out[4], out[5], out[6]],
+                [out[7], out[8], out[9]],
+                [out[10], out[11], out[12]],
+            ],
+            principal_moments: [out[13], out[14], out[15]],
+            file_density: out[16],
+        })
     }
 
     fn mesh_at(

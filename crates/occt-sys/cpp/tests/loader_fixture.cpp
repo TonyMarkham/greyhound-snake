@@ -18,7 +18,7 @@ extern "C" uint32_t greyhound_abi_version() noexcept {
 #ifdef FIXTURE_BAD_ABI
   return 42;
 #else
-  return 5;
+  return 6;
 #endif
 }
 extern "C" const char* greyhound_last_error() noexcept { return error_text; }
@@ -71,6 +71,22 @@ extern "C" int32_t greyhound_scene_fill(
 extern "C" int32_t greyhound_color_fill(void* doc, float* colors) noexcept {
   if (!doc || !colors) return 1;
   colors[0] = 0.72f; colors[1] = 0.72f; colors[2] = 0.72f; colors[3] = 1.0f;
+  return 0;
+}
+extern "C" int32_t greyhound_mesh_properties(
+    void* doc, uint32_t mesh, double, double* out) noexcept {
+  if (!doc || mesh != 0 || !out) return 1;
+  // A 2x1x1 box (mm3 volume 2) centred at the origin: principal axes are
+  // the world axes; gyration radii follow from the box formulas.
+  out[0] = 2.0;
+  out[1] = 0.0; out[2] = 0.0; out[3] = 0.0;
+  out[4] = 0.0; out[5] = 0.0; out[6] = 1.0;
+  out[7] = 1.0; out[8] = 0.0; out[9] = 0.0;
+  out[10] = 0.0; out[11] = 1.0; out[12] = 0.0;
+  out[13] = 0.4166666666666667;  // mass-1 moment about the first axis
+  out[14] = 0.8333333333333334;
+  out[15] = 0.8333333333333334;
+  out[16] = 0.0;
   return 0;
 }
 extern "C" int32_t greyhound_mesh_counts(

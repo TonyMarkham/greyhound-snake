@@ -1,6 +1,7 @@
 mod bounds;
 mod error;
 mod project;
+mod properties;
 mod settings;
 mod sub_mesh;
 mod unity_bounds;
@@ -18,6 +19,7 @@ mod tests;
 pub use bounds::OcctBounds;
 pub use error::{Error as ProjectionError, result::Result as ProjectionResult};
 pub use project::{project, project_scene};
+pub use properties::{UnityPartProperties, project_properties};
 pub use settings::ProjectionSettings;
 pub use sub_mesh::UnitySubMesh;
 pub use unity_bounds::UnityBounds;

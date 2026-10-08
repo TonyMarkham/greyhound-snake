@@ -49,6 +49,20 @@ GREYHOUND_API int32_t greyhound_color_fill(void* doc, float* colors) noexcept;
 // nindices accumulate faces in the walk order (faces without triangulation
 // are skipped); nfaces counts the walked faces.
 GREYHOUND_API int32_t greyhound_mesh_counts(void* doc, uint32_t mesh, double deflection, double angle_rad, uint32_t* nverts, uint32_t* nindices, uint32_t* nfaces) noexcept;
+// out holds 17 double values for the mesh's exact BRep mass properties,
+// computed by BRepGProp::VolumeProperties on the mesh's own shape (local
+// frame, OCCT units):
+//   [0]    volume in mm3 (the density-1 integral; mass = volume * density)
+//   [1..3] centre of gravity in the mesh's local frame (mm)
+//   [4..12] the three principal axes of inertia as unit direction vectors,
+//          row-major (axes[0..2] = first axis, ...), local frame
+//   [13..15] the principal moments matched to those axes (mm5 at density
+//          1; inertia = moment * density)
+//   [16]   the density the STEP file carries for this shape's material
+//          (0.0 when the file carries none; units are the file's context)
+// default_density is unused by the shim today (kept for ABI stability);
+// consumers apply file_density > 0 ? file_density : default_density.
+GREYHOUND_API int32_t greyhound_mesh_properties(void* doc, uint32_t mesh, double default_density, double* out) noexcept;
 // Buffers must match the last successful mesh_counts call for this mesh.
 // face_counts holds 2 * nfaces uint32_t values: [vertex_count, index_count]
 // pairs, in the same face walk order as the vertex and index buffers.

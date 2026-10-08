@@ -4,6 +4,7 @@ mod face_attrib;
 mod face_range;
 mod mesh;
 mod node;
+mod properties;
 mod scene;
 
 #[cfg(test)]
@@ -18,4 +19,5 @@ pub use face_attrib::FaceAttrib;
 pub use face_range::FaceRange;
 pub use mesh::Mesh;
 pub use node::Node;
+pub use properties::MeshProperties;
 pub use scene::Scene;

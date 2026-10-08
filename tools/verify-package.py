@@ -34,7 +34,7 @@ DEFLECTION = 0.01
 ANGLE_RAD = 0.5
 SCALE = 0.001
 
-HOST_ABI_VERSION = 3
+HOST_ABI_VERSION = 4
 
 NO_INDEX = 0xFFFFFFFF
 
@@ -49,6 +49,16 @@ class HostSceneCounts(ctypes.Structure):
         ("mesh_count", ctypes.c_uint32),
         ("color_count", ctypes.c_uint32),
         ("name_bytes", ctypes.c_uint32),
+    ]
+
+
+class HostMeshProperties(ctypes.Structure):
+    _fields_ = [
+        ("volume_mm3", ctypes.c_float),
+        ("file_density", ctypes.c_float),
+        ("centre_of_gravity", ctypes.c_float * 3),
+        ("gyration_radii", ctypes.c_float * 3),
+        ("principal_axes", ctypes.c_float * 9),
     ]
 
 
@@ -137,6 +147,12 @@ def verify(package, asset):
     lib.greyhound_host_color_fill.argtypes = [
         ctypes.c_void_p,
         ctypes.POINTER(ctypes.c_float),
+    ]
+    lib.greyhound_host_mesh_properties.restype = ctypes.c_int32
+    lib.greyhound_host_mesh_properties.argtypes = [
+        ctypes.c_void_p,
+        ctypes.c_uint32,
+        ctypes.POINTER(HostMeshProperties),
     ]
     lib.greyhound_host_mesh_counts.restype = ctypes.c_int32
     lib.greyhound_host_mesh_counts.argtypes = [
@@ -376,6 +392,53 @@ def verify(package, asset):
             f"unexpected mesh totals: {total_vertices} verts, {total_triangles} tris, "
             f"expected {EXPECTED_TOTAL_VERTICES} verts, {EXPECTED_TOTAL_TRIANGLES} tris"
         )
+
+    # Exact BRep mass properties per unique mesh: orthonormal principal
+    # axes, positive matched moments (mass-free gyration radii), the
+    # measured cart volume and local centre of gravity, and no file
+    # density (this file carries no materials).
+    for mesh_index in range(scene.mesh_count):
+        props = HostMeshProperties()
+        status = lib.greyhound_host_mesh_properties(doc, mesh_index, ctypes.byref(props))
+        if status != 0:
+            fail(
+                f"greyhound_host_mesh_properties({mesh_index}): "
+                f"{lib.greyhound_host_last_error().decode()}"
+            )
+        if props.volume_mm3 <= 0 or props.file_density != 0.0:
+            fail(f"mesh {mesh_index}: volume {props.volume_mm3}, file density {props.file_density}")
+        axes = [props.principal_axes[i * 3 : (i + 1) * 3] for i in range(3)]
+        for row in range(3):
+            norm = sum(v * v for v in axes[row]) ** 0.5
+            if abs(norm - 1.0) > 1e-4:
+                fail(f"mesh {mesh_index} principal axis {row} is not unit: {norm}")
+        for a in range(3):
+            for b in range(a + 1, 3):
+                dot = sum(axes[a][k] * axes[b][k] for k in range(3))
+                if abs(dot) > 1e-4:
+                    fail(f"mesh {mesh_index} principal axes {a}/{b} not orthogonal: {dot}")
+        for radius in props.gyration_radii:
+            if radius <= 0:
+                fail(f"mesh {mesh_index} has non-positive gyration radius {radius}")
+
+    expected = HostMeshProperties()
+    status = lib.greyhound_host_mesh_properties(doc, 0, ctypes.byref(expected))
+    if status != 0:
+        fail(f"greyhound_host_mesh_properties(0): {lib.greyhound_host_last_error().decode()}")
+    # Measured on cart-asy (BRepGProp): volume 53605.588 mm3, local centre
+    # of gravity OCCT (16.9977, 62.9348, -0.2281) -> Unity (x, z, y) * 0.001.
+    if abs(expected.volume_mm3 - 53605.588) > 0.5:
+        fail(f"unexpected cart volume {expected.volume_mm3}")
+    expected_com = (0.0169977, -0.0002281, 0.0629348)
+    actual_com = tuple(expected.centre_of_gravity)
+    if any(abs(a - e) > 1e-4 for a, e in zip(actual_com, expected_com)):
+        fail(f"unexpected cart centre of gravity {actual_com}, expected {expected_com}")
+    print(
+        f"properties: cart volume {expected.volume_mm3:.3f} mm3, "
+        f"com ({actual_com[0]:.5f} {actual_com[1]:.5f} {actual_com[2]:.5f}) m, "
+        f"gyration ({expected.gyration_radii[0]:.2f} {expected.gyration_radii[1]:.2f} "
+        f"{expected.gyration_radii[2]:.2f}) mm, file density {expected.file_density}"
+    )
 
     lib.greyhound_host_close_step(doc)
     lib.greyhound_host_free(host)

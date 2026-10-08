@@ -10,7 +10,7 @@ namespace Greyhound.Step
     {
         private const string Library = "importer_host";
 
-        public const int AbiVersion = 3;
+        public const int AbiVersion = 4;
 
         public static string OcctLibraryDirectory()
         {
@@ -62,6 +62,9 @@ namespace Greyhound.Step
 
         [DllImport(Library, EntryPoint = "greyhound_host_color_fill", ExactSpelling = true)]
         public static extern int ColorFill(IntPtr doc, float[] colors);
+
+        [DllImport(Library, EntryPoint = "greyhound_host_mesh_properties", ExactSpelling = true)]
+        public static extern int MeshProperties(IntPtr doc, uint mesh, out HostMeshProperties properties);
 
         [DllImport(Library, EntryPoint = "greyhound_host_mesh_counts", ExactSpelling = true)]
         public static extern int MeshCounts(IntPtr doc, uint mesh, out HostMeshCounts counts);

@@ -6,7 +6,11 @@
 #include <XCAFDoc_ShapeTool.hxx>
 #include <XCAFPrs.hxx>
 #include <XCAFPrs_Style.hxx>
+#include <XCAFDoc_MaterialTool.hxx>
 #include <TDataStd_Name.hxx>
+#include <BRepGProp.hxx>
+#include <GProp_GProps.hxx>
+#include <GProp_PrincipalProps.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
 #include <BRep_Tool.hxx>
 #include <BRepBndLib.hxx>
@@ -24,6 +28,8 @@
 #include <Quantity_ColorRGBA.hxx>
 #include <gp_Pnt.hxx>
 #include <gp_Dir.hxx>
+#include <gp_Ax1.hxx>
+#include <gp_Vec.hxx>
 #include "native_guard.h"
 #include <cmath>
 #include <cstring>
@@ -49,6 +55,10 @@ struct FacePlanEntry {
 // in its own frame; instance placements live on nodes, not here.
 struct GreyMesh {
   TopoDS_Shape shape;
+  // Density the STEP file carries for this shape's material (0.0 when the
+  // file carries none); captured at walk time because the XCAF document
+  // closes right after it.
+  double file_density;
   // Located face -> global color palette index; entries exist for faces
   // with a resolved style, lookup fails for faces that then receive the
   // fallback color.
@@ -189,6 +199,7 @@ uint32_t mesh_for_label(GreyDoc& doc, const TDF_Label& label) {
   }
   GreyMesh mesh;
   mesh.shape = XCAFDoc_ShapeTool::GetShape(label);
+  mesh.file_density = XCAFDoc_MaterialTool::GetDensityForShape(label);
   resolve_face_colors(doc, label, mesh.face_color_indices);
   doc.meshes.push_back(std::move(mesh));
   const uint32_t index = static_cast<uint32_t>(doc.meshes.size() - 1);
@@ -443,6 +454,48 @@ extern "C" int32_t greyhound_color_fill(void* doc_in, float* colors) noexcept {
       *colors++ = static_cast<float>(b);
       *colors++ = static_cast<float>(color.Alpha());
     }
+    return 0;
+  });
+}
+
+extern "C" int32_t greyhound_mesh_properties(
+    void* doc_in, uint32_t mesh_index, double default_density,
+    double* out) noexcept {
+  return greyhound::guard<int32_t>(1, [&]() -> int32_t {
+    auto* doc = static_cast<GreyDoc*>(doc_in);
+    if (!doc || mesh_index >= doc->meshes.size() || !out) {
+      greyhound::set_error("invalid mesh properties handle or output pointer");
+      return 1;
+    }
+    (void)default_density;
+    const GreyMesh& mesh = doc->meshes[mesh_index];
+    GProp_GProps props;
+    BRepGProp::VolumeProperties(mesh.shape, props);
+    const GProp_PrincipalProps& principal = props.PrincipalProperties();
+    const gp_Pnt com = props.CentreOfMass();
+    const gp_Vec axes[3] = {principal.FirstAxisOfInertia(),
+                            principal.SecondAxisOfInertia(),
+                            principal.ThirdAxisOfInertia()};
+    // GProp_PrincipalProps does not guarantee which principal moment
+    // corresponds to which axis; resolve each axis against its own line
+    // through the centre of gravity.
+    double moments[3];
+    for (int i = 0; i < 3; ++i) {
+      moments[i] = props.MomentOfInertia(gp_Ax1(com, axes[i]));
+    }
+    out[0] = props.Mass();
+    out[1] = com.X();
+    out[2] = com.Y();
+    out[3] = com.Z();
+    for (int i = 0; i < 3; ++i) {
+      out[4 + 3 * i] = axes[i].X();
+      out[5 + 3 * i] = axes[i].Y();
+      out[6 + 3 * i] = axes[i].Z();
+    }
+    out[13] = moments[0];
+    out[14] = moments[1];
+    out[15] = moments[2];
+    out[16] = mesh.file_density;
     return 0;
   });
 }

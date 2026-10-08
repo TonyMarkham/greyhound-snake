@@ -274,6 +274,38 @@ Verified against the OCCT 8.0.1 sources (`STEPCAFControl_Reader.cxx`,
   side scan); per-submesh bounds are auto-computed by `SetSubMesh` unless
   `DontRecalculateBounds` is passed (`unity-mesh.md`).
 
+## Mass properties
+
+- Source: the exact BRep, not the tessellation — `BRepGProp::VolumeProperties`
+  gives volume, centre of gravity, and principal axes/moments; mesh-derived
+  properties would carry the deflection error into physics.
+- Density: `XCAFDoc_MaterialTool::GetDensityForShape(label)` returns the file's
+  material density and **0.0 when the file has none** — the shim therefore
+  reports density-free raw values and the policy `file > 0 ? file : parameter`
+  lives with the consumer (C# default 1.0 g/cm³).
+- Shim ABI v6 `greyhound_mesh_properties`: 17 doubles per unique mesh —
+  `[0]` volume (mm³), `[1..3]` local COM (mm), `[4..12]` principal axes
+  (row-major unit vectors, local frame), `[13..15]` moments **matched to those
+  axes** (mm⁵ at density 1), `[16]` file density (0.0 = none). A
+  `default_density` parameter is reserved for ABI stability but unused.
+- Ordering trap: `GProp_PrincipalProps::Moments()` order versus the
+  First/Second/Third axes is **not guaranteed** — the shim resolves each
+  axis's moment with `GProp_GProps::MomentOfInertia(gp_Ax1(com, axis))`.
+- Properties are computed during the scene walk (same dedup as meshes),
+  cached by the host, and served per mesh via host ABI v4
+  `greyhound_host_mesh_properties`.
+- Consumers derive: `mass = volume × density`, `gyration_i =
+  sqrt(moment_i / volume)`, `inertia_i = mass × gyration_i²`. C# converts
+  `volume_mm3 × density × 1e-6` → kg (g/cm³ × mm³ is dimensionally mg).
+- Projection: COM permutes and scales like a position (`(x, z, y)·s`), axes
+  conjugate like a rotation (`R' = M·R·M`), gyration radii are scale-invariant
+  in form (`sqrt(moment/volume)` — moment scales as length⁵, volume as
+  length³, so gyration scales with the length factor; the projection bakes
+  the scale into COM and moments and re-derives gyration).
+- Unity surface: `StepMassProperties` component per meshed node (mass in kg,
+  body-local COM, `inertiaTensor` + `inertiaTensorRotation` ready for
+  `Rigidbody`); the importer fills a `Rigidbody` only when the node has one.
+
 ## C# call sequence (planned)
 
 With the v1 layout (positions + normals, 24 B stride, UVs omitted):
@@ -319,6 +351,7 @@ Status: **shim** = exists in C++ shim today; **planned** = agreed next step;
 | G11 | C# buffer bridging | done | Pinned `T[]` P/Invoke: blittable `UnityVertex[]`/`uint[]`/`UnitySubMesh[]`/`uint[]`/`float[]` pin for the duration of `mesh_fill`; `NativeArray` copy rejected for v1. Implemented in `package/com.greyhound.step/Runtime/NativeMethods.cs` |
 | G12 | Progress/cancel, threading | deferred | `BRepMesh` supports `Message_ProgressRange`; unused today. Large assemblies tessellate for seconds |
 | G13 | Colors + materials | done | XCAF path in the shim (ABI v4): `STEPCAFControl_Reader` + `XCAFPrs::CollectStyleSettings`; per-face sRGB RGBA color table + `(solid, color)` attribution. ABI v5 moved the palette to scene scope (`greyhound_color_fill`); each `Mesh` still carries it for the mesh model's validation. C# builds one URP Lit material per palette entry and assigns per submesh through the mesh's `submesh_colors`. Color space: shim emits sRGB; Unity converts on upload (verify visually). Visibility/`XCAFPrs_Style::IsVisible` not consumed (deferred); SHUO instance colors follow `CollectStyleSettings` but per-instance overrides stay unresolved (G8 note) |
+| G14 | Mass properties | done | Exact-BRep mass properties per unique mesh (shim ABI v6): `BRepGProp::VolumeProperties` volume/COM/principal axes, each axis's moment resolved via `MomentOfInertia(gp_Ax1(com, axis))` because `GProp_PrincipalProps::Moments()` order is not guaranteed; density stays out of the shim (`GetDensityForShape` is 0.0 without a file material — the `file > 0 ? file : parameter` policy and the 1.0 g/cm³ default live in C#). Core model type `MeshProperties` in `crates/mesh` (density-free raw values, like Node/Scene); projection conjugates COM/axes into Unity space; host ABI v4 caches and serves per-mesh properties; `StepMassProperties` component fills `Rigidbody` when present |
 
 ## Verification checklist (once implemented)
 
@@ -340,6 +373,13 @@ Status: **shim** = exists in C++ shim today; **planned** = agreed next step;
    sum. Instance placement comes from the node transforms, not baked
    vertices: select a child and confirm localPosition/localRotation differ
    from identity.
+7. **Mass properties (G14):** import `assets/cart-asy.step`; every meshed
+   node gets a `StepMassProperties`; the cart part reads volume
+   ≈ 53,605.59 mm³, COM (0.0169977, −0.0002281, 0.0629348) m, gyration
+   (52.63, 50.33, 20.05) mm; adding a `Rigidbody` fills mass (density 1.0
+   g/cm³ → ≈ 0.0536 kg), body-local centre of mass, and the inertia tensor +
+   rotation; `inertiaTensorRotation * diag(inertiaTensor) * its inverse`
+   must reproduce the principal moments.
 
 ## References
 

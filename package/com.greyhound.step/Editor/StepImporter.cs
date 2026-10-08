@@ -19,6 +19,10 @@ namespace Greyhound.Step
 
         private const string UrpLitShaderName = "Universal Render Pipeline/Lit";
 
+        // Fallback density when the STEP file carries no material density
+        // (g/cm3); the file's own value wins when present.
+        private const double DefaultDensityGPerCm3 = 1.0;
+
         private const uint NoIndex = uint.MaxValue;
 
         private static readonly VertexAttributeDescriptor[] VertexLayout =
@@ -59,6 +63,7 @@ namespace Greyhound.Step
                 // reference the same asset.
                 Mesh[] meshes = new Mesh[sceneCounts.MeshCount];
                 uint[][] meshSubmeshColors = new uint[sceneCounts.MeshCount][];
+                var meshProperties = new System.Collections.Generic.List<HostMeshProperties>();
                 for (uint meshIndex = 0; meshIndex < sceneCounts.MeshCount; meshIndex++)
                 {
                     HostMeshCounts counts = doc.MeshCounts(meshIndex);
@@ -86,6 +91,7 @@ namespace Greyhound.Step
 
                     meshes[meshIndex] = mesh;
                     meshSubmeshColors[meshIndex] = submeshColors;
+                    meshProperties.Add(doc.MeshProperties(meshIndex));
                     ctx.AddObjectToAsset($"mesh{meshIndex}", mesh);
                 }
 
@@ -128,6 +134,11 @@ namespace Greyhound.Step
                         node.AddComponent<MeshFilter>().sharedMesh = meshes[meshIndex];
                         node.AddComponent<MeshRenderer>().sharedMaterials =
                             SubmeshMaterials(palette, meshSubmeshColors[meshIndex]);
+                        StepMassProperties.Create(node.transform, meshProperties[(int)meshIndex], DefaultDensityGPerCm3);
+                        if (node.TryGetComponent<Rigidbody>(out Rigidbody body))
+                        {
+                            node.GetComponent<StepMassProperties>().ApplyTo(body);
+                        }
                     }
                     nodeTransforms[i] = node.transform;
                 }

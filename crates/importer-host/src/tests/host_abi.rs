@@ -109,7 +109,7 @@ fn given_real_occt_when_importing_an_assembly_then_the_scene_matches_the_direct_
         let mesh_fill: Symbol<MeshFillFn> = library.get(b"greyhound_host_mesh_fill\0").unwrap();
 
         // when
-        assert_eq!(version(), 3);
+        assert_eq!(version(), 4);
         assert!(last_error().is_null());
 
         let host = host_new(c_string(&occt_dir).as_ptr(), c_string(&shim_path).as_ptr());

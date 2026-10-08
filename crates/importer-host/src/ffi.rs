@@ -1,6 +1,6 @@
 use crate::{
-    HostError, HostMeshCounts, HostResult, HostSceneCounts, doc::Doc, guard::guard, host::Host,
-    last_error,
+    HostError, HostMeshCounts, HostMeshProperties, HostResult, HostSceneCounts, doc::Doc,
+    guard::guard, host::Host, last_error,
 };
 
 use unity_projection::{UnitySubMesh, UnityVertex};
@@ -11,7 +11,7 @@ use std::{
     path::PathBuf,
 };
 
-const HOST_ABI_VERSION: u32 = 3;
+const HOST_ABI_VERSION: u32 = 4;
 
 fn path_from(pointer: *const c_char, what: &str) -> HostResult<PathBuf> {
     if pointer.is_null() {
@@ -179,6 +179,36 @@ pub extern "C" fn greyhound_host_color_fill(doc: *mut Doc, colors: *mut [f32; 4]
         let result = unsafe { (*doc).color_fill(colors) };
         match result {
             Ok(()) => 0,
+            Err(failure) => {
+                last_error::set_error(failure.to_string());
+                1
+            }
+        }
+    })
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn greyhound_host_mesh_properties(
+    doc: *mut Doc,
+    mesh: u32,
+    properties: *mut HostMeshProperties,
+) -> i32 {
+    guard(1, || {
+        last_error::clear_error();
+        if doc.is_null() || properties.is_null() {
+            last_error::set_error("mesh properties handle or output pointer is null");
+            return 1;
+        }
+        // SAFETY: the document was created by greyhound_host_open_step and
+        // stays alive for the duration of this call; this call takes the
+        // properties-only immutable access.
+        let result = unsafe { (*doc).mesh_properties(mesh) };
+        match result {
+            Ok(value) => {
+                // SAFETY: properties is a live, caller-provided output pointer.
+                unsafe { *properties = value };
+                0
+            }
             Err(failure) => {
                 last_error::set_error(failure.to_string());
                 1

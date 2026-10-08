@@ -64,8 +64,9 @@ Implement each bite (vertical slice) through the established loop:
 - `crates/occt-sys/`: Rust OCCT integration with C++ shims, including STEP
   loading, document information, and tessellation.
 - `crates/importer-host/`: Unity-facing cdylib — a flat, version-gated C ABI
-  (open STEP, scene counts/fill, color fill, per-mesh two-phase counts/fill)
-  that loads OCCT via `occt-sys` and emits projected Unity buffers.
+  (open STEP, scene counts/fill, color fill, per-mesh two-phase counts/fill,
+  per-mesh mass properties) that loads OCCT via `occt-sys` and emits
+  projected Unity buffers.
 - `.cargo/config.toml`: points `OCCT_PREFIX` at the OCCT install inside the
   package (`dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64`)
   and `OCCT_SHIM_DIR` at the shim's own plugins directory — OCCT installs
@@ -74,8 +75,9 @@ Implement each bite (vertical slice) through the established loop:
   UPM package in `dist/package/`; currently gitignored.
 - `package/com.greyhound.step/`: tracked UPM package skeleton — authored
   sources (`package.json`, `Third Party Notices.md`, and the C# code: the
-  `Runtime/` P/Invoke layer with struct mirrors, the `Editor/`
-  `ScriptedImporter`). `just assemble-package` stages it with the native
+  `Runtime/` P/Invoke layer with struct mirrors and the
+  `StepMassProperties` component, the `Editor/` `ScriptedImporter`).
+  `just assemble-package` stages it with the native
   payload into `dist/package/com.greyhound.step/`; `just verify-package`
   checks the staged package from a copied layout
   (`tools/verify-package.py`).
@@ -120,8 +122,8 @@ implementing.
 - The Unity-facing surface is the `importer-host` cdylib: a flat,
   version-gated C ABI (scene counts/fill for the assembly forest, one
   two-phase counts/fill pair per unique mesh, a palette fill into
-  caller-provided buffers). C# P/Invokes it and contains no OCCT or
-  projection logic.
+  caller-provided buffers, per-mesh exact-BRep mass properties). C#
+  P/Invokes it and contains no OCCT or projection logic.
 - Coordinate map: `Unity = (x, z, y)` of OCCT (det −1; the non-mirroring
   map). The projection flips two indices per triangle as a consequence;
   normals are permuted but never negated. Never mirror by negating an axis.

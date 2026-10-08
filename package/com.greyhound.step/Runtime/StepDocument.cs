@@ -42,6 +42,16 @@ namespace Greyhound.Step
             }
         }
 
+        public HostMeshProperties MeshProperties(uint mesh)
+        {
+            int status = NativeMethods.MeshProperties(handle, mesh, out var properties);
+            if (status != 0)
+            {
+                throw new InvalidOperationException(NativeMethods.TakeLastError());
+            }
+            return properties;
+        }
+
         public HostMeshCounts MeshCounts(uint mesh)
         {
             var counts = new HostMeshCounts();

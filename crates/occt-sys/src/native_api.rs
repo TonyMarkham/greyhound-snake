@@ -16,6 +16,7 @@ pub(crate) struct NativeApi {
     pub(crate) scene_fill:
         unsafe extern "C" fn(*mut c_void, *mut u32, *mut f32, *mut c_char) -> i32,
     pub(crate) color_fill: unsafe extern "C" fn(*mut c_void, *mut f32) -> i32,
+    pub(crate) mesh_properties: unsafe extern "C" fn(*mut c_void, u32, f64, *mut f64) -> i32,
     pub(crate) mesh_counts:
         unsafe extern "C" fn(*mut c_void, u32, f64, f64, *mut u32, *mut u32, *mut u32) -> i32,
     pub(crate) mesh_fill: unsafe extern "C" fn(
@@ -69,11 +70,11 @@ impl NativeApi {
 
         // SAFETY: library owns the resolved probe.
         let actual = unsafe { version() };
-        if actual != 5 {
-            return Err(OcctError::abi(&shim, 5, actual));
+        if actual != 6 {
+            return Err(OcctError::abi(&shim, 6, actual));
         }
 
-        // SAFETY: these signatures match ABI version 5. Nothing is published
+        // SAFETY: these signatures match ABI version 6. Nothing is published
         // until every lookup succeeds and the owning handles are stored.
         unsafe {
             Ok(Self {
@@ -83,6 +84,7 @@ impl NativeApi {
                 scene_counts: symbol(&library, &shim, b"greyhound_scene_counts\0")?,
                 scene_fill: symbol(&library, &shim, b"greyhound_scene_fill\0")?,
                 color_fill: symbol(&library, &shim, b"greyhound_color_fill\0")?,
+                mesh_properties: symbol(&library, &shim, b"greyhound_mesh_properties\0")?,
                 mesh_counts: symbol(&library, &shim, b"greyhound_mesh_counts\0")?,
                 mesh_fill: symbol(&library, &shim, b"greyhound_mesh_fill\0")?,
                 step_close: symbol(&library, &shim, b"greyhound_step_close\0")?,

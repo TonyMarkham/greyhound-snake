@@ -1,8 +1,11 @@
-use crate::{HostError, HostMeshCounts, HostResult, HostSceneCounts, host::Host};
+use crate::{
+    HostError, HostMeshCounts, HostMeshProperties, HostResult, HostSceneCounts, host::Host,
+};
 
 use occt_sys::step_doc::StepDoc;
 use unity_projection::{
-    ProjectionSettings, UnityMesh, UnityNode, UnitySubMesh, UnityVertex, project_scene,
+    ProjectionSettings, UnityMesh, UnityNode, UnitySubMesh, UnityVertex, project_properties,
+    project_scene,
 };
 
 use std::path::Path;
@@ -16,6 +19,7 @@ pub(crate) struct ProjectedScene {
     nodes: Vec<UnityNode>,
     names: Vec<u8>,
     meshes: Vec<UnityMesh>,
+    properties: Vec<HostMeshProperties>,
 }
 
 impl Doc {
@@ -45,6 +49,25 @@ impl Doc {
         let names = projected.names().to_vec();
         let meshes = projected.meshes().to_vec();
 
+        let mut properties = Vec::with_capacity(meshes.len());
+        for index in 0..meshes.len() {
+            let mesh_index = u32::try_from(index)
+                .map_err(|_| HostError::host("mesh index exceeds the u32 range"))?;
+            let occt_props = self
+                .doc
+                .mesh_properties(mesh_index)
+                .map_err(|error| HostError::host(format!("mesh properties: {error}")))?;
+            let projected = project_properties(&occt_props, ProjectionSettings { scale })
+                .map_err(|error| HostError::host(format!("property projection: {error}")))?;
+            properties.push(HostMeshProperties {
+                volume_mm3: projected.volume_mm3,
+                file_density: projected.file_density,
+                centre_of_gravity: projected.centre_of_gravity,
+                gyration_radii: projected.gyration_radii,
+                principal_axes: projected.principal_axes,
+            });
+        }
+
         let node_count = u32::try_from(nodes.len())
             .map_err(|_| HostError::host("node count exceeds the u32 ABI range"))?;
         let mesh_count = u32::try_from(meshes.len())
@@ -58,6 +81,7 @@ impl Doc {
             nodes,
             names,
             meshes,
+            properties,
         });
         Ok(HostSceneCounts {
             node_count,
@@ -115,6 +139,23 @@ impl Doc {
             std::ptr::copy_nonoverlapping(mesh.colors().as_ptr(), colors, mesh.colors().len());
         }
         Ok(())
+    }
+
+    pub(crate) fn mesh_properties(&self, mesh_index: u32) -> HostResult<HostMeshProperties> {
+        let scene = self.scene()?;
+        scene
+            .properties
+            .get(
+                usize::try_from(mesh_index)
+                    .map_err(|_| HostError::host("mesh index exceeds the address range"))?,
+            )
+            .copied()
+            .ok_or_else(|| {
+                HostError::host(format!(
+                    "mesh index {mesh_index} beyond the {} scene meshes",
+                    scene.properties.len()
+                ))
+            })
     }
 
     pub(crate) fn mesh_counts(&self, mesh_index: u32) -> HostResult<HostMeshCounts> {

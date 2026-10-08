@@ -14,7 +14,7 @@ void greyhound::set_error(const char* message) noexcept {
 }
 
 extern "C" uint32_t greyhound_abi_version() noexcept {
-  return 5;
+  return 6;
 }
 
 extern "C" const char* greyhound_last_error() noexcept {
