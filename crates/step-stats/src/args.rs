@@ -14,6 +14,9 @@ pub struct Args {
     /// Also project the tessellated mesh into Unity buffer layout
     #[arg(long)]
     pub unity: bool,
+    /// Also list the assembly forest node names
+    #[arg(long)]
+    pub names: bool,
     /// STEP file to inspect
     pub path: PathBuf,
 }

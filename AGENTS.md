@@ -64,8 +64,8 @@ Implement each bite (vertical slice) through the established loop:
 - `crates/occt-sys/`: Rust OCCT integration with C++ shims, including STEP
   loading, document information, and tessellation.
 - `crates/importer-host/`: Unity-facing cdylib — a flat, version-gated C ABI
-  (open STEP, two-phase mesh counts/fill) that loads OCCT via `occt-sys` and
-  emits projected Unity buffers.
+  (open STEP, scene counts/fill, color fill, per-mesh two-phase counts/fill)
+  that loads OCCT via `occt-sys` and emits projected Unity buffers.
 - `.cargo/config.toml`: points `OCCT_PREFIX` at the OCCT install inside the
   package (`dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64`)
   and `OCCT_SHIM_DIR` at the shim's own plugins directory — OCCT installs
@@ -80,7 +80,7 @@ Implement each bite (vertical slice) through the established loop:
   checks the staged package from a copied layout
   (`tools/verify-package.py`).
 - `tmp/`: disposable OCCT source and build scaffolding; currently gitignored.
-- `assets/`: sample assets, including a STEP file.
+- `assets/`: sample assets, including a single part and an assembly STEP file.
 
 Design reference docs (source of truth for their facts; consult before
 mesh/projection work instead of re-deriving):
@@ -118,8 +118,10 @@ implementing.
   pure blit. Blender later consumes the same core model through its own
   projection — never through Unity assumptions.
 - The Unity-facing surface is the `importer-host` cdylib: a flat,
-  version-gated C ABI (two-phase counts/fill into caller-provided buffers).
-  C# P/Invokes it and contains no OCCT or projection logic.
+  version-gated C ABI (scene counts/fill for the assembly forest, one
+  two-phase counts/fill pair per unique mesh, a palette fill into
+  caller-provided buffers). C# P/Invokes it and contains no OCCT or
+  projection logic.
 - Coordinate map: `Unity = (x, z, y)` of OCCT (det −1; the non-mirroring
   map). The projection flips two indices per triangle as a consequence;
   normals are permuted but never negated. Never mirror by negating an axis.

@@ -5,6 +5,7 @@ pub mod error;
 pub mod grey_box;
 mod native_api;
 pub mod occt;
+pub mod scene;
 pub mod step_doc;
 pub mod step_info;
 

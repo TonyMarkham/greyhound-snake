@@ -10,7 +10,7 @@ namespace Greyhound.Step
     {
         private const string Library = "importer_host";
 
-        public const int AbiVersion = 2;
+        public const int AbiVersion = 3;
 
         public static string OcctLibraryDirectory()
         {
@@ -45,22 +45,35 @@ namespace Greyhound.Step
         [DllImport(Library, EntryPoint = "greyhound_host_close_step", ExactSpelling = true)]
         public static extern void CloseStep(IntPtr doc);
 
-        [DllImport(Library, EntryPoint = "greyhound_host_mesh_counts", ExactSpelling = true)]
-        public static extern int MeshCounts(
+        [DllImport(Library, EntryPoint = "greyhound_host_scene_counts", ExactSpelling = true)]
+        public static extern int SceneCounts(
             IntPtr doc,
             double deflection,
             double angleRad,
             double scale,
-            out HostMeshCounts counts);
+            out HostSceneCounts counts);
+
+        [DllImport(Library, EntryPoint = "greyhound_host_scene_fill", ExactSpelling = true)]
+        public static extern int SceneFill(
+            IntPtr doc,
+            uint[] nodes,
+            float[] transforms,
+            byte[] names);
+
+        [DllImport(Library, EntryPoint = "greyhound_host_color_fill", ExactSpelling = true)]
+        public static extern int ColorFill(IntPtr doc, float[] colors);
+
+        [DllImport(Library, EntryPoint = "greyhound_host_mesh_counts", ExactSpelling = true)]
+        public static extern int MeshCounts(IntPtr doc, uint mesh, out HostMeshCounts counts);
 
         [DllImport(Library, EntryPoint = "greyhound_host_mesh_fill", ExactSpelling = true)]
         public static extern int MeshFill(
             IntPtr doc,
+            uint mesh,
             UnityVertex[] vertices,
             uint[] indices,
             UnitySubMesh[] submeshes,
-            uint[] submeshColors,
-            float[] colors);
+            uint[] submeshColors);
 
         public static string TakeLastError()
         {

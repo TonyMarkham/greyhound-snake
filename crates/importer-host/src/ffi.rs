@@ -1,5 +1,6 @@
 use crate::{
-    HostError, HostMeshCounts, HostResult, doc::Doc, guard::guard, host::Host, last_error,
+    HostError, HostMeshCounts, HostResult, HostSceneCounts, doc::Doc, guard::guard, host::Host,
+    last_error,
 };
 
 use unity_projection::{UnitySubMesh, UnityVertex};
@@ -10,7 +11,7 @@ use std::{
     path::PathBuf,
 };
 
-const HOST_ABI_VERSION: u32 = 2;
+const HOST_ABI_VERSION: u32 = 3;
 
 fn path_from(pointer: *const c_char, what: &str) -> HostResult<PathBuf> {
     if pointer.is_null() {
@@ -106,11 +107,90 @@ pub extern "C" fn greyhound_host_close_step(doc: *mut Doc) {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn greyhound_host_mesh_counts(
+pub extern "C" fn greyhound_host_scene_counts(
     doc: *mut Doc,
     deflection: f64,
     angle_rad: f64,
     scale: f64,
+    counts: *mut HostSceneCounts,
+) -> i32 {
+    guard(1, || {
+        last_error::clear_error();
+        if doc.is_null() || counts.is_null() {
+            last_error::set_error("scene counts handle or output pointer is null");
+            return 1;
+        }
+        // SAFETY: the document was created by greyhound_host_open_step and
+        // stays alive for the duration of this call; this call takes the
+        // counts-only mutable access.
+        let result = unsafe { (*doc).scene_counts(deflection, angle_rad, scale) };
+        match result {
+            Ok(value) => {
+                // SAFETY: counts is a live, caller-provided output pointer.
+                unsafe { *counts = value };
+                0
+            }
+            Err(failure) => {
+                last_error::set_error(failure.to_string());
+                1
+            }
+        }
+    })
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn greyhound_host_scene_fill(
+    doc: *mut Doc,
+    nodes: *mut u32,
+    transforms: *mut [f32; 12],
+    names: *mut u8,
+) -> i32 {
+    guard(1, || {
+        last_error::clear_error();
+        if doc.is_null() || nodes.is_null() || transforms.is_null() {
+            last_error::set_error("scene fill handle or output pointer is null");
+            return 1;
+        }
+        // SAFETY: the document was created by greyhound_host_open_step and
+        // stays alive for the duration of this call; this call takes the
+        // fill-only immutable access.
+        let result = unsafe { (*doc).scene_fill(nodes, transforms, names) };
+        match result {
+            Ok(()) => 0,
+            Err(failure) => {
+                last_error::set_error(failure.to_string());
+                1
+            }
+        }
+    })
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn greyhound_host_color_fill(doc: *mut Doc, colors: *mut [f32; 4]) -> i32 {
+    guard(1, || {
+        last_error::clear_error();
+        if doc.is_null() || colors.is_null() {
+            last_error::set_error("color fill handle or output pointer is null");
+            return 1;
+        }
+        // SAFETY: the document was created by greyhound_host_open_step and
+        // stays alive for the duration of this call; this call takes the
+        // fill-only immutable access.
+        let result = unsafe { (*doc).color_fill(colors) };
+        match result {
+            Ok(()) => 0,
+            Err(failure) => {
+                last_error::set_error(failure.to_string());
+                1
+            }
+        }
+    })
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn greyhound_host_mesh_counts(
+    doc: *mut Doc,
+    mesh: u32,
     counts: *mut HostMeshCounts,
 ) -> i32 {
     guard(1, || {
@@ -121,8 +201,8 @@ pub extern "C" fn greyhound_host_mesh_counts(
         }
         // SAFETY: the document was created by greyhound_host_open_step and
         // stays alive for the duration of this call; this call takes the
-        // counts-only mutable access.
-        let result = unsafe { (*doc).counts(deflection, angle_rad, scale) };
+        // counts-only immutable access.
+        let result = unsafe { (*doc).mesh_counts(mesh) };
         match result {
             Ok(value) => {
                 // SAFETY: counts is a live, caller-provided output pointer.
@@ -140,11 +220,11 @@ pub extern "C" fn greyhound_host_mesh_counts(
 #[unsafe(no_mangle)]
 pub extern "C" fn greyhound_host_mesh_fill(
     doc: *mut Doc,
+    mesh: u32,
     verts: *mut UnityVertex,
     indices: *mut u32,
     submeshes: *mut UnitySubMesh,
     submesh_colors: *mut u32,
-    colors: *mut [f32; 4],
 ) -> i32 {
     guard(1, || {
         last_error::clear_error();
@@ -153,15 +233,14 @@ pub extern "C" fn greyhound_host_mesh_fill(
             || indices.is_null()
             || submeshes.is_null()
             || submesh_colors.is_null()
-            || colors.is_null()
         {
             last_error::set_error("mesh fill handle or output pointer is null");
             return 1;
         }
         // SAFETY: the document was created by greyhound_host_open_step and
         // stays alive for the duration of this call; this call takes the
-        // fill-only mutable access.
-        let result = unsafe { (*doc).fill(verts, indices, submeshes, submesh_colors, colors) };
+        // fill-only immutable access.
+        let result = unsafe { (*doc).mesh_fill(mesh, verts, indices, submeshes, submesh_colors) };
         match result {
             Ok(()) => 0,
             Err(failure) => {

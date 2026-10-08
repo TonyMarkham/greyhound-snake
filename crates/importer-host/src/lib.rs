@@ -12,5 +12,5 @@ mod tests;
 
 // ---------------------------------------------------------------------------------------------- //
 
-pub use counts::HostMeshCounts;
+pub use counts::{HostMeshCounts, HostSceneCounts};
 pub use error::{Error as HostError, result::Result as HostResult};

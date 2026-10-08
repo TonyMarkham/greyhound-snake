@@ -18,7 +18,7 @@ extern "C" uint32_t greyhound_abi_version() noexcept {
 #ifdef FIXTURE_BAD_ABI
   return 42;
 #else
-  return 4;
+  return 5;
 #endif
 }
 extern "C" const char* greyhound_last_error() noexcept { return error_text; }
@@ -50,21 +50,43 @@ extern "C" int32_t greyhound_step_info(
   event("info");
   return 0;
 }
+extern "C" int32_t greyhound_scene_counts(
+    void* doc, uint32_t* nnodes, uint32_t* nmeshes, uint32_t* ncolors,
+    uint32_t* nname_bytes) noexcept {
+  if (!doc || !nnodes || !nmeshes || !ncolors || !nname_bytes) return 1;
+  *nnodes = 1;
+  *nmeshes = 1;
+  *ncolors = 1;
+  *nname_bytes = 0;
+  return 0;
+}
+extern "C" int32_t greyhound_scene_fill(
+    void* doc, uint32_t* nodes, float* transforms, char* names) noexcept {
+  if (!doc || !nodes || !transforms || !names) return 1;
+  nodes[0] = 0; nodes[1] = 0; nodes[2] = 0; nodes[3] = 0;
+  for (int i = 0; i < 12; ++i) transforms[i] = 0.0f;
+  transforms[0] = transforms[5] = transforms[10] = 1.0f;
+  return 0;
+}
+extern "C" int32_t greyhound_color_fill(void* doc, float* colors) noexcept {
+  if (!doc || !colors) return 1;
+  colors[0] = 0.72f; colors[1] = 0.72f; colors[2] = 0.72f; colors[3] = 1.0f;
+  return 0;
+}
 extern "C" int32_t greyhound_mesh_counts(
-    void* doc, double, double, uint32_t* nverts, uint32_t* nindices,
-    uint32_t* nfaces, uint32_t* ncolors) noexcept {
-  if (!doc || !nverts || !nindices || !nfaces || !ncolors) return 1;
+    void* doc, uint32_t mesh, double, double, uint32_t* nverts,
+    uint32_t* nindices, uint32_t* nfaces) noexcept {
+  if (!doc || mesh != 0 || !nverts || !nindices || !nfaces) return 1;
   *nverts = *nindices = 3;
   *nfaces = 1;
-  *ncolors = 1;
   return 0;
 }
 #ifndef FIXTURE_MISSING_FILL
 extern "C" int32_t greyhound_mesh_fill(
-    void* doc, float* verts, float* normals, uint32_t* indices,
-    uint32_t* face_counts, uint32_t* face_attribs, float* colors) noexcept {
-  if (!doc || !verts || !normals || !indices || !face_counts || !face_attribs ||
-      !colors) {
+    void* doc, uint32_t mesh, float* verts, float* normals, uint32_t* indices,
+    uint32_t* face_counts, uint32_t* face_attribs) noexcept {
+  if (!doc || mesh != 0 || !verts || !normals || !indices || !face_counts ||
+      !face_attribs) {
     return 1;
   }
   const float triangle[9] = {0, 0, 0, 1, 0, 0, 0, 1, 0};
@@ -76,7 +98,6 @@ extern "C" int32_t greyhound_mesh_fill(
   face_counts[1] = 3;
   face_attribs[0] = 0;
   face_attribs[1] = 0;
-  colors[0] = 0.72f; colors[1] = 0.72f; colors[2] = 0.72f; colors[3] = 1.0f;
   return 0;
 }
 #endif

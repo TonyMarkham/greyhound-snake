@@ -1,11 +1,12 @@
 use crate::{
-    OcctError, OcctResult, grey_box::GreyBbox, native_api::NativeApi, step_info::StepInfo,
+    OcctError, OcctResult, grey_box::GreyBbox, native_api::NativeApi, scene::Scene,
+    step_info::StepInfo,
 };
 
-use mesh::{FaceAttrib, FaceRange, Mesh, MeshBuilder};
+use mesh::{FaceAttrib, FaceRange, Mesh, MeshBuilder, Node, Scene as NodeScene};
 
 use std::{
-    ffi::{CString, c_void},
+    ffi::{CString, c_char, c_void},
     os::unix::ffi::OsStrExt,
     path::Path,
     ptr::NonNull,
@@ -58,19 +59,125 @@ impl StepDoc {
         })
     }
 
-    pub fn mesh(&self, deflection: f64, angle_rad: f64) -> OcctResult<Mesh> {
-        let (mut nverts, mut nindices, mut nfaces, mut ncolors) = (0, 0, 0, 0);
-        // SAFETY: valid handle and live count outputs; the operation finishes
-        // meshing synchronously before returning the buffer sizes.
+    /// Tessellates every unique mesh of the assembly forest and returns the
+    /// node hierarchy with the mesh and color payloads. Meshes are
+    /// deduplicated by the shim: repeated instances share one `Mesh`.
+    pub fn scene(&self, deflection: f64, angle_rad: f64) -> OcctResult<Scene> {
+        let (mut nodes, mut meshes, mut colors, mut name_bytes) = (0, 0, 0, 0);
+        // SAFETY: valid handle and live count outputs; the operation walks
+        // the XCAF assembly forest synchronously before returning sizes.
+        let status = unsafe {
+            (self.api.scene_counts)(
+                self.handle.as_ptr(),
+                &mut nodes,
+                &mut meshes,
+                &mut colors,
+                &mut name_bytes,
+            )
+        };
+        if status != 0 {
+            return Err(self.api.native_error("scene counts"));
+        }
+
+        let node_len =
+            usize::try_from(nodes).map_err(|_| OcctError::step("node count overflow"))?;
+        let mesh_len =
+            usize::try_from(meshes).map_err(|_| OcctError::step("mesh count overflow"))?;
+        let color_len =
+            usize::try_from(colors).map_err(|_| OcctError::step("color count overflow"))?;
+        let name_len =
+            usize::try_from(name_bytes).map_err(|_| OcctError::step("name length overflow"))?;
+
+        let mut node_buffer = Vec::<u32>::new();
+        node_buffer
+            .try_reserve_exact(node_len * 4)
+            .map_err(|error| OcctError::step(format!("node allocation: {error}")))?;
+        node_buffer.resize(node_len * 4, 0);
+        let mut transforms = Vec::<[f32; 12]>::new();
+        transforms
+            .try_reserve_exact(node_len)
+            .map_err(|error| OcctError::step(format!("transform allocation: {error}")))?;
+        transforms.resize(node_len, [0.0; 12]);
+        let mut names = Vec::<u8>::new();
+        names
+            .try_reserve_exact(name_len)
+            .map_err(|error| OcctError::step(format!("name allocation: {error}")))?;
+        names.resize(name_len, 0);
+        let mut palette = Vec::<[f32; 4]>::new();
+        palette
+            .try_reserve_exact(color_len)
+            .map_err(|error| OcctError::step(format!("color allocation: {error}")))?;
+        palette.resize(color_len, [0.0; 4]);
+
+        // SAFETY: buffers match the counts for this same document. No native
+        // operation mutates it between counts and fill; ownership stays Rust's.
+        // The typed element pointers are layout-identical to their flat forms.
+        let status = unsafe {
+            (self.api.scene_fill)(
+                self.handle.as_ptr(),
+                node_buffer.as_mut_ptr(),
+                transforms.as_mut_ptr().cast::<f32>(),
+                names.as_mut_ptr().cast::<c_char>(),
+            )
+        };
+        if status != 0 {
+            return Err(self.api.native_error("scene fill"));
+        }
+        // SAFETY: same ownership guarantees as the scene_fill call above.
+        let status = unsafe {
+            (self.api.color_fill)(self.handle.as_ptr(), palette.as_mut_ptr().cast::<f32>())
+        };
+        if status != 0 {
+            return Err(self.api.native_error("color fill"));
+        }
+
+        let mut forest_nodes = Vec::<Node>::with_capacity(node_len);
+        for (fields, transform) in node_buffer
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .zip(transforms.iter().copied())
+        {
+            forest_nodes.push(Node {
+                parent: fields[0],
+                mesh: fields[1],
+                name_offset: fields[2],
+                name_length: fields[3],
+                transform,
+            });
+        }
+        let forest = NodeScene::try_new(forest_nodes, meshes, names).map_err(|error| {
+            OcctError::step(format!("node forest rejected by the mesh model: {error}"))
+        })?;
+
+        let mut built_meshes = Vec::<Mesh>::with_capacity(mesh_len);
+        for index in 0..meshes {
+            let mesh = self.mesh_at(index, deflection, angle_rad, &palette)?;
+            built_meshes.push(mesh);
+        }
+
+        Ok(Scene::new(forest, built_meshes))
+    }
+
+    fn mesh_at(
+        &self,
+        mesh: u32,
+        deflection: f64,
+        angle_rad: f64,
+        colors: &[[f32; 4]],
+    ) -> OcctResult<Mesh> {
+        let (mut nverts, mut nindices, mut nfaces) = (0, 0, 0);
+        // SAFETY: valid handle and live count outputs; the operation
+        // finishes meshing synchronously before returning the buffer sizes.
         let status = unsafe {
             (self.api.mesh_counts)(
                 self.handle.as_ptr(),
+                mesh,
                 deflection,
                 angle_rad,
                 &mut nverts,
                 &mut nindices,
                 &mut nfaces,
-                &mut ncolors,
             )
         };
         if status != 0 {
@@ -89,8 +196,6 @@ impl StepDoc {
             .and_then(|n| n.checked_mul(2))
             .ok_or_else(|| OcctError::step("face count buffer length overflow"))?;
         let attrib_len = face_len;
-        let color_len =
-            usize::try_from(ncolors).map_err(|_| OcctError::step("color count overflow"))?;
 
         let mut vertices = Vec::<[f32; 3]>::new();
         vertices
@@ -118,11 +223,6 @@ impl StepDoc {
             .try_reserve_exact(attrib_len)
             .map_err(|error| OcctError::step(format!("face attrib allocation: {error}")))?;
         face_attribs.resize(attrib_len, 0);
-        let mut colors = Vec::<[f32; 4]>::new();
-        colors
-            .try_reserve_exact(color_len)
-            .map_err(|error| OcctError::step(format!("color allocation: {error}")))?;
-        colors.resize(color_len, [0.0; 4]);
 
         // SAFETY: buffers match the counts for this same document. No native
         // operation mutates it between counts and fill; ownership stays Rust's.
@@ -130,12 +230,12 @@ impl StepDoc {
         let status = unsafe {
             (self.api.mesh_fill)(
                 self.handle.as_ptr(),
+                mesh,
                 vertices.as_mut_ptr().cast::<f32>(),
                 normals.as_mut_ptr().cast::<f32>(),
                 triangles.as_mut_ptr().cast::<u32>(),
                 face_counts.as_mut_ptr(),
                 face_attribs.as_mut_ptr(),
-                colors.as_mut_ptr().cast::<f32>(),
             )
         };
         if status != 0 {
@@ -176,7 +276,7 @@ impl StepDoc {
             .with_triangles(triangles)
             .with_faces(faces)
             .with_face_attribs(attribs)
-            .with_colors(colors)
+            .with_colors(colors.to_vec())
             .build()
             .map_err(|error| OcctError::step(format!("mesh build: {error}")))
     }

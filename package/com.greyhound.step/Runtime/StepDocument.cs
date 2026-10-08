@@ -11,10 +11,10 @@ namespace Greyhound.Step
             this.handle = handle;
         }
 
-        public HostMeshCounts MeshCounts(double deflection, double angleRad, double scale)
+        public HostSceneCounts SceneCounts(double deflection, double angleRad, double scale)
         {
-            var counts = new HostMeshCounts();
-            int status = NativeMethods.MeshCounts(handle, deflection, angleRad, scale, out counts);
+            var counts = new HostSceneCounts();
+            int status = NativeMethods.SceneCounts(handle, deflection, angleRad, scale, out counts);
             if (status != 0)
             {
                 throw new InvalidOperationException(NativeMethods.TakeLastError());
@@ -24,15 +24,43 @@ namespace Greyhound.Step
 
         // The blittable element types keep these arrays pinned for the
         // duration of the native call; no explicit GCHandle is required.
+        public void SceneFill(uint[] nodes, float[] transforms, byte[] names)
+        {
+            int status = NativeMethods.SceneFill(handle, nodes, transforms, names);
+            if (status != 0)
+            {
+                throw new InvalidOperationException(NativeMethods.TakeLastError());
+            }
+        }
+
+        public void ColorFill(float[] colors)
+        {
+            int status = NativeMethods.ColorFill(handle, colors);
+            if (status != 0)
+            {
+                throw new InvalidOperationException(NativeMethods.TakeLastError());
+            }
+        }
+
+        public HostMeshCounts MeshCounts(uint mesh)
+        {
+            var counts = new HostMeshCounts();
+            int status = NativeMethods.MeshCounts(handle, mesh, out counts);
+            if (status != 0)
+            {
+                throw new InvalidOperationException(NativeMethods.TakeLastError());
+            }
+            return counts;
+        }
+
         public void MeshFill(
+            uint mesh,
             UnityVertex[] vertices,
             uint[] indices,
             UnitySubMesh[] submeshes,
-            uint[] submeshColors,
-            float[] colors)
+            uint[] submeshColors)
         {
-            int status = NativeMethods.MeshFill(
-                handle, vertices, indices, submeshes, submeshColors, colors);
+            int status = NativeMethods.MeshFill(handle, mesh, vertices, indices, submeshes, submeshColors);
             if (status != 0)
             {
                 throw new InvalidOperationException(NativeMethods.TakeLastError());

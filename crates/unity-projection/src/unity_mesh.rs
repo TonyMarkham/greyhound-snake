@@ -1,6 +1,6 @@
 use crate::{UnityBounds, UnitySubMesh, UnityVertex};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct UnityMesh {
     vertices: Vec<UnityVertex>,
     indices: Vec<u32>,

@@ -10,7 +10,8 @@ Both transformations sections below rest on conventions verified in those two
 docs; this document adds the derivation and the concrete rules. Current-state
 claims are checked against the actual code (`step_mesh.cpp`, `step_doc.rs`,
 `native_api.rs`). Written 2026-10-07; updated 2026-10-08 for the XCAF/colors
-bite (solid+color attribution, submesh grouping, G5/G13).
+bite (solid+color attribution, submesh grouping, G5/G13) and the assembly bite
+(scene forest, per-instance nodes, mesh dedup, G8).
 
 ## Pipeline overview
 
@@ -39,6 +40,13 @@ Greyhound core mesh model (Rust)                      [crates/mesh]
   │  OCCT coords (mm), all triangles outward-CCW
   │  in OCCT algebra
   ▼
+XCAF assembly walk → scene forest (per unique shape)  [shim]
+  │  nodes in depth-first pre-order: parent, mesh
+  │  ref, UTF-8 name, local 3x4 transform (accumulated
+  │  TopLoc_Location); referred simple shapes mesh once
+  │  (dedup across instances); geometry-free assembly
+  │  labels become grouping nodes
+  ▼
 Unity projection (Rust)                               [crates/unity-projection]
   │  • axis permutation (Z-up RH → Y-up LH)
   │  • winding flip (det −1 consequence)
@@ -46,17 +54,23 @@ Unity projection (Rust)                               [crates/unity-projection]
   │  • per-(solid, color) submesh grouping
   │    (index-buffer reorder) + color table +
   │    interleaved vertex layout
+  │  • per-node transform conjugation: rotation
+  │    M·R·M, translation s·M·t (Unity space, scale
+  │    baked); names pass through as a UTF-8 blob
   ▼
 Greyhound host ABI (Rust cdylib)                      [crates/importer-host]
   │  flat C ABI over occt-sys + the projection;
-  │  two-phase counts/fill into C#-pinned buffers
+  │  scene counts/fill + per-mesh two-phase
+  │  counts/fill + palette fill into C#-pinned buffers
   ▼
-C# blit → UnityEngine.Mesh + GameObject root          [package/com.greyhound.step]
-     SetVertexBufferParams → SetVertexBufferData →
-     SetIndexBufferParams → SetIndexBufferData →
-     SetSubMeshes → RecalculateBounds;
-     MeshFilter/MeshRenderer with one URP Lit
-     material per distinct submesh color
+C# blit → GameObject tree, one Mesh asset per         [package/com.greyhound.step]
+     unique mesh: SetVertexBufferParams → data →
+     SetIndexBufferParams → data → SetSubMeshes →
+     bounds; per-node GameObject with TRS decomposed
+     from the projected transform; MeshFilter
+     references the shared mesh, MeshRenderer assigns
+     one URP Lit material per palette color used by
+     the mesh's submeshes
 ```
 
 Layering rule: **OCCT knowledge stays in the shim; host knowledge stays in the
@@ -298,12 +312,12 @@ Status: **shim** = exists in C++ shim today; **planned** = agreed next step;
 | G5 | Submesh grouping | done | One submesh per `(solid_index, color_index)` in first-appearance order; shim walks `TopExp_Explorer` solids first (occurrence semantics), non-solid faces merge into one `GREYHOUND_NO_SOLID` group (decided 2026-10-08). Shim emits per-face `(solid, color)` attribution (ABI v4); the projection reorders the index buffer so each group is contiguous. Non-solid policy: merge into one group; free-edge shells are not diagnosed yet |
 | G6 | Unit scale policy | open | Mechanism decided: bake into vertices, GameObject (1,1,1). The projection takes the factor as `ProjectionSettings` (default 0.001) and `step-stats --unity` uses the default; still open: default factor (0.001 vs 1.0) and import-setting configurability |
 | G7 | Vertex welding | deferred | Edge nodes are duplicated across faces; welding by (position, normal) pairs could cut memory but is unnecessary for correctness. Unity `Optimize*` methods are a cheaper post-step |
-| G8 | Assembly/instance hierarchy | deferred | The XCAF reader is now in place (`STEPCAFControl_Reader`, free-shape labels); instance colors already flow through `XCAFPrs::CollectStyleSettings` locations. Unity children-per-instance mapping stays deferred |
+| G8 | Assembly/instance hierarchy | done | Shim ABI v5 scene walk: `GetFreeShapes` → recursive label walk following reference labels (`GetReferredShape`, `GetLocation`), depth-first pre-order nodes (parent, mesh ref, UTF-8 name from the reference label falling back to the referred label, accumulated-location 3×4 transform). Referred simple shapes mesh once — dedup across instances (`NCollection_IndexedMap` of labels); referred assemblies become geometry-free grouping nodes. Projection conjugates node transforms into Unity space (`R' = M·R·M`, `t' = s·M·t`; reflection reverses rotation sense — verified by composition in tests). C# decomposes each transform to TRS (column norms → localScale, normalized columns → localRotation; negative determinant flips `scale.x`, G9's defensive piece) and builds the GameObject tree. SHUO per-instance color overrides stay unresolved: colors resolve per unique referred label, so instances share the part's colors (this file has no SHUO; documented limitation) |
 | G9 | Negative-scale locations | deferred | Defensive `det(trsf) < 0` winding flip; theoretical for STEP (see Winding section) |
 | G10 | f32 precision for huge models | deferred | Re-origination (subtract pivot before f32, restore via GameObject position) if parts far from origin show jitter |
 | G11 | C# buffer bridging | done | Pinned `T[]` P/Invoke: blittable `UnityVertex[]`/`uint[]`/`UnitySubMesh[]`/`uint[]`/`float[]` pin for the duration of `mesh_fill`; `NativeArray` copy rejected for v1. Implemented in `package/com.greyhound.step/Runtime/NativeMethods.cs` |
 | G12 | Progress/cancel, threading | deferred | `BRepMesh` supports `Message_ProgressRange`; unused today. Large assemblies tessellate for seconds |
-| G13 | Colors + materials | done | XCAF path in the shim (ABI v4): `STEPCAFControl_Reader` + `XCAFPrs::CollectStyleSettings` per free shape; per-face sRGB RGBA color table + `(solid, color)` attribution. C# builds one URP Lit material per distinct color, GameObject root carries `MeshRenderer`. Color space: shim emits sRGB; Unity converts on upload (verify visually). Visibility/`XCAFPrs_Style::IsVisible` not consumed (deferred); SHUO instance colors follow `CollectStyleSettings` but the instance-hierarchy split stays G8 |
+| G13 | Colors + materials | done | XCAF path in the shim (ABI v4): `STEPCAFControl_Reader` + `XCAFPrs::CollectStyleSettings`; per-face sRGB RGBA color table + `(solid, color)` attribution. ABI v5 moved the palette to scene scope (`greyhound_color_fill`); each `Mesh` still carries it for the mesh model's validation. C# builds one URP Lit material per palette entry and assigns per submesh through the mesh's `submesh_colors`. Color space: shim emits sRGB; Unity converts on upload (verify visually). Visibility/`XCAFPrs_Style::IsVisible` not consumed (deferred); SHUO instance colors follow `CollectStyleSettings` but per-instance overrides stay unresolved (G8 note) |
 
 ## Verification checklist (once implemented)
 
@@ -316,13 +330,23 @@ Status: **shim** = exists in C++ shim today; **planned** = agreed next step;
    viewer from two opposite angles — must not be mirrored.
 5. **Submeshes:** counts/slices match the per-solid ranges emitted by the
    projection; materials assign per slot.
+6. **Hierarchy (G8):** import `assets/cart-asy.step`; the GameObject tree
+   mirrors the STEP assembly (root `cart-asy`, `Assembly` and bearing
+   sub-assemblies as grouping nodes, one child per instance with its NAUO
+   name); the two Pillow Block instances share one Mesh asset; the two
+   bearing sub-assemblies land in different places; total vertex count is
+   the unique-mesh sum (69,519 at deflection 0.01), not a per-occurrence
+   sum. Instance placement comes from the node transforms, not baked
+   vertices: select a child and confirm localPosition/localRotation differ
+   from identity.
 
 ## References
 
 - `occt-mesh.md`, `unity-mesh.md` — the two source docs for both sides.
 - `crates/occt-sys/cpp/step_mesh.cpp` — current shim (extraction state).
-- `crates/occt-sys/src/step_doc.rs`, `native_api.rs`, `grey_box.rs` —
-  current Rust ABI surface (two-phase mesh, f64 bbox).
+- `crates/occt-sys/src/step_doc.rs`, `native_api.rs`, `scene.rs`,
+  `grey_box.rs` — current Rust ABI surface (scene + per-mesh two-phase, f64
+  bbox).
 - Unity Manual *Mesh index data* (winding order):
   <https://docs.unity3d.com/6000.0/Documentation/Manual/mesh-index-data.html>
 - Unity Manual *Mesh data* index:

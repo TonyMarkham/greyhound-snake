@@ -1,6 +1,6 @@
 use crate::{
     OcctBounds, ProjectionError, ProjectionResult, ProjectionSettings, UnityBounds, UnityMesh,
-    UnitySubMesh, UnityVertex,
+    UnityNode, UnityScene, UnitySubMesh, UnityVertex,
 };
 
 use mesh::Mesh;
@@ -11,6 +11,112 @@ pub fn project(
     mesh: &Mesh,
     occt_bounds: OcctBounds,
     settings: ProjectionSettings,
+) -> ProjectionResult<UnityMesh> {
+    let bounds = UnityBounds {
+        min: [
+            (occt_bounds.min[0] * settings.scale) as f32,
+            (occt_bounds.min[2] * settings.scale) as f32,
+            (occt_bounds.min[1] * settings.scale) as f32,
+        ],
+        max: [
+            (occt_bounds.max[0] * settings.scale) as f32,
+            (occt_bounds.max[2] * settings.scale) as f32,
+            (occt_bounds.max[1] * settings.scale) as f32,
+        ],
+    };
+    assemble(mesh, settings, bounds)
+}
+
+/// Projects the whole assembly forest: every unique mesh once (bounds
+/// derived from the projected vertices), every node with its transform
+/// conjugated into Unity space.
+pub fn project_scene(
+    forest: &mesh::Scene,
+    meshes: &[Mesh],
+    settings: ProjectionSettings,
+) -> ProjectionResult<UnityScene> {
+    if !settings.scale.is_finite() || settings.scale <= 0.0 {
+        return Err(ProjectionError::projection(format!(
+            "scale {} must be finite and positive",
+            settings.scale
+        )));
+    }
+    if meshes.len() != usize::try_from(forest.mesh_count()).unwrap_or(usize::MAX) {
+        return Err(ProjectionError::projection(format!(
+            "{} meshes do not match the forest's mesh count {}",
+            meshes.len(),
+            forest.mesh_count()
+        )));
+    }
+    let mut projected_meshes = Vec::with_capacity(meshes.len());
+    for mesh in meshes {
+        let projected = assemble(
+            mesh,
+            settings,
+            UnityBounds {
+                min: [0.0; 3],
+                max: [0.0; 3],
+            },
+        )?;
+        let bounds = projected_vertex_bounds(projected.vertices());
+        let projected = assemble(mesh, settings, bounds)?;
+        projected_meshes.push(projected);
+    }
+    let mut nodes = Vec::with_capacity(forest.nodes().len());
+    for node in forest.nodes() {
+        nodes.push(UnityNode {
+            parent: node.parent,
+            mesh: node.mesh,
+            name_offset: node.name_offset,
+            name_length: node.name_length,
+            transform: project_transform(&node.transform, settings.scale),
+        });
+    }
+    Ok(UnityScene::new(
+        nodes,
+        projected_meshes,
+        forest.names().to_vec(),
+    ))
+}
+
+/// Conjugates a node transform (row-major 3x4, OCCT space) by the axis
+/// permutation `Unity = (x, z, y)` and bakes the scale into the translation.
+/// `Unity = M · occt` with M an involution, so the rotation becomes
+/// `M · R · M` and the translation `scale · M · t`; the rotation keeps any
+/// uniform scale factor carried by the source transform, which the C# side
+/// recovers through column norms during TRS decomposition.
+pub(crate) fn project_transform(transform: &[f32; 12], scale: f64) -> [f32; 12] {
+    // new row i reads old row sigma(i); sigma = (0, 2, 1).
+    const SIGMA: [usize; 3] = [0, 2, 1];
+    let mut projected = [0.0f32; 12];
+    for (row, source) in SIGMA.iter().enumerate() {
+        for (col, source_col) in SIGMA.iter().enumerate() {
+            projected[4 * row + col] = transform[4 * source + source_col];
+        }
+        projected[4 * row + 3] = (f64::from(transform[4 * source + 3]) * scale) as f32;
+    }
+    projected
+}
+
+fn projected_vertex_bounds(vertices: &[UnityVertex]) -> UnityBounds {
+    let mut min = [f32::MAX; 3];
+    let mut max = [f32::MIN; 3];
+    for vertex in vertices {
+        for axis in 0..3 {
+            min[axis] = min[axis].min(vertex.position[axis]);
+            max[axis] = max[axis].max(vertex.position[axis]);
+        }
+    }
+    if vertices.is_empty() {
+        (min, max) = ([0.0; 3], [0.0; 3]);
+    }
+    UnityBounds { min, max }
+}
+
+fn assemble(
+    mesh: &Mesh,
+    settings: ProjectionSettings,
+    bounds: UnityBounds,
 ) -> ProjectionResult<UnityMesh> {
     let scale = settings.scale;
     if !scale.is_finite() || scale <= 0.0 {
@@ -112,19 +218,6 @@ pub fn project(
         });
         submesh_colors.push(key.1);
     }
-
-    let bounds = UnityBounds {
-        min: [
-            (occt_bounds.min[0] * scale) as f32,
-            (occt_bounds.min[2] * scale) as f32,
-            (occt_bounds.min[1] * scale) as f32,
-        ],
-        max: [
-            (occt_bounds.max[0] * scale) as f32,
-            (occt_bounds.max[2] * scale) as f32,
-            (occt_bounds.max[1] * scale) as f32,
-        ],
-    };
 
     Ok(UnityMesh::new(
         vertices,
