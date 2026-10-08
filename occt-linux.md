@@ -98,7 +98,7 @@ Unity importer or its UPM package.
 > ```
 > cmake -S tmp/occt/OCCT -B tmp/occt/build -G Ninja \
 >       -DCMAKE_BUILD_TYPE=Release \
->       -DINSTALL_DIR="$PWD/dist/occt/x86_64-linux" \
+>       -DINSTALL_DIR="$PWD/dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64" \
 >       -DINSTALL_DIR_LAYOUT=Unix \
 >       -DINSTALL_DIR_WITH_VERSION=OFF \
 >       -DBUILD_LIBRARY_TYPE=Shared \
@@ -113,13 +113,13 @@ Unity importer or its UPM package.
 > - `-B tmp/occt/build` — build directory: where all intermediate output (object files, generated scripts) goes. Keeping it separate from the source means deleting it deletes the build and nothing else.
 > - `-G Ninja` — generate for the Ninja build system (`ninja-build` package); faster and quieter than `make`.
 > - `-DCMAKE_BUILD_TYPE=Release` — explicitly select an optimized build.
-> - `-DINSTALL_DIR="$PWD/dist/occt/x86_64-linux"` — OCCT's own name for the install prefix (same as `CMAKE_INSTALL_PREFIX`): where `cmake --install` puts the final files. Here: the repo's vendored dist.
+> - `-DINSTALL_DIR="$PWD/dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64"` — OCCT's own name for the install prefix (same as `CMAKE_INSTALL_PREFIX`): where `cmake --install` puts the final files. Here: **the OCCT directory inside the Unity package itself** — the install *is* the package payload; there is no separate dev install to keep in sync.
 > - `-DINSTALL_DIR_LAYOUT=Unix -DINSTALL_DIR_WITH_VERSION=OFF` — use the unversioned Unix directory layout expected by this guide and `build.rs`.
 > - `-DBUILD_LIBRARY_TYPE=Shared` — build the `.so` libraries to distribute with the importer.
 > - `-DBUILD_SHARED_LIBRARY_NAME_POSTFIX=""` — disable the separate postfix symlink rule, including when reusing a CMake cache.
 > - `-DBUILD_MODULE_Draw=OFF` — skip the DRAW test harness: DRAWEXE and draw.sh are not built, Tcl/Tk is not required, and the DRAW sample data and DrawResources are not installed. OCCT validation in this guide goes through section 3 instead.
 >
-> If you previously customized `INSTALL_DIR_LIB`, `INSTALL_DIR_INCLUDE`, or other install subdirectories in this build cache, reset those overrides to the layout below or use a fresh build directory.
+> If you previously customized `INSTALL_DIR_LIB`, `INSTALL_DIR_INCLUDE`, or other install subdirectories in this build cache, make them match the switches above or use a fresh build directory.
 >
 > **Build** — the actual compile; the 10–30 minute part:
 >
@@ -133,13 +133,13 @@ Unity importer or its UPM package.
 >
 > **Install** — copies headers, libraries, resources into the dist:
 >
-> Run this only after the build has completed successfully. If reusing a dist from an older versioned installation, first remove its obsolete `libTK*.so*` files from `dist/occt/x86_64-linux/lib` so stale symlinks and old libraries cannot survive alongside the new files. CMake does not remove obsolete installed files.
+> Run this only after the build has completed successfully. If reusing a dist from an older versioned installation, first remove its obsolete `libTK*.so*` files so stale symlinks and old libraries cannot survive alongside the new files. CMake does not remove obsolete installed files.
 >
 > ```
 > cmake --install tmp/occt/build 2>&1 | tee tmp/occt/install.log
 > ```
 >
-> The headers and libraries go into `include/opencascade` and `lib`, matching the paths `build.rs` expects. Resources go into `share/opencascade/resources`. The prefix is read from `INSTALL_DIR` at **configure time** — `cmake --install --prefix <dir>` afterwards does **not** fully work: OCCT bakes absolute header-install paths into the generated scripts, so only some files would follow the new prefix.
+> The whole install — headers, libraries, resources, CMake package config — lands inside the package at `dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64/`, which is the path `.cargo/config.toml`'s `OCCT_PREFIX` points at. The prefix is read from `INSTALL_DIR` at **configure time** — `cmake --install --prefix <dir>` afterwards does **not** fully work: OCCT bakes absolute header-install paths into the generated scripts, so only some files would follow the new prefix.
 >
 > Useful switches (add to the `cmake -S` line):
 >
@@ -148,7 +148,7 @@ Unity importer or its UPM package.
 >
 > Build time: roughly 10–30 minutes depending on machine and `-j` level.
 >
-> Installed layout (= the repo's `dist/occt/x86_64-linux/`):
+> Installed layout (= the package's OCCT directory `dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64/`):
 >
 > ```
 > <prefix>/
@@ -166,9 +166,9 @@ Unity importer or its UPM package.
 > Check that the libraries are real, unversioned files:
 >
 > ```bash
-> test -f dist/occt/x86_64-linux/lib/libTKernel.so && \
->     test ! -L dist/occt/x86_64-linux/lib/libTKernel.so
-> find dist/occt/x86_64-linux -type l
+> test -f dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64/lib/libTKernel.so && \
+>     test ! -L dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64/lib/libTKernel.so
+> find dist/package/com.greyhound.step -type l
 > ```
 >
 > The `test` command must succeed and `find` must print nothing. The source change removes OCCT's library symlinks; separately copied third-party libraries must also be packaged as real files.
@@ -205,13 +205,13 @@ Unity importer or its UPM package.
 > assets/rod-clamp-16mm.stp        # validation asset
 > ```
 
-> `OCCT_PREFIX` in `.cargo/config.toml` must point at the repo-relative `dist/occt/x86_64-linux` — the install prefix from step 2 (update the value if it differs). `build.rs` uses `include/opencascade` and `lib` under that prefix, compiles the three C++ shims as C++17, and links these nine toolkits:
+> `OCCT_PREFIX` in `.cargo/config.toml` must point at the repo-relative `dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64` — the install prefix from step 2 — and `OCCT_SHIM_DIR` at `dist/package/com.greyhound.step/Runtime/Plugins/shim/x86_64` (update the values if they differ). `build.rs` uses `include/opencascade` and `lib` under `OCCT_PREFIX`, compiles the three C++ shims as C++17, and links these nine toolkits:
 >
 > ```
 > TKernel TKMath TKGeomBase TKBRep TKPrim TKTopAlgo TKMesh TKXSBase TKDESTEP
 > ```
 >
-> It writes the shim to `dist/shim/x86_64-linux/libgreyhound_occt.so` with `RPATH=$ORIGIN`, using `--disable-new-dtags`. `$ORIGIN` means the directory of the ELF object carrying that path. Nothing links the shim into a Rust binary. At runtime the loader reads `config.toml`, which points `library_dir` at the OCCT lib directory and `shim_path` at the shim (values resolve relative to the config file's directory), preloads every OCCT library reachable through the shim's `DT_NEEDED` chain, and then opens the shim and resolves the C ABI symbols. This config-driven development loading is not a completed Unity loading strategy.
+> It writes the shim to `dist/package/com.greyhound.step/Runtime/Plugins/shim/x86_64/libgreyhound_occt.so` — its own first-party plugins directory beside the third-party OCCT tree — with `RPATH=$ORIGIN`, using `--disable-new-dtags`. `$ORIGIN` means the directory of the ELF object carrying that path; the shim's real dependency resolution happens through the loader's explicit pre-dlopen below, so the split directories need no rpath setup. Nothing links the shim into a Rust binary. At runtime the loader reads `config.toml`, which points `library_dir` at `Runtime/Plugins/occt/x86_64/lib` and `shim_path` at the shim (values resolve relative to the config file's directory), preloads every OCCT library reachable through the shim's `DT_NEEDED` chain, and then opens the shim and resolves the C ABI symbols. This config-driven loading already matches the package layout; Unity still needs the managed Scripted Importer on top.
 >
 > After installing OCCT, validate against the repo's test asset:
 >
@@ -245,5 +245,5 @@ Unity importer or its UPM package.
 > - **CMake can't find FreeType** — make sure `libfreetype-dev` is installed; check `CMakeError` output for the missing component name.
 > - **`X11` or `GL/gl.h` not found** — install `libx11-dev`/`libgl1-mesa-dev` (Ubuntu) or `libX11-devel`/`mesa-libGL-devel` (Fedora).
 > - **`file cannot create directory: /usr/local/include/opencascade`** (or headers land in `/usr/local` despite `--prefix`) — the prefix was not set at configure time. Re-run the configure step with `-DINSTALL_DIR="$PWD/dist/occt/x86_64-linux"`, then `cmake --build tmp/occt/build --parallel` and `cmake --install tmp/occt/build`. Use the same build directory throughout.
-> - **`libTK*.so` not found at runtime** — confirm installation succeeded and check `config.toml`: `library_dir` must point at the installed OCCT lib directory and `shim_path` at `dist/shim/x86_64-linux/libgreyhound_occt.so`, both resolved relative to the config file's directory. A Unity package needs its own relocatable loading setup, which this guide does not cover.
+> - **`libTK*.so` not found at runtime** — confirm installation succeeded and check `config.toml`: `library_dir` must point at `dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64/lib` and `shim_path` at `dist/package/com.greyhound.step/Runtime/Plugins/shim/x86_64/libgreyhound_occt.so`, both resolved relative to the config file's directory. The same layout must be reachable when the package is relocated, which `just verify-package` checks from a copied layout.
 > - **Libraries still have symlinks or version suffixes** — confirm both `VERSION` and `SOVERSION` were removed, the postfix is empty, and you reconfigured and rebuilt before installing. Remove leftovers from an older dist; reinstalling does not clean them up.

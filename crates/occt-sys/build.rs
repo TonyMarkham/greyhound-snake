@@ -54,12 +54,16 @@ fn compile_shared(
 fn build_native_shim() -> Result<(), Box<dyn std::error::Error>> {
     use std::{env, ffi::OsString, io, path::PathBuf};
 
-    for name in ["OCCT_PREFIX", "CXX", "CXXFLAGS"] {
+    for name in ["OCCT_PREFIX", "OCCT_SHIM_DIR", "CXX", "CXXFLAGS"] {
         println!("cargo:rerun-if-env-changed={name}");
     }
     let prefix =
         PathBuf::from(env::var_os("OCCT_PREFIX").ok_or_else(|| {
             io::Error::other("build-native-shim requires build-time OCCT_PREFIX")
+        })?);
+    let shim_dir =
+        PathBuf::from(env::var_os("OCCT_SHIM_DIR").ok_or_else(|| {
+            io::Error::other("build-native-shim requires build-time OCCT_SHIM_DIR")
         })?);
     let include = prefix.join("include/opencascade");
     let lib = prefix.join("lib");
@@ -105,20 +109,9 @@ fn build_native_shim() -> Result<(), Box<dyn std::error::Error>> {
     for header in ["greyhound_abi.h", "native_guard.h"] {
         println!("cargo:rerun-if-changed={}", cpp.join(header).display());
     }
-    let workspace = root
-        .ancestors()
-        .nth(2)
-        .ok_or_else(|| io::Error::other("cannot locate workspace root"))?;
-    let platform = format!(
-        "{}-{}",
-        env::var("CARGO_CFG_TARGET_ARCH")?,
-        env::var("CARGO_CFG_TARGET_OS")?,
-    );
-    let output = workspace
-        .join("dist")
-        .join("shim")
-        .join(platform)
-        .join("libgreyhound_occt.so");
+    // The shim compiles into its own plugins directory, separate from the
+    // third-party OCCT toolkit tree it bridges.
+    let output = shim_dir.join("libgreyhound_occt.so");
     let mut args = vec![
         OsString::from("-L"),
         lib.as_os_str().to_owned(),

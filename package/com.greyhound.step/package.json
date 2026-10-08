@@ -1,0 +1,8 @@
+{
+  "name": "com.greyhound.step",
+  "version": "0.1.0",
+  "displayName": "Greyhound STEP Importer",
+  "description": "Imports STEP files via Open CASCADE Technology (OCCT).",
+  "unity": "6000.0",
+  "dependencies": {}
+}

@@ -74,8 +74,9 @@ fn given_cleared_error_when_queried_then_pointer_is_null() {
 fn given_real_occt_when_importing_through_the_host_abi_then_buffers_match_the_direct_pipeline() {
     // given
     let root = workspace_root();
-    let occt_dir = root.join("dist/occt/x86_64-linux/lib");
-    let shim_path = root.join("dist/shim/x86_64-linux/libgreyhound_occt.so");
+    let occt_dir = root.join("dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64/lib");
+    let shim_path = root
+        .join("dist/package/com.greyhound.step/Runtime/Plugins/shim/x86_64/libgreyhound_occt.so");
     let asset = root.join("assets/rod-clamp-16mm.stp");
     let library = unsafe { Library::new(host_artifact()) }.unwrap();
 
@@ -176,8 +177,9 @@ fn given_real_occt_when_importing_through_the_host_abi_then_buffers_match_the_di
 fn given_host_abi_when_calls_fail_then_status_and_error_report_the_cause() {
     // given
     let root = workspace_root();
-    let occt_dir = root.join("dist/occt/x86_64-linux/lib");
-    let shim_path = root.join("dist/shim/x86_64-linux/libgreyhound_occt.so");
+    let occt_dir = root.join("dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64/lib");
+    let shim_path = root
+        .join("dist/package/com.greyhound.step/Runtime/Plugins/shim/x86_64/libgreyhound_occt.so");
     let asset = root.join("assets/rod-clamp-16mm.stp");
     let library = unsafe { Library::new(host_artifact()) }.unwrap();
 

@@ -29,21 +29,25 @@ importer.
 
 | Path | Contents |
 |---|---|
-| `dist/occt/<platform>/` | OCCT installation: `lib/`, `include/opencascade/`, `share/`, `bin/` |
-| `dist/shim/<platform>/` | `libgreyhound_occt.so` — the C++ shim built by `occt-sys/build.rs` |
+| `dist/package/com.greyhound.step/` | the assembled UPM package: authored sources plus the native payload |
+| `…/Runtime/Plugins/occt/x86_64/` | the OCCT installation (`lib/`, `include/opencascade/`, `share/`, `bin/`) |
+| `…/Runtime/Plugins/shim/x86_64/` | `libgreyhound_occt.so` — the C++ shim built by `occt-sys/build.rs` |
+| `…/Runtime/Plugins/x86_64/` | `libimporter_host.so` — the Unity-facing host cdylib |
 
-The only working `<platform>` today is `x86_64-linux`. The same
-`<component>/<platform>` convention is what a future UPM `plugins/` staging
-step would copy from.
+The only working platform today is `x86_64-linux`. OCCT installs and the
+shim compiles directly into the package layout; `just assemble-package`
+stages the authored sources and the host cdylib, and `just verify-package`
+checks the result from a copied layout.
 
 ## Getting started (Linux x86_64)
 
 Prerequisites: a recent Rust toolchain (edition 2024) and a C++17 compiler.
 `build.rs` only accepts native Linux x86_64 builds; other targets are rejected.
 
-1. Install OCCT 8.0.1 into `dist/occt/x86_64-linux` by following
-   **`occt-linux.md`** (configure → build → install, then validate with
-   `step-stats` as described there).
+1. Install OCCT 8.0.1 into
+   `dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64` by
+   following **`occt-linux.md`** (configure → build → install, then
+   validate with `step-stats` as described there).
 2. Build the workspace:
 
    ```
@@ -51,8 +55,9 @@ Prerequisites: a recent Rust toolchain (edition 2024) and a C++17 compiler.
    ```
 
    `occt-sys/build.rs` compiles the C++ shims into
-   `dist/shim/x86_64-linux/libgreyhound_occt.so`, linking the OCCT toolkits it
-   needs. This requires the OCCT installation from step 1.
+   `dist/package/com.greyhound.step/Runtime/Plugins/shim/x86_64/libgreyhound_occt.so`,
+   linking the OCCT toolkits it needs. This requires the OCCT installation
+   from step 1.
 3. Inspect the sample STEP file:
 
    ```

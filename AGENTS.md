@@ -39,9 +39,17 @@ this integration, not a finished Unity package.
 - `crates/importer-host/`: Unity-facing cdylib — a flat, version-gated C ABI
   (open STEP, two-phase mesh counts/fill) that loads OCCT via `occt-sys` and
   emits projected Unity buffers.
-- `.cargo/config.toml`: currently points `OCCT_PREFIX` at the repo-local
-  Linux installation in `dist/x86_64-linux`.
-- `dist/`: repo-local native distributions; currently gitignored.
+- `.cargo/config.toml`: points `OCCT_PREFIX` at the OCCT install inside the
+  package (`dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64`)
+  and `OCCT_SHIM_DIR` at the shim's own plugins directory — OCCT installs
+  and the shim compiles directly into the package layout.
+- `dist/`: repo-local native distributions, including the fully assembled
+  UPM package in `dist/package/`; currently gitignored.
+- `package/com.greyhound.step/`: tracked UPM package skeleton — authored
+  sources only (`package.json`, `Third Party Notices.md`; later the C#
+  code). `just assemble-package` stages it with the native payload into
+  `dist/package/com.greyhound.step/`; `just verify-package` checks the
+  staged package from a copied layout (`tools/verify-package.py`).
 - `tmp/`: disposable OCCT source and build scaffolding; currently gitignored.
 - `assets/`: sample assets, including a STEP file.
 

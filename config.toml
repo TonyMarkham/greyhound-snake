@@ -1,3 +1,3 @@
 [occt]
-library_dir = "dist/occt/x86_64-linux/lib"
-shim_path = "dist/shim/x86_64-linux/libgreyhound_occt.so"
+library_dir = "dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64/lib"
+shim_path = "dist/package/com.greyhound.step/Runtime/Plugins/shim/x86_64/libgreyhound_occt.so"
