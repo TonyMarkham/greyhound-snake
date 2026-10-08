@@ -10,7 +10,7 @@ using UnityEditor.AssetImporters;
 
 namespace Greyhound.Step
 {
-    [ScriptedImporter(version: 1, ext: "stp")]
+    [ScriptedImporter(version: 1, ext: "stp,step")]
     internal sealed class StepImporter : ScriptedImporter
     {
         private const double Deflection = 0.01;
