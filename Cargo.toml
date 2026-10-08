@@ -2,7 +2,8 @@
 members         = [
     "crates/mesh",
     "crates/occt-sys",
-    "crates/step-stats"
+    "crates/step-stats",
+    "crates/unity-projection"
 ]
 resolver        = "3"
 
@@ -19,10 +20,11 @@ libloading      = { version = "0.9.0" }
 serde           = { version = "1.0.229", features = ["derive"] }
 tempfile        = { version = "3.27.0" }
 thiserror       = { version = "2.0.21" }
-toml            = { version = "1.1.6" }
+toml            = { version = "1.1.7" }
 
 mesh        = { path = "./crates/mesh" }
 occt-sys        = { path = "./crates/occt-sys" }
+unity-projection = { path = "./crates/unity-projection" }
 
 [workspace.lints.clippy]
 unwrap_used     = "deny"

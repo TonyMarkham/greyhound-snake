@@ -1,0 +1,12 @@
+[package]
+name = "unity-projection"
+version        = { workspace = true }
+edition        = { workspace = true }
+
+[dependencies]
+error-location = { workspace = true }
+mesh           = { workspace = true }
+thiserror      = { workspace = true }
+
+[lints]
+workspace      = true

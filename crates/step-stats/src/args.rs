@@ -11,6 +11,9 @@ pub struct Args {
     /// Also tessellate the STEP file and report mesh statistics
     #[arg(long)]
     pub mesh: bool,
+    /// Also project the tessellated mesh into Unity buffer layout
+    #[arg(long)]
+    pub unity: bool,
     /// STEP file to inspect
     pub path: PathBuf,
 }

@@ -74,7 +74,7 @@ implementing.
 - Layering: OCCT knowledge stays in the C++ shim (1-based→0-based indices,
   `TopLoc_Location` transforms, `TopAbs_REVERSED` fix); host-specific work
   (axis permutation, Unity winding flip, scale, submesh assembly, buffer
-  layout) lives in a Rust Unity projection (gap G4) so the C# side is a
+  layout) lives in a Rust Unity projection (gap G4 done) so the C# side is a
   pure blit. Blender later consumes the same core model through its own
   projection — never through Unity assumptions.
 - Coordinate map: `Unity = (x, z, y)` of OCCT (det −1; the non-mirroring

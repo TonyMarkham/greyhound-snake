@@ -12,6 +12,7 @@ use app_config::AppConfig;
 use args::Args;
 
 use occt_sys::Occt;
+use unity_projection::{OcctBounds, ProjectionSettings, project};
 
 use clap::Parser;
 use std::process::ExitCode;
@@ -51,6 +52,30 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         println!("tris:     {}", mesh.triangles().len());
         println!("ranges:   {}", mesh.faces().len());
         println!("normals:  {}", mesh.normals().map_or(0, |n| n.len()));
+    }
+    if args.unity {
+        let mesh = doc.mesh(0.01, 0.5)?;
+        let projected = project(
+            &mesh,
+            OcctBounds {
+                min: info.bbox.min,
+                max: info.bbox.max,
+            },
+            ProjectionSettings::default(),
+        )?;
+        println!("u-verts:  {}", projected.vertices().len());
+        println!("u-tris:   {}", projected.indices().len() / 3);
+        println!("u-ranges: {}", projected.submeshes().len());
+        let bounds = projected.bounds();
+        println!(
+            "u-bounds: [{:.3} {:.3} {:.3}] .. [{:.3} {:.3} {:.3}]",
+            bounds.min[0],
+            bounds.min[1],
+            bounds.min[2],
+            bounds.max[0],
+            bounds.max[1],
+            bounds.max[2]
+        );
     }
     Ok(())
 }

@@ -33,7 +33,7 @@ Greyhound core mesh model (Rust)                      [crates/mesh]
   │  per-face ranges, normals; OCCT coords (mm),
   │  all triangles outward-CCW in OCCT algebra
   ▼
-Unity projection (Rust)                               [to be built]
+Unity projection (Rust)                               [crates/unity-projection]
   │  • axis permutation (Z-up RH → Y-up LH)
   │  • winding flip (det −1 consequence)
   │  • uniform scale (mm → m, import setting)
@@ -244,9 +244,9 @@ Status: **shim** = exists in C++ shim today; **planned** = agreed next step;
 | G1 | Normal extraction | done | Shim emits per-vertex unit normals (ABI v3): `BRepLib_ToolTriangulatedShape::ComputeNormals()` when `HasNormals()` is false, location transform, `TopAbs_REVERSED` negation — matching OCCT's own exporters (`RWMesh_FaceIterator::NormalTransformed` reverses the same way; stored normals follow surface-natural orientation, not the face flag). Empirically verified on `rod-clamp-16mm.stp`: 0/5580 vertex normals oppose their triangle winding with the negation, 4572/5580 without (`step_mesh.cpp:141-147`) |
 | G2 | UVs | decided | Omit `TexCoord0` for v1 (24 B `[pos][normal]` layout). OCCT UVs are surface *parameters* (arbitrary ranges, per-face space, seam-duplicated), not normalized texture coords, and CAD STEP has no textures to map. Decided 2026-10-07; the shim never reads `UVNode`, the mesh model keeps its `uvs` field for a future texturing pass |
 | G3 | Core mesh model + per-face ranges | done | `crates/mesh` model validated at the ABI boundary; shim reports per-face counts (`greyhound_mesh_counts`/`greyhound_mesh_fill`, ABI v2); two-phase tuple return retired |
-| G4 | Unity projection | planned | Axis permutation, winding flip, scale, submesh assembly — does not exist yet |
-| G5 | Submesh grouping | open | Per-face / per-solid / single. Recommend per-solid for v1 (material slots scale) |
-| G6 | Unit scale policy | open | Mechanism decided: bake into vertices, GameObject (1,1,1). Remaining: default factor (0.001 vs 1.0) and import-setting configurability |
+| G4 | Unity projection | done | `crates/unity-projection` consumes the core model: permutes positions and normals (`(x, z, y)`), bakes the scale parameter into positions, swaps two indices per triangle, emits one submesh per face with `firstVertex`/`vertexCount` from the face ranges, maps the OCCT bbox to Unity bounds; all output types are `repr(C)` for the future C# blit (gap G11). Scalar loops only (`perf.md`) |
+| G5 | Submesh grouping | open | Per-face / per-solid / single. Recommend per-solid for v1 (material slots scale). The projection groups per-face today (identity with the core model's ranges); per-solid needs face→solid attribution from the shim — a future ABI addition |
+| G6 | Unit scale policy | open | Mechanism decided: bake into vertices, GameObject (1,1,1). The projection takes the factor as `ProjectionSettings` (default 0.001) and `step-stats --unity` uses the default; still open: default factor (0.001 vs 1.0) and import-setting configurability |
 | G7 | Vertex welding | deferred | Edge nodes are duplicated across faces; welding by (position, normal) pairs could cut memory but is unnecessary for correctness. Unity `Optimize*` methods are a cheaper post-step |
 | G8 | Assembly/instance hierarchy | deferred | `STEPControl_Reader.OneShape()` bakes everything into one compound with locations applied. Unity children-per-instance mapping needs the XCAF reader (`TKDESTEP` has it) — later |
 | G9 | Negative-scale locations | deferred | Defensive `det(trsf) < 0` winding flip; theoretical for STEP (see Winding section) |
