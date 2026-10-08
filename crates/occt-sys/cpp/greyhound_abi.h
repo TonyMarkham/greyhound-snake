@@ -14,9 +14,11 @@ GREYHOUND_API const char* greyhound_last_error() noexcept;
 GREYHOUND_API int32_t greyhound_box_volume(double dx, double dy, double dz, double* volume) noexcept;
 GREYHOUND_API void* greyhound_step_open(const char* path) noexcept;
 GREYHOUND_API int32_t greyhound_step_info(void* doc, int32_t* solids, int32_t* faces, int32_t* edges,GreyBbox* bbox) noexcept;
-GREYHOUND_API int32_t greyhound_mesh_counts(void* doc, double deflection, double angle_rad,uint32_t* nverts, uint32_t* nindices) noexcept;
+GREYHOUND_API int32_t greyhound_mesh_counts(void* doc, double deflection, double angle_rad,uint32_t* nverts, uint32_t* nindices, uint32_t* nfaces) noexcept;
 // Buffers must match the last successful counts call for this document.
-GREYHOUND_API int32_t greyhound_mesh_fill(void* doc, float* verts, uint32_t* indices) noexcept;
+// face_counts holds 2 * nfaces uint32_t values: [vertex_count, index_count]
+// pairs, in the same face walk order as the vertex and index buffers.
+GREYHOUND_API int32_t greyhound_mesh_fill(void* doc, float* verts, uint32_t* indices, uint32_t* face_counts) noexcept;
 GREYHOUND_API void greyhound_step_close(void* doc) noexcept;
 }
 

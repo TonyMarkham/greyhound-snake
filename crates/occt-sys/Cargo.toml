@@ -4,15 +4,11 @@ version = { workspace = true }
 edition = { workspace = true }
 links = "occt"
 
-# [features]
-# default = []
-# build-native-shim = ["dep:cc"]
-# loader-fixtures = ["dep:cc"]
-
 [dependencies]
 error-location = { workspace = true }
 goblin         = { workspace = true }
 libloading     = { workspace = true }
+mesh           = { workspace = true }
 thiserror      = { workspace = true }
 
 [dev-dependencies]

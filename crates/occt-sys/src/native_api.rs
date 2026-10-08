@@ -11,8 +11,9 @@ pub(crate) struct NativeApi {
     pub(crate) step_open: unsafe extern "C" fn(*const c_char) -> *mut c_void,
     pub(crate) step_info:
         unsafe extern "C" fn(*mut c_void, *mut i32, *mut i32, *mut i32, *mut GreyBbox) -> i32,
-    pub(crate) mesh_counts: unsafe extern "C" fn(*mut c_void, f64, f64, *mut u32, *mut u32) -> i32,
-    pub(crate) mesh_fill: unsafe extern "C" fn(*mut c_void, *mut f32, *mut u32) -> i32,
+    pub(crate) mesh_counts:
+        unsafe extern "C" fn(*mut c_void, f64, f64, *mut u32, *mut u32, *mut u32) -> i32,
+    pub(crate) mesh_fill: unsafe extern "C" fn(*mut c_void, *mut f32, *mut u32, *mut u32) -> i32,
     pub(crate) step_close: unsafe extern "C" fn(*mut c_void),
     last_error: unsafe extern "C" fn() -> *const c_char,
     _library: Library,
@@ -55,8 +56,8 @@ impl NativeApi {
 
         // SAFETY: library owns the resolved probe.
         let actual = unsafe { version() };
-        if actual != 1 {
-            return Err(OcctError::abi(&shim, 1, actual));
+        if actual != 2 {
+            return Err(OcctError::abi(&shim, 2, actual));
         }
 
         // SAFETY: these signatures match ABI version 1. Nothing is published

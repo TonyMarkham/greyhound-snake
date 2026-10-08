@@ -248,6 +248,7 @@ dependencies = [
  "error-location",
  "goblin",
  "libloading",
+ "mesh",
  "tempfile",
  "thiserror",
 ]

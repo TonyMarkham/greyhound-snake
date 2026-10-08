@@ -238,7 +238,7 @@ Status: **shim** = exists in C++ shim today; **planned** = agreed next step;
 |---|---|---|---|
 | G1 | Normal extraction | planned | Shim fills positions only (`step_mesh.cpp:118-123`); no `Normal(i)`. Also needs `HasNormals()==false → ComputeNormals()` fallback, rotation-only location transform for normals, and a check of `TopAbs_REVERSED` normal handling (stored normals may follow surface orientation — verify against OCCT's own STL/OBJ writers) |
 | G2 | UVs | open | OCCT UVs are surface *parameters* (arbitrary ranges, per-face space, seam-duplicated), not normalized texture coords. For CAD STEP they are rarely meaningful without textures. Recommendation: omit `TexCoord0` for v1 (24 B layout), revisit when texturing is requested |
-| G3 | Core mesh model + per-face ranges | planned | Rust struct owning positions/indices/ranges replaces the two-phase counts/fill ABI (`step_doc.rs:59-104`); projection needs the ranges for submeshes |
+| G3 | Core mesh model + per-face ranges | done | `crates/mesh` model validated at the ABI boundary; shim reports per-face counts (`greyhound_mesh_counts`/`greyhound_mesh_fill`, ABI v2); two-phase tuple return retired |
 | G4 | Unity projection | planned | Axis permutation, winding flip, scale, submesh assembly — does not exist yet |
 | G5 | Submesh grouping | open | Per-face / per-solid / single. Recommend per-solid for v1 (material slots scale) |
 | G6 | Unit scale policy | open | Mechanism decided: bake into vertices, GameObject (1,1,1). Remaining: default factor (0.001 vs 1.0) and import-setting configurability |

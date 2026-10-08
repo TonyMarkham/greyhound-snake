@@ -2,6 +2,8 @@ use crate::{
     OcctError, OcctResult, grey_box::GreyBbox, native_api::NativeApi, step_info::StepInfo,
 };
 
+use mesh::{FaceRange, Mesh, MeshBuilder};
+
 use std::{
     ffi::{CString, c_void},
     os::unix::ffi::OsStrExt,
@@ -56,8 +58,8 @@ impl StepDoc {
         })
     }
 
-    pub fn mesh(&self, deflection: f64, angle_rad: f64) -> OcctResult<(Vec<f32>, Vec<u32>)> {
-        let (mut nverts, mut nindices) = (0, 0);
+    pub fn mesh(&self, deflection: f64, angle_rad: f64) -> OcctResult<Mesh> {
+        let (mut nverts, mut nindices, mut nfaces) = (0, 0, 0);
         // SAFETY: valid handle and live count outputs; the operation finishes
         // meshing synchronously before returning the buffer sizes.
         let status = unsafe {
@@ -67,40 +69,81 @@ impl StepDoc {
                 angle_rad,
                 &mut nverts,
                 &mut nindices,
+                &mut nfaces,
             )
         };
         if status != 0 {
             return Err(self.api.native_error("mesh counts"));
         }
-        let vertex_len = usize::try_from(nverts)
-            .ok()
-            .and_then(|n| n.checked_mul(3))
-            .ok_or_else(|| OcctError::step("vertex buffer length overflow"))?;
+
+        let vertex_len =
+            usize::try_from(nverts).map_err(|_| OcctError::step("vertex count overflow"))?;
         let index_len = usize::try_from(nindices)
             .map_err(|_| OcctError::step("index buffer length overflow"))?;
-        let mut verts = Vec::new();
-        verts
+        if index_len % 3 != 0 {
+            return Err(OcctError::step("index count is not a multiple of 3"));
+        }
+        let face_len = usize::try_from(nfaces)
+            .ok()
+            .and_then(|n| n.checked_mul(2))
+            .ok_or_else(|| OcctError::step("face count buffer length overflow"))?;
+
+        let mut vertices = Vec::<[f32; 3]>::new();
+        vertices
             .try_reserve_exact(vertex_len)
             .map_err(|error| OcctError::step(format!("vertex allocation: {error}")))?;
-        verts.resize(vertex_len, 0.0f32);
-        let mut indices = Vec::new();
-        indices
-            .try_reserve_exact(index_len)
+        vertices.resize(vertex_len, [0.0; 3]);
+        let triangle_len = index_len / 3;
+        let mut triangles = Vec::<[u32; 3]>::new();
+        triangles
+            .try_reserve_exact(triangle_len)
             .map_err(|error| OcctError::step(format!("index allocation: {error}")))?;
-        indices.resize(index_len, 0u32);
+        triangles.resize(triangle_len, [0; 3]);
+        let mut face_counts = Vec::<u32>::new();
+        face_counts
+            .try_reserve_exact(face_len)
+            .map_err(|error| OcctError::step(format!("face count allocation: {error}")))?;
+        face_counts.resize(face_len, 0);
+
         // SAFETY: buffers match the counts for this same document. No native
         // operation mutates it between counts and fill; ownership stays Rust's.
+        // The typed element pointers are layout-identical to their flat forms.
         let status = unsafe {
             (self.api.mesh_fill)(
                 self.handle.as_ptr(),
-                verts.as_mut_ptr(),
-                indices.as_mut_ptr(),
+                vertices.as_mut_ptr().cast::<f32>(),
+                triangles.as_mut_ptr().cast::<u32>(),
+                face_counts.as_mut_ptr(),
             )
         };
         if status != 0 {
             return Err(self.api.native_error("mesh fill"));
         }
-        Ok((verts, indices))
+
+        let mut faces = Vec::with_capacity(face_len / 2);
+        let (mut vertex_start, mut index_start) = (0u32, 0u32);
+        for pair in face_counts.as_chunks::<2>().0 {
+            let (vertex_count, index_count) = (pair[0], pair[1]);
+            faces.push(FaceRange {
+                vertex_start,
+                vertex_count,
+                index_start,
+                index_count,
+            });
+            vertex_start = vertex_start
+                .checked_add(vertex_count)
+                .ok_or_else(|| OcctError::step("face range vertex offset overflow"))?;
+            index_start = index_start
+                .checked_add(index_count)
+                .ok_or_else(|| OcctError::step("face range index offset overflow"))?;
+        }
+
+        MeshBuilder::default()
+            .with_vertices(vertices)
+            .with_triangles(triangles)
+            .with_faces(faces)
+            .build()
+            .map_err(|error| OcctError::step(format!("mesh build: {error}")))
     }
 }
 

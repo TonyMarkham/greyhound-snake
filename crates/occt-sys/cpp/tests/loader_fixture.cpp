@@ -18,7 +18,7 @@ extern "C" uint32_t greyhound_abi_version() noexcept {
 #ifdef FIXTURE_BAD_ABI
   return 42;
 #else
-  return 1;
+  return 2;
 #endif
 }
 extern "C" const char* greyhound_last_error() noexcept { return error_text; }
@@ -51,18 +51,22 @@ extern "C" int32_t greyhound_step_info(
   return 0;
 }
 extern "C" int32_t greyhound_mesh_counts(
-    void* doc, double, double, uint32_t* nverts, uint32_t* nindices) noexcept {
-  if (!doc || !nverts || !nindices) return 1;
+    void* doc, double, double, uint32_t* nverts, uint32_t* nindices,
+    uint32_t* nfaces) noexcept {
+  if (!doc || !nverts || !nindices || !nfaces) return 1;
   *nverts = *nindices = 3;
+  *nfaces = 1;
   return 0;
 }
 #ifndef FIXTURE_MISSING_FILL
 extern "C" int32_t greyhound_mesh_fill(
-    void* doc, float* verts, uint32_t* indices) noexcept {
-  if (!doc || !verts || !indices) return 1;
+    void* doc, float* verts, uint32_t* indices, uint32_t* face_counts) noexcept {
+  if (!doc || !verts || !indices || !face_counts) return 1;
   const float triangle[9] = {0, 0, 0, 1, 0, 0, 0, 1, 0};
   for (int i = 0; i < 9; ++i) verts[i] = triangle[i];
   indices[0] = 0; indices[1] = 1; indices[2] = 2;
+  face_counts[0] = 3;
+  face_counts[1] = 3;
   return 0;
 }
 #endif

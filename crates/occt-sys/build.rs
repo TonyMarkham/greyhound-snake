@@ -1,13 +1,10 @@
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("cargo:rerun-if-changed=build.rs");
-    // #[cfg(feature = "build-native-shim")]
     build_native_shim()?;
-    // #[cfg(feature = "loader-fixtures")]
     build_loader_fixtures()?;
     Ok(())
 }
 
-// #[cfg(any(feature = "build-native-shim", feature = "loader-fixtures"))]
 fn compile_shared(
     output: &std::path::Path,
     sources: &[std::path::PathBuf],
@@ -54,7 +51,6 @@ fn compile_shared(
     Ok(())
 }
 
-// #[cfg(feature = "build-native-shim")]
 fn build_native_shim() -> Result<(), Box<dyn std::error::Error>> {
     use std::{env, ffi::OsString, io, path::PathBuf};
 
@@ -141,7 +137,6 @@ fn build_native_shim() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-// #[cfg(feature = "loader-fixtures")]
 fn build_loader_fixtures() -> Result<(), Box<dyn std::error::Error>> {
     use std::{env, ffi::OsString, io, path::PathBuf};
 

@@ -45,5 +45,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         "bbox max: [{:.3} {:.3} {:.3}]",
         info.bbox.max[0], info.bbox.max[1], info.bbox.max[2]
     );
+    if args.mesh {
+        let mesh = doc.mesh(0.01, 0.5)?;
+        println!("verts:    {}", mesh.vertices().len());
+        println!("tris:     {}", mesh.triangles().len());
+        println!("ranges:   {}", mesh.faces().len());
+    }
     Ok(())
 }

@@ -71,16 +71,16 @@ extern "C" void greyhound_step_close(void* doc_in) noexcept {
 
 extern "C" int32_t greyhound_mesh_counts(
     void* doc_in, double deflection, double angle_rad,
-    uint32_t* nverts, uint32_t* nindices) noexcept {
+    uint32_t* nverts, uint32_t* nindices, uint32_t* nfaces) noexcept {
   return greyhound::guard<int32_t>(1, [&]() -> int32_t {
-    if (!doc_in || !nverts || !nindices || !std::isfinite(deflection) ||
+    if (!doc_in || !nverts || !nindices || !nfaces || !std::isfinite(deflection) ||
         !std::isfinite(angle_rad) || deflection <= 0 || angle_rad <= 0) {
       greyhound::set_error("invalid tessellation arguments");
       return 1;
     }
     auto* doc = static_cast<GreyDoc*>(doc_in);
     BRepMesh_IncrementalMesh mesh(doc->shape, deflection, false, angle_rad, true);
-    uint64_t nv = 0, ni = 0;
+    uint64_t nv = 0, ni = 0, nf = 0;
     for (TopExp_Explorer e(doc->shape, TopAbs_FACE); e.More(); e.Next()) {
       TopLoc_Location loc;
       const Handle(Poly_Triangulation)& tri =
@@ -88,27 +88,31 @@ extern "C" int32_t greyhound_mesh_counts(
       if (tri.IsNull()) continue;
       nv += static_cast<uint64_t>(tri->NbNodes());
       ni += 3ULL * static_cast<uint64_t>(tri->NbTriangles());
+      ++nf;
       if (nv > std::numeric_limits<uint32_t>::max() ||
-          ni > std::numeric_limits<uint32_t>::max()) {
+          ni > std::numeric_limits<uint32_t>::max() ||
+          nf > std::numeric_limits<uint32_t>::max()) {
         greyhound::set_error("mesh exceeds the C ABI count range");
         return 1;
       }
     }
     *nverts = static_cast<uint32_t>(nv);
     *nindices = static_cast<uint32_t>(ni);
+    *nfaces = static_cast<uint32_t>(nf);
     return 0;
   });
 }
 
 extern "C" int32_t greyhound_mesh_fill(
-    void* doc_in, float* verts, uint32_t* indices) noexcept {
+    void* doc_in, float* verts, uint32_t* indices, uint32_t* face_counts) noexcept {
   return greyhound::guard<int32_t>(1, [&]() -> int32_t {
-    if (!doc_in || !verts || !indices) {
+    if (!doc_in || !verts || !indices || !face_counts) {
       greyhound::set_error("invalid mesh handle or output pointer");
       return 1;
     }
     auto* doc = static_cast<GreyDoc*>(doc_in);
     uint32_t base = 0;
+    uint32_t face_index = 0;
     for (TopExp_Explorer e(doc->shape, TopAbs_FACE); e.More(); e.Next()) {
       TopLoc_Location loc;
       const Handle(Poly_Triangulation)& tri =
@@ -122,6 +126,7 @@ extern "C" int32_t greyhound_mesh_fill(
         *verts++ = static_cast<float>(p.Z());
       }
       const bool reversed = e.Current().Orientation() == TopAbs_REVERSED;
+      uint32_t tri_count = 0;
       for (int i = 1; i <= tri->NbTriangles(); ++i) {
         int n1, n2, n3;
         tri->Triangle(i).Get(n1, n2, n3);
@@ -129,7 +134,11 @@ extern "C" int32_t greyhound_mesh_fill(
         *indices++ = base + static_cast<uint32_t>(n1 - 1);
         *indices++ = base + static_cast<uint32_t>(n2 - 1);
         *indices++ = base + static_cast<uint32_t>(n3 - 1);
+        ++tri_count;
       }
+      face_counts[2 * face_index] = static_cast<uint32_t>(tri->NbNodes());
+      face_counts[2 * face_index + 1] = 3U * tri_count;
+      ++face_index;
       base += static_cast<uint32_t>(tri->NbNodes());
     }
     return 0;

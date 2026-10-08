@@ -8,6 +8,9 @@ pub struct Args {
     /// Runtime configuration file
     #[arg(long, default_value = "config.toml")]
     pub config: PathBuf,
+    /// Also tessellate the STEP file and report mesh statistics
+    #[arg(long)]
+    pub mesh: bool,
     /// STEP file to inspect
     pub path: PathBuf,
 }
