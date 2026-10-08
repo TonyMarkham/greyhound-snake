@@ -66,10 +66,10 @@ Key API:
   triangulation. The **location is returned separately**: node positions are
   in face-local coordinates and must be transformed by
   `theLocation.Transformation()` (`gp_Trsf`) to get shape-global coordinates.
-  This is what `step_mesh.cpp:113-119` does. Note: `gp_Trsf` may in principle
-  carry scale; transform positions with the full trsf, but transform normals
-  only by the rotation part and re-normalize (our shim doesn't yet extract
-  normals).
+  This is what `step_mesh.cpp:131-137` does. Note: `gp_Trsf` may in principle
+  carry scale; transform positions with the full trsf, and transform normals
+  with the vectorial part and re-normalize (`gp_Dir::Transform` does this) —
+  our shim extracts normals this way since ABI v3 (`step_mesh.cpp:141-147`).
 - `BRep_Tool::Triangulations(face, loc)` → all triangulations of the face.
 - Edge approximations (not needed for triangle extraction, part of the family):
   - `PolygonOnTriangulation(edge, tri, loc)` — edge as a polyline of **node
@@ -88,7 +88,7 @@ Key API:
   the requested parameters are kept (status flag `Reused`); outdated or
   missing ones are recomputed (`Outdated`, `ReMesh`). To force a fresh mesh,
   remove existing triangulations first with `BRepTools::Clean(shape)`.
-- Convenience constructor (what our shim uses at `step_mesh.cpp:82`):
+- Convenience constructor (what our shim uses at `step_mesh.cpp:84`):
   `BRepMesh_IncrementalMesh(shape, linDeflection, isRelative=false,
   angDeflection=0.5, isInParallel=false)` — **runs `Perform()` automatically**.
 - Full constructor takes `IMeshTools_Parameters` (below).
@@ -139,15 +139,14 @@ Practical reads for tuning:
 
 ## Conventions that affect our importer
 
-1. **1-based node indexing** → shim subtracts 1 (`step_mesh.cpp:129-131`).
-2. **Face-local coordinates + `TopLoc_Location`** → shim must transform nodes
-   (it does) — and will need the rotation-part transform + re-normalization
-   for normals when we add them.
+1. **1-based node indexing** → shim subtracts 1 (`step_mesh.cpp:154-156`).
+2. **Face-local coordinates + `TopLoc_Location`** → shim transforms nodes and
+   normals (`step_mesh.cpp:131-147`).
 3. **Winding / orientation** `[Poly_Triangulation.hxx, TopoDS docs]`:
    triangle node order of a FORWARD face is counter-clockwise when viewed
    from outside the material; faces with `TopAbs_REVERSED` orientation are
    stored with inverted orientation, so the shim swaps two indices
-   (`step_mesh.cpp:124-128`). OCCT is right-handed, Z-up; the handedness flip
+   (`step_mesh.cpp:152`). OCCT is right-handed, Z-up; the handedness flip
    for a host (Unity: left-handed Y-up, clockwise front faces) happens in the
    Unity projection layer, not here.
 4. **No vertex sharing between faces**: each face owns its own
@@ -155,15 +154,27 @@ Practical reads for tuning:
    surfaces deliberately get duplicated nodes (UV seam). Whole-shape
    concatenation (as in our shim) is therefore natural; deduping shared edge
    nodes is an optional post-step, and conflicts with per-face UV seams.
-5. **Per-node normals**: BRepMesh produces smooth per-node normals
-   (`HasNormals()`), except some degenerate cases. If missing,
-   `Poly_Triangulation::ComputeNormals()` recomputes smooth normals; a Unity
-   fallback is `Mesh.RecalculateNormals()`.
+5. **Per-node normals** `[BRepLib_ToolTriangulatedShape.cxx, verified in the
+   V8.0.1 source]`: BRepMesh itself does **not** populate normals (no
+   `SetNormal` call in the mesher); consumers do it lazily.
+   `BRepLib_ToolTriangulatedShape::ComputeNormals(face, tris)` fills
+   surface-aware per-node normals when UV nodes exist (analytic
+   `GeomLib::NormEstim`, flat-averaged fallback), does nothing if normals
+   already exist. Crucially, both it and the winding-averaged
+   `Poly_Triangulation::ComputeNormals()` produce normals in the **surface's
+   natural orientation, ignoring the face orientation flag** — OCCT's own
+   mesh exporters therefore reverse normals for `TopAbs_REVERSED` faces
+   (`RWMesh_FaceIterator::NormalTransformed` negates exactly like its
+   `TriangleOriented` swaps winding). Our shim does the same
+   (`step_mesh.cpp:141-147`). Verified empirically on `rod-clamp-16mm.stp`:
+   with the negation 0 of 5580 vertex normals oppose their triangle's
+   winding; without it 4572 of 5580 do.
 6. **`float` vs `double`**: node positions are typically double; we convert to
    `f32` when filling the Rust mesh model (standard for GPU meshes; CAD
    coordinates can exceed f32 precision for large models — a per-part
    origin/translation strategy may be needed later, same as Unity's own
-   float precision guidance).
+   float precision guidance). Normals are always `float` in OCCT and
+   converted unchanged.
 
 ## Mesh interchange in this build (writers/readers present)
 

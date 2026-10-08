@@ -25,10 +25,12 @@ Poly_Triangulation per TopoDS_Face
   │    • transform nodes by TopLoc_Location
   │    • fix TopAbs_REVERSED winding
   │    • 1-based → 0-based indices
+  │    • per-node normals: location transform,
+  │      TopAbs_REVERSED negation
   ▼
-Greyhound core mesh model (Rust)                      [to be built]
+Greyhound core mesh model (Rust)                      [crates/mesh]
   │  neutral: flat f32 positions + u32 indices,
-  │  per-face ranges, normals later; OCCT coords (mm),
+  │  per-face ranges, normals; OCCT coords (mm),
   │  all triangles outward-CCW in OCCT algebra
   ▼
 Unity projection (Rust)                               [to be built]
@@ -100,7 +102,7 @@ the imported GameObject keeps Unity scale (1, 1, 1).
   Unity physics, lighting and camera defaults behave sanely at (1, 1, 1).
 - Keep the core model in native mm — no scale there; tessellation deflection
   is specified in model units (mm) and applied before any scaling
-  (`step_mesh.cpp:82`), so nothing changes for the shim. Changing the scale
+  (`step_mesh.cpp:84`), so nothing changes for the shim. Changing the scale
   factor is a re-projection of the core model (cheap buffer math), never a
   re-tessellation.
 - Baking mm → m before the f64→f32 cast also improves f32 relative precision:
@@ -117,8 +119,10 @@ user-configurable as an import setting.
 - **OCCT:** front faces are wound so that the right-hand-rule normal
   `(v1−v0)×(v2−v0)` points **outward** (counter-clockwise seen from outside).
   Faces flagged `TopAbs_REVERSED` store inverted order; the shim already
-  swaps two indices for them (`step_mesh.cpp:124-128`), so the core model is
-  uniformly outward-CCW in OCCT algebra.
+  swaps two indices for them (`step_mesh.cpp:152`), so the core model is
+  uniformly outward-CCW in OCCT algebra. The shim's emitted normals are
+  negated the same way, so they point outward too and agree with the winding
+  (gap G1).
 - **Unity:** front faces connect **clockwise** as viewed; Unity derives
   facing from winding order and culls back faces by default
   (Unity Manual *Mesh index data*, "Winding order").
@@ -143,9 +147,10 @@ Two notes:
   shading), and after `n' = P·n` they still point physically outward, which
   is what lighting wants. The winding flip only affects facing/culling.
 - Edge case — negative-scale `TopLoc_Location`: `gp_Trsf` may carry a
-  negative uniform scale (a mirror). The shim transforms positions with the
-  full trsf (`step_mesh.cpp:117-119`) but does not flip winding for such
-  faces, so a mirrored instance would render inside-out. Standard STEP
+  negative uniform scale (a mirror). The shim transforms positions and
+  normals with the full trsf (`step_mesh.cpp:131-147`) but does not flip
+  winding or normals for such faces, so a mirrored instance would render
+  inside-out. Standard STEP
   placements (`AXIS2_PLACEMENT_3D`) are rotation+translation frames and never
   mirror, so this is theoretical for our reader; add a defensive
   `det(trsf) < 0 → flip` check anyway (gap G9).
@@ -167,7 +172,7 @@ planned Unity vertex struct:
   rule; the matching C# struct needs
   `[StructLayout(LayoutKind.Sequential)]` (`unity-mesh.md`).
 - Precision: positions/normals converted to f32 at extraction (shim already
-  casts positions, `step_mesh.cpp:120-122`). Same limit Unity itself has; the
+  casts positions, `step_mesh.cpp:133-135`). Same limit Unity itself has; the
   f64→f32 loss is the importer's only precision loss (gap G10 for huge
   models).
 
@@ -175,7 +180,7 @@ planned Unity vertex struct:
 
 - OCCT gives one `Poly_Triangulation` per face with 1-based node indices; the
   shim already concatenates faces into one global 0-based `u32` buffer
-  (`step_mesh.cpp:111-134`). Faces share **no** vertices (each face owns its
+  (`step_mesh.cpp:119-164`). Faces share **no** vertices (each face owns its
   node array; UV-seam nodes are duplicated by design), so concatenation is
   lossless.
 - Unity consumes one shared index buffer + `SubMeshDescriptor`s
@@ -236,8 +241,8 @@ Status: **shim** = exists in C++ shim today; **planned** = agreed next step;
 
 | # | Area | Status | Note |
 |---|---|---|---|
-| G1 | Normal extraction | planned | Shim fills positions only (`step_mesh.cpp:118-123`); no `Normal(i)`. Also needs `HasNormals()==false → ComputeNormals()` fallback, rotation-only location transform for normals, and a check of `TopAbs_REVERSED` normal handling (stored normals may follow surface orientation — verify against OCCT's own STL/OBJ writers) |
-| G2 | UVs | open | OCCT UVs are surface *parameters* (arbitrary ranges, per-face space, seam-duplicated), not normalized texture coords. For CAD STEP they are rarely meaningful without textures. Recommendation: omit `TexCoord0` for v1 (24 B layout), revisit when texturing is requested |
+| G1 | Normal extraction | done | Shim emits per-vertex unit normals (ABI v3): `BRepLib_ToolTriangulatedShape::ComputeNormals()` when `HasNormals()` is false, location transform, `TopAbs_REVERSED` negation — matching OCCT's own exporters (`RWMesh_FaceIterator::NormalTransformed` reverses the same way; stored normals follow surface-natural orientation, not the face flag). Empirically verified on `rod-clamp-16mm.stp`: 0/5580 vertex normals oppose their triangle winding with the negation, 4572/5580 without (`step_mesh.cpp:141-147`) |
+| G2 | UVs | decided | Omit `TexCoord0` for v1 (24 B `[pos][normal]` layout). OCCT UVs are surface *parameters* (arbitrary ranges, per-face space, seam-duplicated), not normalized texture coords, and CAD STEP has no textures to map. Decided 2026-10-07; the shim never reads `UVNode`, the mesh model keeps its `uvs` field for a future texturing pass |
 | G3 | Core mesh model + per-face ranges | done | `crates/mesh` model validated at the ABI boundary; shim reports per-face counts (`greyhound_mesh_counts`/`greyhound_mesh_fill`, ABI v2); two-phase tuple return retired |
 | G4 | Unity projection | planned | Axis permutation, winding flip, scale, submesh assembly — does not exist yet |
 | G5 | Submesh grouping | open | Per-face / per-solid / single. Recommend per-solid for v1 (material slots scale) |

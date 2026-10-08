@@ -50,6 +50,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         println!("verts:    {}", mesh.vertices().len());
         println!("tris:     {}", mesh.triangles().len());
         println!("ranges:   {}", mesh.faces().len());
+        println!("normals:  {}", mesh.normals().map_or(0, |n| n.len()));
     }
     Ok(())
 }

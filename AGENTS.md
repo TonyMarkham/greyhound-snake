@@ -66,8 +66,8 @@ Decisions below are settled; the referenced docs hold the rationale. Do not
 re-litigate them without new information, and keep them consistent when
 implementing.
 
-- The host-neutral mesh abstraction is a **Rust core mesh model** (not built
-  yet, gap G3): flat `f32` positions + `u32` indices + per-face ranges, in
+- The host-neutral mesh abstraction is a **Rust core mesh model** (built,
+  gap G3 done): flat `f32` positions + `u32` indices + per-face ranges, in
   OCCT coordinates (mm), triangles outward-CCW in OCCT algebra.
   `Poly_Triangulation` is an internal detail behind the C++ shim, not the
   abstraction; no OCCT type crosses an ABI.
@@ -85,11 +85,10 @@ implementing.
 - Unity C# side targets the advanced Mesh API
   (`SetVertexBufferParams` → data → `SetIndexBufferParams` → data →
   `SetSubMeshes` → bounds), `UInt32` indices, interleaved
-  pos+normal stream, no `TexCoord0` for v1 (OCCT UVs are surface
-  parameters, gap G2).
+  pos+normal stream, no `TexCoord0` for v1 (G2 decided: UVs omitted).
 - The Unity projection is scalar first; SIMD only if profiling shows it
   matters (`perf.md` revisit trigger).
-- Remaining open decisions (G2, G5, G6, G11) and deferred items are tracked
+- Remaining open decisions (G5, G6, G11) and deferred items are tracked
   in the `occt-to-unity.md` gap table — consult it before proposing mesh or
   projection work.
 

@@ -5,6 +5,7 @@
 #include <BRepBndLib.hxx>
 #include <Bnd_Box.hxx>
 #include <Poly_Triangulation.hxx>
+#include <BRepLib_ToolTriangulatedShape.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopoDS.hxx>
 #include <TopLoc_Location.hxx>
@@ -104,9 +105,10 @@ extern "C" int32_t greyhound_mesh_counts(
 }
 
 extern "C" int32_t greyhound_mesh_fill(
-    void* doc_in, float* verts, uint32_t* indices, uint32_t* face_counts) noexcept {
+    void* doc_in, float* verts, float* normals, uint32_t* indices,
+    uint32_t* face_counts) noexcept {
   return greyhound::guard<int32_t>(1, [&]() -> int32_t {
-    if (!doc_in || !verts || !indices || !face_counts) {
+    if (!doc_in || !verts || !normals || !indices || !face_counts) {
       greyhound::set_error("invalid mesh handle or output pointer");
       return 1;
     }
@@ -115,17 +117,33 @@ extern "C" int32_t greyhound_mesh_fill(
     uint32_t face_index = 0;
     for (TopExp_Explorer e(doc->shape, TopAbs_FACE); e.More(); e.Next()) {
       TopLoc_Location loc;
-      const Handle(Poly_Triangulation)& tri =
-          BRep_Tool::Triangulation(TopoDS::Face(e.Current()), loc);
+      const TopoDS_Face face = TopoDS::Face(e.Current());
+      const Handle(Poly_Triangulation)& tri = BRep_Tool::Triangulation(face, loc);
       if (tri.IsNull()) continue;
+      BRepLib_ToolTriangulatedShape::ComputeNormals(face, tri);
+      if (!tri->HasNormals()) {
+        greyhound::set_error("face triangulation has no normals");
+        return 1;
+      }
       const gp_Trsf& trsf = loc.Transformation();
+      const bool reversed = face.Orientation() == TopAbs_REVERSED;
       for (int i = 1; i <= tri->NbNodes(); ++i) {
         gp_Pnt p = tri->Node(i).Transformed(trsf);
         *verts++ = static_cast<float>(p.X());
         *verts++ = static_cast<float>(p.Y());
         *verts++ = static_cast<float>(p.Z());
+        // Stored normals follow the surface's natural orientation, not the
+        // face orientation flag; mirror what OCCT's own mesh exporters do
+        // (RWMesh_FaceIterator::NormalTransformed): transform by the location,
+        // then reverse for REVERSED faces so normals match the emitted
+        // (orientation-corrected) winding.
+        gp_Dir n = tri->Normal(i);
+        if (!loc.IsIdentity()) n.Transform(trsf);
+        if (reversed) n.Reverse();
+        *normals++ = static_cast<float>(n.X());
+        *normals++ = static_cast<float>(n.Y());
+        *normals++ = static_cast<float>(n.Z());
       }
-      const bool reversed = e.Current().Orientation() == TopAbs_REVERSED;
       uint32_t tri_count = 0;
       for (int i = 1; i <= tri->NbTriangles(); ++i) {
         int n1, n2, n3;

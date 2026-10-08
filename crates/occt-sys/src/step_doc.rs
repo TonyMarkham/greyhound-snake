@@ -93,6 +93,11 @@ impl StepDoc {
             .try_reserve_exact(vertex_len)
             .map_err(|error| OcctError::step(format!("vertex allocation: {error}")))?;
         vertices.resize(vertex_len, [0.0; 3]);
+        let mut normals = Vec::<[f32; 3]>::new();
+        normals
+            .try_reserve_exact(vertex_len)
+            .map_err(|error| OcctError::step(format!("normal allocation: {error}")))?;
+        normals.resize(vertex_len, [0.0; 3]);
         let triangle_len = index_len / 3;
         let mut triangles = Vec::<[u32; 3]>::new();
         triangles
@@ -112,6 +117,7 @@ impl StepDoc {
             (self.api.mesh_fill)(
                 self.handle.as_ptr(),
                 vertices.as_mut_ptr().cast::<f32>(),
+                normals.as_mut_ptr().cast::<f32>(),
                 triangles.as_mut_ptr().cast::<u32>(),
                 face_counts.as_mut_ptr(),
             )
@@ -140,6 +146,7 @@ impl StepDoc {
 
         MeshBuilder::default()
             .with_vertices(vertices)
+            .with_normals(normals)
             .with_triangles(triangles)
             .with_faces(faces)
             .build()
