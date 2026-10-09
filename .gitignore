@@ -9,3 +9,6 @@ target/
 
 # IDE
 .idea/
+
+# disposable
+__WIP__/

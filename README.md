@@ -1,29 +1,45 @@
 # greyhound-snake
 
 A Unity **Scripted Importer for STEP files** built on Open CASCADE Technology
-(OCCT). The plan is to ship it as a **Unity Package Manager (UPM) package that
-bundles the required OCCT native binaries**, so Unity users never install OCCT
+(OCCT). Shipped as a **Unity Package Manager (UPM) package that bundles the
+required OCCT native binaries**, so Unity users never install OCCT
 themselves.
 
-**Status: early groundwork.** The Unity integration and the UPM package do not
-exist yet. What exists today is a Linux x86_64 Rust workspace with C++ shims
-that load OCCT at runtime and exercise STEP import end to end from the command
-line. Building this repository does not by itself create or validate the Unity
-importer.
+**Status: working on Linux x86_64.** The importer imports single parts and
+assembly hierarchies into Unity with per-part solid colors, bounds, and
+exact-BRep mass properties (per-part and rolled up over assemblies). The
+packaged native payload and its loading are relocatable — validated from an
+installed package, not just the developer checkout. Joint authoring and a
+MuJoCo exporter are designed but not yet built (`unity-mujoco.md`). Only
+Linux x86_64 is exercised end to end.
 
 ## Repository layout
 
 | Path | Purpose |
 |---|---|
-| `crates/occt-sys` | Rust binding: runtime loader for the C++ shim and OCCT libraries; STEP open/info/mesh API (`Occt`, `StepDoc`, `StepInfo`, `GreyBbox`) |
-| `crates/occt-sys/cpp` | C++ shims with a C ABI, compiled by `build.rs` |
+| `crates/occt-sys` | Rust binding: runtime loader for the C++ shim and OCCT libraries; STEP open/info/mesh/scene/mass-properties API behind a version-gated C ABI |
+| `crates/occt-sys/cpp` | C++ shims with a C ABI, compiled by `build.rs` directly into the package layout |
+| `crates/mesh` | Host-neutral core mesh model (positions/indices/per-face ranges, assembly scene, exact-BRep `MeshProperties`) |
+| `crates/unity-projection` | OCCT→Unity projection: axis permutation, winding flip, scale, submesh assembly |
+| `crates/importer-host` | Unity-facing cdylib — flat, version-gated C ABI over the projection |
 | `crates/step-stats` | CLI that prints geometry stats (solids/faces/edges/bbox) for a STEP file |
-| `occt-linux.md` / `occt-mac.md` / `occt-win.md` | Platform instructions for installing OCCT 8.0.1 |
-| `assets/` | Sample STEP file |
+| `package/com.greyhound.step` | Tracked UPM package sources: the C# `Runtime/` P/Invoke layer and components, the `Editor/` ScriptedImporter |
+| `tools/verify-package.py` | End-to-end verification of the assembled package against measured constants |
+| `justfile` | `just assemble-package` stages package + native payload into `dist/`; `just verify-package` checks it from a copied layout |
+| `assets/` | Sample STEP files (single part `rod-clamp-16mm.stp`, assembly `cart-asy.step`) |
 | `config.toml` | Runtime config for `step-stats`: OCCT `library_dir` and `shim_path` |
-| `.cargo/config.toml` | Sets `OCCT_PREFIX` for the shim build |
+| `.cargo/config.toml` | Sets `OCCT_PREFIX` and `OCCT_SHIM_DIR` so OCCT installs and the shim compiles into the package layout |
+| `third_party/occt` | OCCT license and exception texts bundled with the binaries |
 | `dist/` | Gitignored native output (see below) |
 | `tmp/` | Gitignored OCCT source/build scratch area, including the stage logs (see `occt-linux.md`) |
+
+### Design reference docs
+
+- `occt-to-unity.md` — the OCCT→Unity transformation pipeline, the gap
+  backlog, and the handedness/source-of-truth rules
+- `occt-mesh.md`, `unity-mesh.md` — mesh data-model facts for both sides
+- `unity-mujoco.md` — MuJoCo/MJCF export and joint authoring facts and plan
+- `perf.md` — benchmark plan and the scalar-first SIMD decision
 
 ## Native output layout
 
@@ -33,11 +49,6 @@ importer.
 | `…/Runtime/Plugins/occt/x86_64/` | the OCCT installation (`lib/`, `include/opencascade/`, `share/`, `bin/`) |
 | `…/Runtime/Plugins/shim/x86_64/` | `libgreyhound_occt.so` — the C++ shim built by `occt-sys/build.rs` |
 | `…/Runtime/Plugins/x86_64/` | `libimporter_host.so` — the Unity-facing host cdylib |
-
-The only working platform today is `x86_64-linux`. OCCT installs and the
-shim compiles directly into the package layout; `just assemble-package`
-stages the authored sources and the host cdylib, and `just verify-package`
-checks the result from a copied layout.
 
 ## Getting started (Linux x86_64)
 
@@ -67,20 +78,31 @@ Prerequisites: a recent Rust toolchain (edition 2024) and a C++17 compiler.
    `--config` defaults to `config.toml` in the working directory; its
    `library_dir` and `shim_path` values resolve relative to the config file's
    directory.
+4. Assemble and verify the UPM package:
+
+   ```
+   just verify-package
+   ```
+
+5. Use it in Unity: reference or copy
+   `dist/package/com.greyhound.step/` into a project (a `file:` entry in
+   `Packages/manifest.json` works), restart the editor so the native plugins
+   are scanned, and drop a `.stp`/`.step` file into `Assets/`.
 
 ## How native loading works
 
-- `step-stats` reads `config.toml`, then `occt-sys` `dlopen`s the shim and
-  explicitly preloads every OCCT library reachable through the shim's ELF
-  `DT_NEEDED` chain from `library_dir` before any STEP work
-  (`crates/occt-sys/src/dependencies.rs`).
+- Unity loads `importer_host` as a native plugin from the package's
+  `Runtime/Plugins/x86_64` directory and P/Invokes it
+  (`NativeMethods.cs`).
+- The C# side resolves the package's own plugin directories at runtime
+  (`OcctLibraryDirectory()`, shim path) and hands them to the host; nothing
+  pins absolute paths from the developer's checkout.
+- `occt-sys` `dlopen`s the shim and explicitly preloads every OCCT library
+  reachable through the shim's ELF `DT_NEEDED` chain from that directory
+  before any STEP work (`crates/occt-sys/src/dependencies.rs`).
 - The shim is built with `RPATH=$ORIGIN`; the loader tests use stub fixtures
   compiled alongside it, so they exercise the loader without touching real
   OCCT libraries at runtime.
-- This config-file loading is development scaffolding, not the Unity loading
-  strategy. Relocatable loading from an installed UPM package — dependency
-  closure packaging, `$ORIGIN` setup, resource lookup, license inclusion — is
-  not implemented or documented yet.
 
 ## Platform OCCT installation docs
 
@@ -89,8 +111,9 @@ Prerequisites: a recent Rust toolchain (edition 2024) and a C++17 compiler.
   third-party libraries)
 - **`occt-win.md`** — install the official prebuilt Windows binaries (MSVC x64)
 
-Only the Linux x86_64 path is exercised by the Rust/C++ integration today; the
-macOS/Windows docs cover OCCT installation, not a working integration.
+Only the Linux x86_64 path is exercised by the Rust/C++/Unity integration
+today; the macOS/Windows docs cover OCCT installation, not a working
+integration.
 
 ## License
 

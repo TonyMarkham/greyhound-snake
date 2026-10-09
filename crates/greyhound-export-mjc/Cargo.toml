@@ -1,0 +1,19 @@
+[package]
+name             = "greyhound-export-mjc"
+version          = { workspace = true }
+edition          = { workspace = true }
+
+[dependencies]
+clap             = { workspace = true }
+error-location   = { workspace = true }
+mesh             = { workspace = true }
+occt-sys         = { workspace = true }
+serde            = { workspace = true }
+thiserror        = { workspace = true }
+toml             = { workspace = true }
+
+[dev-dependencies]
+tempfile         = { workspace = true }
+
+[lints]
+workspace        = true

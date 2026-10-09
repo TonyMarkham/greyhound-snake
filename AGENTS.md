@@ -102,6 +102,9 @@ mesh/projection work instead of re-deriving):
 - `unity-mujoco.md`: MuJoCo/MJCF export and joint authoring facts and
   plan (the core model's second consumer; naive rigid-tree exporter, then
   joint annotation + UX bites).
+- `better-occt-bins.md`: the neutral-OCCT-install + selective-staging
+  workflow (payload facts, `just stage-occt` design, the STEP-resources
+  needs-test).
 - `perf.md`: benchmark plan (criterion, micro/macro layers, assets),
   the scalar-first SIMD decision and its revisit trigger, and rules for
   recording timings.
