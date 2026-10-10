@@ -99,6 +99,7 @@ namespace Greyhound.Step
             StepJointSetFactory.WarnDuplicatePartNames(set, instanceRoot, part);
             StepJoint joint = StepJointSetFactory.CreateJointAsset(set, instanceRoot, part, type);
             Select(joint);
+            StepJointEditor.BeginPick(joint);
         }
 
         private static void AddActuatorInternal(GameObject part)

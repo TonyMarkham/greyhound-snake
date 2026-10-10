@@ -142,12 +142,13 @@ in a manual Unity validation:
   the assembly root, creation-time name alongside) with a drop zone for
   drag-to-rebind — the re-pick affordance. Verify: styled forms render
   and edit; overview pings parts.
-- **M2c — scene authoring**: axis-pick rays, `PositionHandle`, gizmos,
-  wiggle slider + pose restore; Hierarchy marker hook (persistent tint
-  + bar on jointed part rows via `hierarchyWindowItemOnGUI`, membership
-  through the containers, nothing stored on parts). Verify: transcribe
-  the real cart slide + pole hinge via axis pick + fields; wiggle
-  both — signs and anchors confirmed. This is the UX payoff shard.
+- **M2c — scene authoring**: axis-pick rays, `PositionHandle`, gizmos;
+  Hierarchy marker hook (persistent tint
+  + bar on jointed part rows via `hierarchyWindowItemByEntityIdOnGUI`,
+  membership through the containers, nothing stored on parts). Verify:
+  transcribe the real cart slide + pole hinge via axis pick + fields;
+  signs and anchors confirmed against the rendered geometry. This is
+  the UX payoff shard.
 - **M2d — reimport survival + lifecycle**: AssetPostprocessor
   validation by sibling-path resolution, unmatched-path Console
   reporting, container prune on deleted assets. Verify: reimport →
@@ -271,14 +272,18 @@ self-sufficient, keyed and resolved by STEP part names):
    relative `Style src` in UXML is unreliable — and the shipped .meta
    GUIDs keep the assignments stable. The layout is data, editable in
    place, no recompile.
-- The joint asset's editor keeps the scene tools in `OnSceneGUI` (Handles
-  are not UXML — only the forms are): the axis-pick rays, the
-  `PositionHandle`, the **wiggle slider's** kinematics, and the gizmo
-  (axis line, rotation arc / travel double-arrow across the limits)
-  while the part is selected. The wiggle slider itself is a UXML slider
-  (prismatic across the mechanical range, revolute −π..π or the authored
-  limits; pose restores on release — the check that catches sign flips
-  and off-pivot anchors before any export).
+- The joint asset's editor keeps the scene tools in the
+  `SceneView.duringSceneGui` callback (Handles are not UXML — only the
+  forms are; Unity 6.7 removed the per-editor `OnSceneGUI` hook): the
+  axis-pick rays, the `PositionHandle`, and the gizmo (axis line,
+  rotation arc / travel double-arrow across the limits) while that
+  joint owns the tools — the editor claims a static authored-joint
+  slot on enable, so the tools keep working while its inspector is
+  **locked** and the selection is elsewhere; the claim clears when the
+  editor dies while deselected (unlocked lifecycle), another joint's
+  editor opens, or the asset is deleted. The re-pick button also
+  selects the asset first, so the authored asset stays pinged in the
+  Project window.
 - The container's UIToolkit editor doubles as the set overview: its
   `ListView`s of joints/actuators ping-select entries and their parts —
   the surface the dropped window would have been.
@@ -303,9 +308,8 @@ self-sufficient, keyed and resolved by STEP part names):
   FreeCAD joint tree's cart slide + pole hinge (right-click →
   `Add > Joint`, axis pick, fields), add the position actuator
   (`Add > Actuator`), reimport, and confirm the asset family survives
-  the reimport with no unmatched-part errors; wiggle each joint to
-  verify signs and anchors. No Rust, shim, or host changes; nothing to build outside
-  Unity.
+  the reimport with no unmatched-part errors. No Rust, shim, or host
+  changes; nothing to build outside Unity.
 
 ## Bite M3 — exporter consumes joints
 

@@ -7,6 +7,7 @@
         <ue:PropertyField binding-path="mj.pos" />
         <ue:PropertyField binding-path="mj.axis" />
         <ui:Label name="axis-warning" class="warning" text="axis must be a non-zero unit vector" />
+        <ui:Button name="repick-axis" text="Re-pick Axis" />
         <ue:PropertyField binding-path="mj.rangeEnabled" />
         <ue:PropertyField binding-path="mj.rangeLo" />
         <ue:PropertyField binding-path="mj.rangeHi" />
