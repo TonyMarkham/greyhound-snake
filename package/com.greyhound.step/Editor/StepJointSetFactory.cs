@@ -203,7 +203,7 @@ namespace Greyhound.Step
             return chain;
         }
 
-        private static Transform ResolveInstanceRoot(string stepAssetPath)
+        internal static Transform ResolveInstanceRoot(string stepAssetPath)
         {
             PrefabStage stage = PrefabStageUtility.GetCurrentPrefabStage();
             if (stage != null && stage.assetPath == stepAssetPath && stage.prefabContentsRoot != null)
@@ -300,7 +300,7 @@ namespace Greyhound.Step
             }
         }
 
-        private static bool HasStepExtension(string path)
+        internal static bool HasStepExtension(string path)
         {
             string extension = Path.GetExtension(path).ToLowerInvariant();
             return extension == ".stp" || extension == ".step";
