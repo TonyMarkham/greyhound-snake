@@ -1,0 +1,35 @@
+.section-title {
+    -unity-font-style: bold;
+    font-size: 13px;
+    margin-bottom: 4px;
+}
+
+.warning {
+    color: rgb(230, 110, 80);
+    margin-top: 2px;
+    margin-bottom: 6px;
+    display: none;
+}
+
+.sibling-path-chain {
+    margin-left: 10px;
+}
+
+.sibling-path-chain__row {
+    padding: 1px 0;
+}
+
+.sibling-path-chain__row--target {
+    -unity-font-style: bold;
+}
+
+.sibling-path-dropzone {
+    border-width: 1px;
+    border-radius: 3px;
+    border-color: rgb(90, 90, 90);
+    padding: 6px;
+    margin-top: 4px;
+    opacity: 0.75;
+    justify-content: center;
+    -unity-text-align: middle-center;
+}

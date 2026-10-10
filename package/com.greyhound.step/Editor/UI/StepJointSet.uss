@@ -1,0 +1,23 @@
+.section-title {
+    -unity-font-style: bold;
+    font-size: 13px;
+    margin-bottom: 4px;
+}
+
+.list-header {
+    -unity-font-style: bold;
+    margin-top: 8px;
+    margin-bottom: 2px;
+}
+
+.list-view {
+    height: 88px;
+    border-width: 1px;
+    border-color: rgb(70, 70, 70);
+    border-radius: 2px;
+    margin-bottom: 4px;
+}
+
+.list-item {
+    padding: 2px 4px;
+}

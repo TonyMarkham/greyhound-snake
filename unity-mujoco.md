@@ -125,21 +125,33 @@ Sharded 2026-10-09 — four worktree bites in dependency order, each ending
 in a manual Unity validation:
 
 - **M2a — data model + creation**: `StepJointSet`/`StepJoint`/
-  `StepActuator` assets, `StepJointHandle`, root-mobility component, set
-  folder locate/create, `Add >` menu items with validation, auto-select.
+  `StepActuator` assets, set folder locate/create, `Add >` menu items
+  with validation, auto-select. No components attach to the imported
+  hierarchy.
   Verify: menus create the asset family on cart-pole; default SO
   inspectors are editable; container lists populate.
 - **M2b — UIToolkit editors**: the three `[CustomEditor]`s + six
   UXML/USS files, bound `PropertyField`s, container ListViews as the set
-  overview. Verify: styled forms render and edit; overview pings parts.
+  overview (ListView has lived in `UnityEngine.UIElements` since Unity
+  6 — the UXML spells it `ui:ListView`; the legacy
+  `UnityEditor.UIElements` namespace has no `UxmlElement` descriptor and
+  fails to instantiate); the `stepAssetPath` drawer re-skins as a
+  `CreatePropertyGUI` UIToolkit binding and the IMGUI plumbing is
+  deleted; the joint's `StepSiblingPath` renders through its own
+  `PropertyDrawer` as an immutable hierarchy accordion (live chain from
+  the assembly root, creation-time name alongside) with a drop zone for
+  drag-to-rebind — the re-pick affordance. Verify: styled forms render
+  and edit; overview pings parts.
 - **M2c — scene authoring**: axis-pick rays, `PositionHandle`, gizmos,
-  wiggle slider + pose restore. Verify: transcribe the real cart slide +
-  pole hinge via axis pick + fields; wiggle both — signs and anchors
-  confirmed. This is the UX payoff shard.
+  wiggle slider + pose restore; Hierarchy marker hook (persistent tint
+  + bar on jointed part rows via `hierarchyWindowItemOnGUI`, membership
+  through the containers, nothing stored on parts). Verify: transcribe
+  the real cart slide + pole hinge via axis pick + fields; wiggle
+  both — signs and anchors confirmed. This is the UX payoff shard.
 - **M2d — reimport survival + lifecycle**: AssetPostprocessor
-  auto-restore by `childPart` matching, unmatched-name Console
+  validation by sibling-path resolution, unmatched-path Console
   reporting, container prune on deleted assets. Verify: reimport →
-  handles return; delete a joint → prune.
+  unmatched joints reported; delete a joint → prune.
 
 Decided post-M1 (2026-10-09):
 
@@ -163,75 +175,102 @@ Data model (`Greyhound.Step`, Runtime assembly):
 - `StepJointSet` (the container asset, `<step-stem>.joints.asset`):
   `stepAssetPath` (the .stp's project path — the stable key; a serialized
   reference to the imported root GameObject dies on every reimport, so
-  the path is the only durable link), `rootMobility: free | welded`,
+  the path is the only durable link; a `PropertyDrawer` renders it as an
+  asset link to the .stp — drag, ping, or clear — while the string stays
+  the serialized store), `rootMobility: free | welded`,
   `List<StepJoint> joints`, `List<StepActuator> actuators` — **direct
   object references; no GUIDs anywhere**.
-- `StepJoint` (one .asset per joint): `name`, `child part` (STEP part
-  name), `parent part`, `type: slide | hinge`, `origin` (child-local, m),
-  `axis` (child-local unit), `limits lo/hi` (optional — the mechanical
-  range), `damping`, `frictionloss`, `armature`. Pure kinematics. Entries
-  key on **STEP part names** — stable across reimports, unlike node
-  indices; creation warns on duplicate part names, since keying assumes
-  unique occurrence names.
-- `StepActuator` (one .asset per actuator): `name`, `target joint`
-  (object reference to a `StepJoint`), `type: position` (v1), belt pitch
-  radius (m), `forcerange lo/hi`, `ctrlrange lo/hi` (the operating
-  range), calibration field (homing end, approach speed, zero offset).
-  Mirrors MJCF, where `<actuator>` is a separate element referencing a
-  joint by name — the joint asset stays kinematics-only.
+- `StepJoint` (one .asset per joint): the SO carries identity and Unity
+  references only — `root` (reference to the owning `StepJointSet`; the
+  required affordance, durable because .asset files are not reimported),
+  the asset's own `name` (the MJCF `<joint name>`), and `body`, a
+  `StepSiblingPath`: the **sibling-index path from the assembly root as
+  the source of truth** for the body the joint is defined in — the
+  hierarchy rebuilds deterministically per STEP file, so the path is
+  rename-robust and distinguishes duplicate-named parts (the
+  duplicate-name warning now guards MJCF body-name collisions at
+  export, an M3 concern, not keying) — plus `mj`, an `MjJoint` payload:
+  the `[Serializable]` MJCF `<joint>` mirror with attribute names
+  verbatim (`type`, `pos` (m), `axis`, `rangeEnabled` + `rangeLo/hi` —
+  the presence bit for the optional `range` attribute), `damping`,
+  `frictionloss`, `armature`. No parent field — parenting is the
+  hierarchy's job. Reimport conflict resolution (compare the resolved
+  part's name against the stored one; accept rename or re-pick) is
+  **deferred** — the design lives in the `StepSiblingPath` comment;
+  until then a shifted index path rebinds to whatever sits at the
+  position now.
+- `StepActuator` (one .asset per actuator): the SO carries `root` (the
+  required affordance), the asset's own `name`, `target joint` (object
+  reference to a `StepJoint`) — plus `mj`, an `MjActuator` payload: the
+  `[Serializable]` MJCF `<position>` mirror (`type`, `forcerange lo/hi`,
+  `ctrlrange lo/hi` in joint units). Nothing deployment-side lives in
+  the schema: calibration (homing end, approach speed, zero offset) and
+  transmission constants (the belt pitch radius) enter when their
+  consumer exists — at M3 or on the deployment side — never as schema
+  fields. Mirrors MJCF, where `<actuator>` is a separate element
+  referencing a joint by name — the joint asset stays kinematics-only.
+- The `Mj*` payload classes (`MjJoint`, `MjActuator`) are pure,
+  attribute-verbatim MJCF mirrors and the future seam for MJCF XML
+  serialization: the M3 exporter writes XML elements from them, and
+  Unity-specific concerns never leak into them.
 - The asset family is the **data source of truth for articulation** —
   STEP has no joint semantics to import — while geometry remains the
   STEP's truth; the exporter merges the two, so the assets must survive
   reimports of the geometry they annotate. MJCF mapping of the range
   split (joint limits → joint `range`, actuator `ctrlrange` → actuator
-  envelope, calibration → deployment-side only) is settled with the
-  exporter bite, not M2.
+  envelope) is settled with the exporter bite, not M2.
 
-Scene integration and editor UX (decided 2026-10-09):
+Scene integration and editor UX (decided 2026-10-09; revised same day —
+no components anywhere in the imported hierarchy: the asset family is
+self-sufficient, keyed and resolved by STEP part names):
 
 - Authoring rides Unity's own affordances — **no custom window**.
   Right-click a part in the Hierarchy → `Add > Joint > Slide` /
   `Add > Joint > Hinge` / `Add > Actuator` (GameObject menu items,
   rendered in the Hierarchy context menu, the Hierarchy `+` dropdown,
-  and the GameObject menu bar). Validation greys the joint items when
-  the selection is not a STEP-imported part or already carries a joint
-  handle, and greys the actuator item when the selection carries no
-  joint. The menu handler walks up from the selection to its prefab
+   and the GameObject menu bar). Validation greys the joint items when
+   the selection is not a STEP-imported part or already has a joint in
+   the set for its position, and greys the actuator item when the
+   selection has no unambiguous joint. The menu handler walks up from
+   the selection to its prefab
   root, resolves the source `.stp` path, and finds or creates the set
   folder + container. The parent of a joint is never picked: it is the
   part's hierarchy parent — the parent–child rule holds by construction
   (and matches MJCF, where a joint couples a body to its implicit tree
   parent).
 - Joint creation: inserts a `StepJoint` .asset into the set folder
-  (default name from the child part), appends it to the container's
-  list, attaches a lightweight `StepJointHandle` component to the part
-  holding a **direct object reference** to the joint asset, and
-  auto-selects the asset — its serialized fields render **natively** in
-  the Inspector; no form-proxy editor needed. The handle's only jobs are
-  scene-side: host the gizmo/handles and give reimport re-binding a
-  per-part attachment point.
+  (named after the part), appends it to the container's
+  list, and auto-selects the asset — its serialized fields render
+  **natively** in the Inspector; no form-proxy editor needed. Nothing is
+  attached to the part GameObject: the SO is self-sufficient, and M2c/M2d
+  resolve the part by sibling-index path through the container's
+  `stepAssetPath` → prefab instance → indexed walk.
 - Axis pick: six `Handles.Button` rays at the part's origin (±X/±Y/±Z in
-  the child's local frame); clicking a ray sets the axis **with sign**.
+  the body's local frame); clicking a ray sets the axis **with sign**.
   A slide needs nothing more (its joint pos is render-only); a hinge's
-  origin is then dragged with a `PositionHandle`. Esc cancels; the
+  pos is then dragged with a `PositionHandle`. Esc cancels; the
   joint asset's editor offers a re-pick button. CAD axes are orthogonal
   — free axis rotation is deliberately impossible.
 - Actuator creation: `Add > Actuator` on a part that carries a joint;
   the new `StepActuator` (type `position`, v1) targets that joint
-  (object reference) and is auto-selected — drive fields (pitch radius,
-  forcerange, ctrlrange, calibration field) render natively.
+  (object reference) and is auto-selected — drive fields (forcerange,
+  ctrlrange) render natively.
 - Deletion: a joint or actuator is its own .asset — delete it in the
-  Project window; the container drops the cleared list slot, and a
-  handle whose joint reference is gone flags itself in the Inspector.
+  Project window; the container drops the cleared list slot (M2d scan),
+  and actuators targeting the deleted joint show the broken reference
+  natively in the Inspector.
 - Custom editors are **UIToolkit, not IMGUI**: `StepJointSet`,
   `StepJoint`, and `StepActuator` each get a `[CustomEditor]`
   implementing `CreateInspectorGUI()`. Forms are **UXML assets styled by
   USS** shipped in the package's `Editor/UI/`; serialized fields render
-  as bound `PropertyField`s, so layout changes are asset edits, not code
-  edits. Numeric editing is **meters native**, axis nonzero, lo < hi.
-  Each editor references its own pair from the package
-  (`Editor/UI/<Type>.uxml` styled by `<Type>.uss`) — the layout is
-  data, editable in place, no recompile.
+   as bound `PropertyField`s, so layout changes are asset edits, not code
+   edits. Numeric editing is **meters native**, axis nonzero, lo < hi.
+   Each editor holds serialized references to its own pair from the
+   package (`Editor/UI/<Type>.uxml` + `<Type>.uss`), assigned on the
+   editor's script asset; stylesheets are applied in code — package-
+   relative `Style src` in UXML is unreliable — and the shipped .meta
+   GUIDs keep the assignments stable. The layout is data, editable in
+   place, no recompile.
 - The joint asset's editor keeps the scene tools in `OnSceneGUI` (Handles
   are not UXML — only the forms are): the axis-pick rays, the
   `PositionHandle`, the **wiggle slider's** kinematics, and the gizmo
@@ -243,27 +282,29 @@ Scene integration and editor UX (decided 2026-10-09):
 - The container's UIToolkit editor doubles as the set overview: its
   `ListView`s of joints/actuators ping-select entries and their parts —
   the surface the dropped window would have been.
-- `rootMobility` has no per-part home: a lightweight root-level
-  component (attached automatically by the first joint creation; add
-  manually for free-root with zero joints) edits the container's
-  `rootMobility`. Reimport failures (unmatched names, duplicates)
+- `rootMobility` is a plain field on the container asset, edited on the
+  container's own Inspector (M2b's overview editor presents it with the
+  rest); the free-root-with-zero-joints path is the container's
+  CreateAssetMenu entry. Reimport failures (unmatched names, duplicates)
   surface as Console messages — there is no window to report them in.
 - Reimport survival: annotations live in the asset family, never on the
-  imported hierarchy (a reimport recreates the GameObjects). After each
-  `.stp` reimport, an AssetPostprocessor hook **auto-restores** the
-  handles on the scene instance by matching part names to
-  `StepJoint.childPart` — fully automatic, no Apply button anywhere.
-  Unmatched part names surface as Console errors ("2 of 5 joints could
-  not be placed"), never silently dropped. Deeper importer-settings
-  integration deferred.
+  imported hierarchy (a reimport recreates the GameObjects), so nothing
+  on the parts needs restoring. After each `.stp` reimport, an
+  AssetPostprocessor hook validates the fresh instance by resolving each
+  joint's sibling path in it (the deferred conflict flow compares the
+  resolved name against the stored one) — fully automatic, no Apply
+  button
+  anywhere. Unmatched part names surface as Console errors ("2 of 5
+  joints could not be placed"), never silently dropped. Deeper
+  importer-settings integration deferred.
 - V1 restriction: joints on **parent–child edges** only (arbitrary pairs
   need inserted intermediate fixed bodies — later).
 - Validation is manual in the user's Unity (6.7.0b1): transcribe the
   FreeCAD joint tree's cart slide + pole hinge (right-click →
   `Add > Joint`, axis pick, fields), add the position actuator
   (`Add > Actuator`), reimport, and confirm the asset family survives
-  and the handles auto-restore; wiggle each joint to verify signs and
-  anchors. No Rust, shim, or host changes; nothing to build outside
+  the reimport with no unmatched-part errors; wiggle each joint to
+  verify signs and anchors. No Rust, shim, or host changes; nothing to build outside
   Unity.
 
 ## Bite M3 — exporter consumes joints

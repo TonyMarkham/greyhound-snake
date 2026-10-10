@@ -1,0 +1,18 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:ue="UnityEditor.UIElements">
+    <ui:VisualElement class="joint-form">
+        <ui:Label text="Step Joint" class="section-title" />
+        <ue:PropertyField binding-path="root" />
+        <ue:PropertyField binding-path="body" />
+        <ue:PropertyField binding-path="mj.type" />
+        <ue:PropertyField binding-path="mj.pos" />
+        <ue:PropertyField binding-path="mj.axis" />
+        <ui:Label name="axis-warning" class="warning" text="axis must be a non-zero unit vector" />
+        <ue:PropertyField binding-path="mj.rangeEnabled" />
+        <ue:PropertyField binding-path="mj.rangeLo" />
+        <ue:PropertyField binding-path="mj.rangeHi" />
+        <ui:Label name="limits-warning" class="warning" text="limits require lo &lt; hi" />
+        <ue:PropertyField binding-path="mj.damping" />
+        <ue:PropertyField binding-path="mj.frictionloss" />
+        <ue:PropertyField binding-path="mj.armature" />
+    </ui:VisualElement>
+</ui:UXML>

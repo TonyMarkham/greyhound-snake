@@ -1,0 +1,12 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:ue="UnityEditor.UIElements">
+    <ui:VisualElement class="actuator-form">
+        <ui:Label text="Step Actuator" class="section-title" />
+        <ue:PropertyField binding-path="root" />
+        <ue:PropertyField binding-path="target" />
+        <ue:PropertyField binding-path="mj.type" />
+        <ue:PropertyField binding-path="mj.forceLo" />
+        <ue:PropertyField binding-path="mj.forceHi" />
+        <ue:PropertyField binding-path="mj.ctrlLo" />
+        <ue:PropertyField binding-path="mj.ctrlHi" />
+    </ui:VisualElement>
+</ui:UXML>
