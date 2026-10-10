@@ -3,8 +3,10 @@
 The cart-pole project's matured design details, settled in conversation
 (2026-10-09/10) after M1 landed. Companion to:
 
-- `unity-mujoco.md` — the M1–M4 bite plan (still the plan of record)
-- `mujoco-m1.md` — M1 checked facts (MJCF schema, STL, projection math)
+- `unity-mujoco.md` — MuJoCo/MJCF export and joint authoring: facts,
+  plan, and the landed M1–M3 decisions
+- `mujoco-schema.md` — MJCF facts checked against the MuJoCo stable
+  docs (the schema layer this file's sim-model references)
 - `occt-to-unity.md` — importer pipeline, gap table G1–G14
 
 Everything below is **design/decision, not code** except where noted.
@@ -20,11 +22,16 @@ deployment architecture that M2–M4 and later bites serve.
   through a timing belt; **500 mm pole** pivoted on the cart; two limit
   switches.
   The user designed, 3D-printed, and built it — CAD in **FreeCAD 1.1.1**
-  (`cart-pole-asm`: pillow-block, bearing, bearing-cap, belt-tensioner,
-  pole-asm, pole-target-holder, pole-target-clamp, bar-rod-d8x240,
-  bar-rod-d8x500, spacer-8mm, rod-clamp-16mm, rod-clamp-8mm …).
+  (`cart-pole-asm`: cart + cart-asy, the pole sub-assembly `Assembly`
+  with pole-target-holder/clamp, Pillow Block ×2, 5972K91_Steel Ball
+  Bearing ×12, bearing-cap ×2, belt-retainer ×2, GT2 48T 8 Bore v3
+  pulley, pully-gt2-idler-6mm-5b, Nema23_Stepper_Motor and
+  5958N103_Wet-Environment Stepper Motor ×20, base-idler, base-motor,
+  bars bar-rd-d16x1000/1001, bar-rd-d5x51, bar-rd-d8x240, bar-rd-d8x500,
+  rod-clamp-16mm ×4, rod-clamp-5mm ×2, rod-clamp-8mm ×4, Screw ×2,
+  spacer-8mm ×2 …).
 - FreeCAD bbox ≈ **1086 × 1056 mm** — consistent with the 1 m rail span and
-  the 500 mm pole hanging below. Verified working: Unity **6.7.0b1**
+  the 500 mm pole hanging below. Verified working: Unity **6.7.0b2**
   imports `cart-pole-asm.stp` through the StepImporter, hierarchy and
   materials intact (screenshot 2026-10-10).
 - The FreeCAD **joint tree** (`GroundedJoint`, `FixedJoint`s,
@@ -171,15 +178,15 @@ deployment architecture that M2–M4 and later bites serve.
   ONNX/Candle, Hailo AI-kit, or ship frames to a bigger box); a one-trait
   change.
 
-## Sim control model (post-M1, pre-M3 bites)
+## Sim control model
 
 - **Stepper/belt = the high-friction-wheel fake**: `<position>` actuator on
   the slide joint, belt folded into `forcerange`/`ctrlrange`. 48-tooth
-  GT2 belt (user wrote "JT2"; confirm) ⇒ pitch radius ≈ **15.28 mm**,
-  96 mm/rev; NEMA-17 at 1.8° ⇒ 0.48 mm/step, **0.03 mm/step at ×16
+  GT2 belt (CAD: `GT2 48T 8 Bore v3` pulley) ⇒ pitch radius ≈ **15.28 mm**,
+  96 mm/rev; NEMA-23 at 1.8° ⇒ 0.48 mm/step, **0.03 mm/step at ×16
   microstepping**; `F_max = τ_stall / 0.01528`. `kp` = tracking grip,
   joint damping = rail friction, ctrl targets advance in microstep
-  increments. Rotor inertia negligible (NEMA-17 vs kg-scale cart) — the
+  increments. Rotor inertia negligible (NEMA-23 vs kg-scale cart) — the
   full-fidelity model (rotor hinge + soft joint equality ⇒ believable
   stall) only if calibration can't reproduce observed behavior.
 - **Direction-reversal calibration is not trial and error**: the fake has
@@ -207,10 +214,17 @@ deployment architecture that M2–M4 and later bites serve.
 - **Curriculum**: near-upright stabilization first; swing-up from hang
   optional later (hard under limited travel). Objective is regulation:
   upright + centered.
-- **M2 consequence**: `StepJointSet` entries gain actuation metadata —
-  drive type, belt ratio/pitch radius, `forcerange`, `ctrlrange`, plus the
-  mechanical-range / operating-range / calibration-field split (homing
-  end, approach speed, zero offset).
+- **M2 consequence (landed)**: actuation is its own asset — `Add >
+  Actuator` on a jointed part creates a `StepActuator` asset (in the
+  set folder) targeting the joint by reference, carrying the
+  `MjActuator` mirror of the MJCF `<position>` element verbatim:
+  `type`, `ctrllimited` + `ctrlLo/Hi`, `forcelimited` + `forceLo/Hi`
+  (the spec's own limit switches; explicit `false` disables
+  clamping). Belt ratio/pitch radius and the calibration split
+  (homing end, approach speed, zero offset) are deliberately **not**
+  schema fields — transmission constants and calibration enter when
+  their consumer exists, on the deployment side; `ctrlrange` remains
+  the sim-side mirror of the firmware envelope clamp.
 
 ## Training loop (three streams, never mixed)
 
@@ -233,7 +247,7 @@ cameras, and eventually no meshes at all (below).
 - **Headless ≠ `-nographics`**: you still need the graphics device to
   render. Working combos: `-batchmode` alone with a GPU, or `xvfb-run`.
   **Not** the Linux *server build* target (strips graphics). Verify
-  against the pinned Unity version — the user runs **6.7.0b1**.
+  against the pinned Unity version — the user runs **6.7.0b2**.
 - **Farm**: eventually ~16 parallel instances as **compiled standalone
   players** (not Editor instances — footprint, startup, licensing). One
   build, N processes, per-instance args (`--instance-id --port --seed`).
@@ -255,23 +269,25 @@ cameras, and eventually no meshes at all (below).
 - MJX symmetry: the physics side can batch the same way the render side
   wants to, later.
 
-## Bbox geoms and the Unity-triggered export (endgame)
+## Export transport (landed) and the bbox-geom option
 
-- **MJCF meshes become simple bounding-box geoms** (`<geom type="box"
-  size pos>` from core-model vertex min/max — no shim change): a debug
-  tool for `simulate` only. No STL assets in the final export; **Unity
-  renders the real STEP geometry**; the STL demotes to optional
-  interchange/debug artifact. Inertials, names, freejoint, and the
-  fixture-box test's *inertial* expectations are unaffected; the STL/asset
-  assertions swap for box-extent assertions.
-- **The export is ultimately triggered from Unity** (M3 already requires
-  it — `StepJointSet` is authored in the Editor). The M1 CLI is the
-  pipeline probe. Final surface: a version-gated C ABI, preferably in
-  `importer-host` (one cdylib, already links `occt-sys`, already exposes
-  the exact inputs); Unity supplies the OCCT plugin dir it ships, the
-  output path, and density/scale from import settings — no `config.toml`.
-  What survives untouched: `assemble`, `quat`, `naming`, `mjcf`, `model`
-  types (host-agnostic); the CLI/config layer is the throwaway part.
+- **Landed (M3, 2026-10-10)**: the exporter is C# in the Unity
+  package — the Export button on the joint-set inspector writes the
+  MJCF model directly from the `Mj*` payload mirrors and the imported
+  prefab, with binary STL meshes, into `<step file>.stp~` beside the
+  STEP file. The two transport options left open at M2 (a C ABI into
+  the host, probe-side JSON feeding the Rust CLI) are rejected: both
+  would bolt an interchange layer onto a data model that already
+  carries MJCF's attribute names, and the CLI path would ship a
+  second native binary. The Rust `greyhound-export-mjc` stays the
+  rigid-tree reference implementation (`unity-mujoco.md`, *Bite M3*).
+- **Open later option — bbox geoms for `simulate`**: MJCF meshes
+  could become simple bounding-box geoms (`<geom type="box" size
+  pos>` from mesh min/max) — a lightweight physics-side variant;
+  Unity renders the real STEP geometry, so the simulation itself
+  needs no STLs. Never decided; revisit when the training loop wants
+  a leaner physics model. Inertials stay exact-BRep either way —
+  they never come from geoms.
 
 ## Detector training (synthetic labeling loop)
 
@@ -365,15 +381,21 @@ cameras, and eventually no meshes at all (below).
   load/unload cycles).
 - Release binary verified on cart-asy: 43 bodies / 20 meshes / 39 geoms /
   0.255450 kg.
-- `mujoco-export-mjc.md` (bite doc) is **stale on purpose**: Step 21 still
-  shows the pre-split single-file `export.rs` and the pre-fix use layout;
-  main is the source of truth (user ordered no doc update).
+- **M2 is landed and Unity-validated** (M2a–d): the joint/actuator
+  annotation asset family — creation menus, UIToolkit editors with
+  the set overview, axis-pick scene tools with the locked-inspector
+  claim, reimport survival (AssetPostprocessor validation + container
+  prune) (`unity-mujoco.md`, *Bites M2a–M2d*).
+- **M3 is landed and Unity-validated**: the C# MJCF exporter — the
+  Export button writes `<step>.stp~` (XML + STLs) beside the STEP
+  file; spec-verbatim limit switches (`limited`, `ctrllimited`,
+  `forcelimited`); forms grey their ranges behind the switches;
+  MuJoCo's own moving-body mass rule transcribed. Validated on
+  `cart-pole-asm` (81 bodies, 29 meshes; cart COM/mass match the M1
+  reference numbers). Pending: the MuJoCo compile/viewer smoke test.
 - `../greyhound-snake-m1` worktree is stale (pre-fixes) and dismissed;
   removal on request. `next-step.md` is an old handoff predating G5/G13 —
   historical.
-- `mujoco-m1.md` corrections applied: rod-clamp mass 3.18262e-3 kg (was
-  e-6); fixture-moment drift documented (analytic 2×1×1 box moments are
-  (1/3, 5/6, 5/6) mm⁵ — the stub fixture's numbers are not analytic).
 - MuJoCo not installed locally; **local from-source install doc is a
   future session** (pattern: `occt-linux.md` — prerequisites → configure →
   build → install → validation, checked against MuJoCo's build docs for a
@@ -388,9 +410,10 @@ cameras, and eventually no meshes at all (below).
 1. RA4M1 Rust ecosystem maturity (HAL vs PAC-only) — POC or repo check.
 2. S3 reflash tooling on the Uno R4 WiFi; `esp-hal`/`esp-wifi` version pin
    against primary sources.
-3. 48-tooth belt: confirm GT2 (2 mm pitch) vs whatever "JT2" is — sets
-   pitch radius 15.28 mm and mm/step numbers.
-4. Unity 6.7.0b1 headless/batchmode behavior (batchmode without
+3. 48-tooth belt: **GT2 48T confirmed in the CAD** (`GT2 48T 8 Bore v3`
+   pulley) — 2 mm pitch stands; pitch radius 15.28 mm and the mm/step
+   numbers stand with it. The "JT2" note is moot.
+4. Unity 6.7.0b2 headless/batchmode behavior (batchmode without
    -nographics, RT rendering) on the pinned build.
 5. New Unity CLI build commands for the pinned version.
 6. MuJoCo from-source install doc session; validate with
@@ -400,12 +423,12 @@ cameras, and eventually no meshes at all (below).
 
 ## References
 
-- `unity-mujoco.md` — M1–M4 plan; `mujoco-m1.md` — M1 facts;
-  `occt-to-unity.md` — importer + gaps; `mujoco-export-mjc.md` — M1 bite
-  doc (stale Step 21 noted above).
-- MuJoCo XML reference (stable), modeling guide, Python docs — anchors in
-  `mujoco-m1.md`.
+- `unity-mujoco.md` — facts, plan, and landed M1–M3 decisions;
+  `mujoco-schema.md` — MJCF schema facts; `occt-to-unity.md` —
+  importer + gaps.
+- MuJoCo XML reference (stable), modeling guide, Python docs — anchors
+  in `mujoco-schema.md`.
 - FreeCAD 1.1.1 `cart-pole-asm` (local design file, joint tree = M2
-  transcription source); Unity 6.7.0b1 import screenshot (2026-10-10).
+  transcription source); Unity 6.7.0b2 import screenshot (2026-10-10).
 - Unity Perception package — randomizer/labeler wheel for the synthetic
   loop.

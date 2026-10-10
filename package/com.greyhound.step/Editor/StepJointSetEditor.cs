@@ -55,6 +55,8 @@ namespace Greyhound.Step
             actuators.Rebuild();
             actuators.selectionChanged += items => SelectActuator(items.FirstOrDefault() as StepActuator);
 
+            root.Q<Button>("export-button").clicked += () => StepMjcfExporter.Export(set);
+
             root.RegisterCallback<SerializedPropertyChangeEvent>(change => RebuildLists(joints, actuators));
             return root;
         }

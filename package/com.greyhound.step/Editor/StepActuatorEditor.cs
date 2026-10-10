@@ -33,7 +33,31 @@ namespace Greyhound.Step
             root.styleSheets.Add(m_StyleSheet);
 
             root.Bind(serializedObject);
+
+            PropertyField ctrlLo = root.Q<PropertyField>("ctrl-lo");
+            PropertyField ctrlHi = root.Q<PropertyField>("ctrl-hi");
+            PropertyField forceLo = root.Q<PropertyField>("force-lo");
+            PropertyField forceHi = root.Q<PropertyField>("force-hi");
+            UpdateSwitches(ctrlLo, ctrlHi, forceLo, forceHi);
+            root.RegisterCallback<SerializedPropertyChangeEvent>(change =>
+                UpdateSwitches(ctrlLo, ctrlHi, forceLo, forceHi));
             return root;
+        }
+
+        // The range fields are their limit switch's payload: with the
+        // switch off they are inert, so they grey out (the joint form's
+        // pattern).
+        private void UpdateSwitches(
+            PropertyField ctrlLo, PropertyField ctrlHi, PropertyField forceLo, PropertyField forceHi)
+        {
+            SerializedProperty ctrl = serializedObject.FindProperty("mj.ctrllimited");
+            SerializedProperty force = serializedObject.FindProperty("mj.forcelimited");
+            bool ctrlOn = ctrl != null && ctrl.boolValue;
+            bool forceOn = force != null && force.boolValue;
+            ctrlLo?.SetEnabled(ctrlOn);
+            ctrlHi?.SetEnabled(ctrlOn);
+            forceLo?.SetEnabled(forceOn);
+            forceHi?.SetEnabled(forceOn);
         }
     }
 }

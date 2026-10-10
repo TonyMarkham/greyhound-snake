@@ -192,8 +192,10 @@ Data model (`Greyhound.Step`, Runtime assembly):
   duplicate-name warning now guards MJCF body-name collisions at
   export, an M3 concern, not keying) — plus `mj`, an `MjJoint` payload:
   the `[Serializable]` MJCF `<joint>` mirror with attribute names
-  verbatim (`type`, `pos` (m), `axis`, `rangeEnabled` + `rangeLo/hi` —
-  the presence bit for the optional `range` attribute), `damping`,
+  verbatim (`type`, `pos` (m), `axis`, `limited` + `rangeLo/hi` —
+  the spec's own limit switch for the `range` attribute; renamed from
+  the earlier invented `rangeEnabled` when the actuator's
+  `ctrllimited`/`forcelimited` completed the spec mirror), `damping`,
   `frictionloss`, `armature`. No parent field — parenting is the
   hierarchy's job. Reimport conflict resolution (compare the resolved
   part's name against the stored one; accept rename or re-pick) is
@@ -313,18 +315,61 @@ self-sufficient, keyed and resolved by STEP part names):
 
 ## Bite M3 — exporter consumes joints
 
-- Map revolute → `<joint type="hinge" pos axis range>`, prismatic →
-  `type="slide"`, in the child body; limits → `range` (autolimits infers
-  `limited`); an edge without a joint stays welded; `rootMobility` chooses
-  `<freejoint/>` vs static root. A `StepActuator` on a joint emits
-  `<position>` targeting it (`forcerange`/`ctrlrange` verbatim; how belt
-  pitch radius enters — gear scaling vs ctrl semantics — is an M3
-  decision); an actuator whose target joint is missing is an export
-  error.
-- Conjugate the Unity-authored joint frames into the OCCT-frame MJCF.
-- Validation: MuJoCo compiles; joint count/types/axes match the asset;
-  Σ`body_mass` unchanged from M1's rigid case; drive a hinge in `simulate`
-  and watch the subtree move while welded siblings stay rigid.
+Decided at M3 start (2026-10-10):
+
+- **The exporter is C#, in the Unity package.** The `Mj*` payload classes
+  were designed as the MJCF XML serialization seam ("the M3 exporter
+  writes XML elements from them"), so the Export button on the set
+  overview writes the model directly from the imported prefab hierarchy
+  and the annotation family. The two transport options left open at M2
+  (C ABI into the host, probe-side JSON feeding the Rust CLI) are
+  rejected: both would bolt an interchange layer onto a data model that
+  already carries MJCF's attribute names, and the CLI path would ship a
+  second native binary. The Rust `greyhound-export-mjc` stays frozen at
+  M1 as the reference implementation of the rigid-tree schema.
+- **Frame math lives in the C# exporter**, mirroring the importer's
+  map: Unity→MJCF is the `(x, z, y)` permutation for points and
+  directions (its own inverse — everything is already meters) and the
+  `M·R·M` conjugation for rotations, including the inertial principal
+  axes. Verified against M1's validated cart-asy numbers: Unity COM
+  `(0.017, −0.000228, 0.0629)` m permutes to the MJCF COM
+  `(0.017, 0.0629, −0.000228)` m.
+- **Output location**: `<step file name>~` beside the `.stp` — the
+  trailing tilde puts the folder on Unity's ignore list, so the XML and
+  the `meshes/` STLs never enter the AssetDatabase.
+- **Emission is a literal mirror** of the data model, including the
+  spec's own limit switches: `ctrllimited`/`forcelimited` (actuator) are
+  emitted verbatim as "true"/"false" — explicit `false` disables
+  clamping even when a range is present (`xmlref
+  #actuator-general-ctrllimited`), which makes the emitted file valid
+  under autolimits with no heuristic. Ranges are emitted only when
+  their limit switch is true (a default `0 0` range would otherwise
+  trip the strict lo<hi validation). Joint `range` follows the joint's
+  limit switch the same way. The range split maps verbatim per field:
+  joint `rangeLo/Hi` → `<joint range>`, actuator `ctrlLo/Hi`/`forceLo/Hi`
+  → the `<position>` attributes.
+- **Actuation is 1:1**: `<position name joint=... ctrlrange forcerange>`
+  with no `gear` attribute — transmission constants (belt pitch radius)
+  enter only when their consumer exists, never as schema fields (the
+  M2a purge already settled this; the stale "gear scaling vs ctrl
+  semantics" question is struck).
+- **A moving body needs mass — MuJoCo's own rule**: the exporter
+  transcribes the compiler's `CheckBodyMassInertia` (checked against
+  `user_model.cc`, current main): a jointed body or free root is
+  exportable iff its own mass properties exist, or some static
+  (joint-free) descendant carries mass — a massless assembly frame with
+  welded meshy children is legal and emits no inertial of its own. The
+  refusal survives only when the welded subtree is entirely massless
+  (a massless body between joints cannot compile).
+
+Mapping: revolute → `<joint type="hinge" pos axis range>`, prismatic →
+`type="slide"`, in the child body; an edge without a joint stays welded;
+`rootMobility` chooses `<freejoint/>` vs static root; an actuator whose
+target joint is missing is an export error.
+
+Validation: MuJoCo compiles; joint count/types/axes match the asset;
+Σ`body_mass` unchanged from M1's rigid case; drive a hinge in `simulate`
+and watch the subtree move while welded siblings stay rigid.
 
 ## Bite M4 (later) — geometry snapping
 

@@ -9,9 +9,16 @@ themselves.
 assembly hierarchies into Unity with per-part solid colors, bounds, and
 exact-BRep mass properties (per-part and rolled up over assemblies). The
 packaged native payload and its loading are relocatable — validated from an
-installed package, not just the developer checkout. Joint authoring and a
-MuJoCo exporter are designed but not yet built (`unity-mujoco.md`). Only
-Linux x86_64 is exercised end to end.
+installed package, not just the developer checkout. Joint authoring is
+built: right-click a part to add joints and actuators as a
+ScriptableObject asset family beside the STEP file, with scene tools for
+axis picking and travel gizmos, surviving STEP reimports. The joint set's
+Export button writes a MuJoCo MJCF model (body tree, joints, `<position>`
+actuators, exact-BRep inertials) with binary STL meshes into a
+`<step file>.stp~` folder beside the file (`unity-mujoco.md` holds the
+facts and decisions). A standalone Rust CLI,
+`crates/greyhound-export-mjc`, exports the same rigid-tree MJCF without
+Unity. Only Linux x86_64 is exercised end to end.
 
 ## Repository layout
 
@@ -22,8 +29,9 @@ Linux x86_64 is exercised end to end.
 | `crates/mesh` | Host-neutral core mesh model (positions/indices/per-face ranges, assembly scene, exact-BRep `MeshProperties`) |
 | `crates/unity-projection` | OCCT→Unity projection: axis permutation, winding flip, scale, submesh assembly |
 | `crates/importer-host` | Unity-facing cdylib — flat, version-gated C ABI over the projection |
+| `crates/greyhound-export-mjc` | CLI exporting a STEP file as a naive rigid-tree MJCF model plus binary STL meshes (reference implementation of the emitted schema) |
 | `crates/step-stats` | CLI that prints geometry stats (solids/faces/edges/bbox) for a STEP file |
-| `package/com.greyhound.step` | Tracked UPM package sources: the C# `Runtime/` P/Invoke layer and components, the `Editor/` ScriptedImporter |
+| `package/com.greyhound.step` | Tracked UPM package sources: the C# `Runtime/` P/Invoke layer, mass-properties components, the joint/actuator annotation asset family with its `Mj*` MJCF mirrors, and the `Editor/` ScriptedImporter, authoring editors, scene tools, reimport validator, and MJCF exporter |
 | `tools/verify-package.py` | End-to-end verification of the assembled package against measured constants |
 | `justfile` | `just assemble-package` stages package + native payload into `dist/`; `just verify-package` checks it from a copied layout |
 | `assets/` | Sample STEP files (single part `rod-clamp-16mm.stp`, assembly `cart-asy.step`) |
@@ -38,7 +46,10 @@ Linux x86_64 is exercised end to end.
 - `occt-to-unity.md` — the OCCT→Unity transformation pipeline, the gap
   backlog, and the handedness/source-of-truth rules
 - `occt-mesh.md`, `unity-mesh.md` — mesh data-model facts for both sides
-- `unity-mujoco.md` — MuJoCo/MJCF export and joint authoring facts and plan
+- `unity-mujoco.md` — MuJoCo/MJCF export and joint authoring facts, plan,
+  and landed decisions
+- `mujoco-schema.md` — MJCF facts checked against the MuJoCo stable docs
+  (compiler, body/joint/inertial, `<position>` actuation)
 - `perf.md` — benchmark plan and the scalar-first SIMD decision
 
 ## Native output layout
@@ -87,7 +98,10 @@ Prerequisites: a recent Rust toolchain (edition 2024) and a C++17 compiler.
 5. Use it in Unity: reference or copy
    `dist/package/com.greyhound.step/` into a project (a `file:` entry in
    `Packages/manifest.json` works), restart the editor so the native plugins
-   are scanned, and drop a `.stp`/`.step` file into `Assets/`.
+   are scanned, and drop a `.stp`/`.step` file into `Assets/`. Right-click
+   an imported part to author joints and actuators; the joint set's
+   inspector has the Export button that writes the MJCF model beside the
+   STEP file.
 
 ## How native loading works
 

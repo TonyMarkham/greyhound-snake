@@ -4,9 +4,11 @@
         <ue:PropertyField binding-path="root" />
         <ue:PropertyField binding-path="target" />
         <ue:PropertyField binding-path="mj.type" />
-        <ue:PropertyField binding-path="mj.forceLo" />
-        <ue:PropertyField binding-path="mj.forceHi" />
-        <ue:PropertyField binding-path="mj.ctrlLo" />
-        <ue:PropertyField binding-path="mj.ctrlHi" />
+        <ue:PropertyField binding-path="mj.ctrllimited" />
+        <ue:PropertyField name="ctrl-lo" binding-path="mj.ctrlLo" />
+        <ue:PropertyField name="ctrl-hi" binding-path="mj.ctrlHi" />
+        <ue:PropertyField binding-path="mj.forcelimited" />
+        <ue:PropertyField name="force-lo" binding-path="mj.forceLo" />
+        <ue:PropertyField name="force-hi" binding-path="mj.forceHi" />
     </ui:VisualElement>
 </ui:UXML>

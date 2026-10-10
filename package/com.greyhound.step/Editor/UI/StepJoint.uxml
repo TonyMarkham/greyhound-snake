@@ -8,9 +8,9 @@
         <ue:PropertyField binding-path="mj.axis" />
         <ui:Label name="axis-warning" class="warning" text="axis must be a non-zero unit vector" />
         <ui:Button name="repick-axis" text="Re-pick Axis" />
-        <ue:PropertyField binding-path="mj.rangeEnabled" />
-        <ue:PropertyField binding-path="mj.rangeLo" />
-        <ue:PropertyField binding-path="mj.rangeHi" />
+        <ue:PropertyField binding-path="mj.limited" />
+        <ue:PropertyField name="range-lo" binding-path="mj.rangeLo" />
+        <ue:PropertyField name="range-hi" binding-path="mj.rangeHi" />
         <ui:Label name="limits-warning" class="warning" text="limits require lo &lt; hi" />
         <ue:PropertyField binding-path="mj.damping" />
         <ue:PropertyField binding-path="mj.frictionloss" />

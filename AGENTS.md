@@ -1,13 +1,14 @@
 # Project purpose
 
-This repository is near the beginning of development. Its intended product is
-a **Unity Scripted Importer that uses Open CASCADE Technology (OCCT) to import
-STEP files into Unity**.
+This repository builds a **Unity Scripted Importer that uses Open CASCADE
+Technology (OCCT) to import STEP files into Unity**, with joint authoring and
+MuJoCo MJCF export on top of the imported assemblies.
 
-The importer will be distributed as a **Unity Package Manager (UPM) package**.
-The OCCT native binaries needed by the importer must be distributed inside
-that package. The current Rust workspace and C++ shims are groundwork for
-this integration, not a finished Unity package.
+It is distributed as a **Unity Package Manager (UPM) package**. The OCCT
+native binaries needed by the importer must be distributed inside that
+package. The Rust workspace and C++ shims back this integration: the
+importer, joint authoring, and MJCF export work end to end on Linux x86_64;
+the macOS/Windows integration is not yet exercised.
 
 ## Working with the user
 
@@ -57,6 +58,32 @@ Implement each bite (vertical slice) through the established loop:
    omissions such as missing EOF newlines), then remove the `dist` symlink
    and `git worktree remove --force`.
 
+## Unity package tweaks (dist-first special case)
+
+Bites that author or tweak the Unity package itself — C#, UXML/USS, or
+anything only Unity can validate — cannot run through the worktree loop:
+there is no build or test outside Unity, and `.meta` files must be minted
+by Unity itself so asset GUIDs stay stable. Those bites go:
+
+1. **Author in the dist package.** Edit
+   `dist/package/com.greyhound.step/` directly — it is the copy the
+   user's Unity project consumes via a `file:` manifest entry, so
+   changes compile immediately and Unity mints or refreshes the `.meta`
+   files there. Do not author in the tracked `package/` tree first.
+2. **The user validates in Unity.** Compilation, inspectors, scene
+   behavior, and `Editor.log` errors are checked by the user; the agent
+   reads the log on request and fixes code in dist until validation
+   passes.
+3. **Sync back on confirmation.** Copy each affected file — plus the
+   Unity-minted `.meta` of any new file — from dist to the tracked
+   `package/com.greyhound.step/` at its matching path, then verify
+   parity with `diff -r` (excluding the dist-only `Plugins/` native
+   payload). The user commits.
+
+The chooser is where validation lives: if a bite can be validated from
+the repo alone (Rust, C++, docs, tooling), use the worktree loop; if it
+needs the user's Unity editor, use the dist-first loop.
+
 ## Repository map
 
 - `occt-linux.md`, `occt-mac.md`, `occt-win.md`: user-facing OCCT build,
@@ -73,11 +100,15 @@ Implement each bite (vertical slice) through the established loop:
   and the shim compiles directly into the package layout.
 - `dist/`: repo-local native distributions, including the fully assembled
   UPM package in `dist/package/`; currently gitignored.
-- `package/com.greyhound.step/`: tracked UPM package skeleton — authored
-  sources (`package.json`, `Third Party Notices.md`, and the C# code: the
-  `Runtime/` P/Invoke layer with struct mirrors, the
+- `package/com.greyhound.step/`: tracked UPM package — authored
+  sources (`package.json`, `Third Party Notices.md`, and the C# code:
+  the `Runtime/` P/Invoke layer with struct mirrors, the
   `StepMassProperties` component and the `StepAssemblyMassProperties`
-  aggregator, the `Editor/` `ScriptedImporter`).
+  aggregator, the joint/actuator annotation asset family
+  (`StepJointSet`/`StepJoint`/`StepActuator` with the `Mj*` MJCF
+  payload mirrors), and the `Editor/` `ScriptedImporter`, authoring
+  editors, scene tools, reimport validator/pruner, and the MJCF
+  exporter).
   `just assemble-package` stages it with the native
   payload into `dist/package/com.greyhound.step/`; `just verify-package`
   checks the staged package from a copied layout
@@ -86,7 +117,7 @@ Implement each bite (vertical slice) through the established loop:
 - `assets/`: sample assets, including a single part and an assembly STEP file.
 
 Design reference docs (source of truth for their facts; consult before
-mesh/projection work instead of re-deriving):
+mesh, projection, or export work instead of re-deriving):
 
 - `occt-mesh.md`: OCCT 8.0.1 mesh data model and tessellation API facts,
   read from the installed headers (`Poly_Triangulation`, `BRepMesh`,
@@ -99,9 +130,13 @@ mesh/projection work instead of re-deriving):
   derivation (axis map, winding flip, scale, vertex layout), an audit of
   current shim/Rust state, the gap list **G1–G12 (the working backlog)**,
   and the import verification checklist.
-- `unity-mujoco.md`: MuJoCo/MJCF export and joint authoring facts and
-  plan (the core model's second consumer; naive rigid-tree exporter, then
-  joint annotation + UX bites).
+- `unity-mujoco.md`: MuJoCo/MJCF export and joint authoring facts,
+  plan, and landed decisions (the core model's second consumer; M1
+  rigid-tree exporter, M2 annotation bites, M3 exporter consumes
+  joints).
+- `mujoco-schema.md`: MJCF facts checked against the MuJoCo stable
+  docs (compiler, body/joint/inertial, `<position>` actuation) — the
+  source the C# exporter's emission was checked against.
 - `better-occt-bins.md`: the neutral-OCCT-install + selective-staging
   workflow (payload facts, `just stage-occt` design, the STEP-resources
   needs-test).
@@ -142,9 +177,18 @@ implementing.
   pos+normal stream, no `TexCoord0` for v1 (G2 decided: UVs omitted).
 - The Unity projection is scalar first; SIMD only if profiling shows it
   matters (`perf.md` revisit trigger).
+- The MuJoCo side is settled the same way: the **annotation asset
+  family is the source of truth for articulation**
+  (`StepJointSet`/`StepJoint`/`StepActuator` keyed by sibling-index
+  paths — no components on the imported hierarchy), and the **MJCF
+  exporter is C#, in the Unity package**, writing the model directly
+  from the `Mj*` payload mirrors (the Rust CLI stays the rigid-tree
+  reference). Export artifacts land in `<step file>.stp~` beside the
+  STEP file, which Unity ignores. Facts, rationale, and the full
+  decision list live in `unity-mujoco.md`.
 - Remaining open decisions (G6) and deferred items are tracked
-  in the `occt-to-unity.md` gap table — consult it before proposing mesh or
-  projection work.
+  in the `occt-to-unity.md` gap table — consult it before proposing
+  mesh, projection, or export work.
 
 ## Native distribution requirements
 

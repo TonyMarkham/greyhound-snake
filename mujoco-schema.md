@@ -1,6 +1,6 @@
 # MuJoCo XML schema — joints and actuation for the cart-pole
 
-Facts doc (like `mujoco-m1.md`, not a bite doc) covering the MJCF schema
+Facts doc (not a bite doc) covering the MJCF schema
 surface the repo needs next: the cart's **horizontal slide joint**, the
 pole's **horizontal hinge joint**, and the **stepper-motor drive** of the
 cart (position servo on the slide; `potpori.md` *Sim control model*).
@@ -8,7 +8,7 @@ Checked 2026-10-09 against the MuJoCo **stable** docs — XML reference and
 modeling guide — which track release **3.15.0** (verified via the GitHub
 releases API). Sources: `XMLreference.rst` and `modeling.rst` from
 readthedocs' `_sources` (full text, not summarized renders). Companions:
-`unity-mujoco.md` (M1–M4 plan), `mujoco-m1.md` (M1 facts), `potpori.md`
+`unity-mujoco.md` (M1–M4 plan), `potpori.md`
 (the physical system this schema work serves).
 
 Conventions as settled in `unity-mujoco.md`: SI units (meters, kg) by
@@ -247,6 +247,23 @@ pole 500 mm ⇒ small-signal pendulum period ≈ 1.2–1.4 s (potpori.md);
 switches exist only for homing — never hit outside calibration, hence
 ctrlrange strictly inside the mechanical range (the visible safety gap).
 
+## Mesh assets — what the exporter relies on
+
+- `<asset><mesh name file>` accepts binary STL, OBJ, or MuJoCo's binary
+  MSH. The asset `scale` attribute exists, but baking units into the
+  exported file keeps the STL standalone-correct, so we do that instead.
+- **Recentering**: MuJoCo pre-processes every mesh — translated to its
+  centre of mass and rotated to principal axes — and composes those
+  offsets into the referencing geom's pose. Net effect: with a default
+  geom pose the mesh renders exactly at the STL's authored coordinates
+  in the body frame — which is why no geom `pos`/`quat` is needed.
+  Validation trap: `mjModel.mesh_vert` holds the *centered* vertices,
+  not the file's coordinates.
+- STL specifics: facet normals are not read as vertex normals (MuJoCo
+  generates its own); repeated vertices are removed and faces
+  re-indexed. Mesh geoms are convex-hulled for collision.
+- Degenerate triangles with area below `mjMINVAL` are a compile error.
+
 ## Limit switches — deliberately not in the simulation XML
 
 Decided 2026-10-09: the physical limit switches are **hardware, not model**
@@ -299,5 +316,5 @@ retired by this decision.
   (*Actuator shortcuts*, *Force limits*)
 - Release pin: google-deepmind/mujoco latest release **3.15.0** (GitHub
   releases API, 2026-10-09); readthedocs "stable" tracks it
-- Repo: `unity-mujoco.md` (M2/M3 plan), `mujoco-m1.md` (M1 emitted schema),
+- Repo: `unity-mujoco.md` (facts, plan, and landed M1–M3 decisions),
   `potpori.md` (physical system, sim control model, M2 actuation fields)

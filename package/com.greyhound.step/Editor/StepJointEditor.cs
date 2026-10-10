@@ -70,9 +70,11 @@ namespace Greyhound.Step
 
             Label axisWarning = root.Q<Label>("axis-warning");
             Label limitsWarning = root.Q<Label>("limits-warning");
-            UpdateValidation(axisWarning, limitsWarning);
+            PropertyField rangeLo = root.Q<PropertyField>("range-lo");
+            PropertyField rangeHi = root.Q<PropertyField>("range-hi");
+            UpdateValidation(axisWarning, limitsWarning, rangeLo, rangeHi);
             root.RegisterCallback<SerializedPropertyChangeEvent>(change =>
-                UpdateValidation(axisWarning, limitsWarning));
+                UpdateValidation(axisWarning, limitsWarning, rangeLo, rangeHi));
             return root;
         }
 
@@ -139,7 +141,8 @@ namespace Greyhound.Step
             SceneView.RepaintAll();
         }
 
-        private void UpdateValidation(Label axisWarning, Label limitsWarning)
+        private void UpdateValidation(
+            Label axisWarning, Label limitsWarning, PropertyField rangeLo, PropertyField rangeHi)
         {
             var joint = (StepJoint)target;
             if (joint == null)
@@ -149,9 +152,15 @@ namespace Greyhound.Step
             axisWarning.style.display =
                 joint.mj.axis.sqrMagnitude < 0.5f ? DisplayStyle.Flex : DisplayStyle.None;
             limitsWarning.style.display =
-                joint.mj.rangeEnabled && joint.mj.rangeLo >= joint.mj.rangeHi
+                joint.mj.limited && joint.mj.rangeLo >= joint.mj.rangeHi
                     ? DisplayStyle.Flex
                     : DisplayStyle.None;
+            // The range fields are the limit switch's payload: with
+            // limited off they are inert, so they grey out.
+            SerializedProperty limited = serializedObject.FindProperty("mj.limited");
+            bool limitsOn = limited != null && limited.boolValue;
+            rangeLo?.SetEnabled(limitsOn);
+            rangeHi?.SetEnabled(limitsOn);
         }
 
         // Instance subscription keeps one callback per live editor; the
@@ -266,7 +275,7 @@ namespace Greyhound.Step
                     u = Vector3.Cross(axisWorld, Vector3.right);
                 }
                 u.Normalize();
-                if (joint.mj.rangeEnabled)
+                if (joint.mj.limited)
                 {
                     Vector3 from = Quaternion.AngleAxis(
                         joint.mj.rangeLo * Mathf.Rad2Deg, axisWorld) * u;
@@ -278,7 +287,7 @@ namespace Greyhound.Step
                     Handles.DrawWireArc(posWorld, axisWorld, u, 360.0f, arm);
                 }
             }
-            else if (joint.mj.rangeEnabled)
+            else if (joint.mj.limited)
             {
                 Vector3 loPos = posWorld + axisWorld * joint.mj.rangeLo;
                 Vector3 hiPos = posWorld + axisWorld * joint.mj.rangeHi;
