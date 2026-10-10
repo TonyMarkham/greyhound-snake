@@ -23,5 +23,7 @@ namespace Greyhound.Step
         public List<StepJoint> joints = new List<StepJoint>();
 
         public List<StepActuator> actuators = new List<StepActuator>();
+
+        public List<StepGeom> geoms = new List<StepGeom>();
     }
 }

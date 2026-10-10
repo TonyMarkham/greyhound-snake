@@ -55,13 +55,20 @@ namespace Greyhound.Step
             actuators.Rebuild();
             actuators.selectionChanged += items => SelectActuator(items.FirstOrDefault() as StepActuator);
 
+            ListView geoms = root.Q<ListView>("geoms-list");
+            geoms.makeItem = MakeItem;
+            geoms.bindItem = (element, index) => ((Label)element).text = GeomText(set.geoms[index]);
+            geoms.itemsSource = new List<StepGeom>(set.geoms);
+            geoms.Rebuild();
+            geoms.selectionChanged += items => SelectGeom(items.FirstOrDefault() as StepGeom);
+
             root.Q<Button>("export-button").clicked += () => StepMjcfExporter.Export(set);
 
-            root.RegisterCallback<SerializedPropertyChangeEvent>(change => RebuildLists(joints, actuators));
+            root.RegisterCallback<SerializedPropertyChangeEvent>(change => RebuildLists(joints, actuators, geoms));
             return root;
         }
 
-        private void RebuildLists(ListView joints, ListView actuators)
+        private void RebuildLists(ListView joints, ListView actuators, ListView geoms)
         {
             var set = (StepJointSet)target;
             if (set == null)
@@ -70,8 +77,10 @@ namespace Greyhound.Step
             }
             joints.itemsSource = new List<StepJoint>(set.joints);
             actuators.itemsSource = new List<StepActuator>(set.actuators);
+            geoms.itemsSource = new List<StepGeom>(set.geoms);
             joints.Rebuild();
             actuators.Rebuild();
+            geoms.Rebuild();
         }
 
         private static VisualElement MakeItem()
@@ -91,6 +100,25 @@ namespace Greyhound.Step
             return actuator != null
                 ? $"{actuator.name}  →  {(actuator.target != null ? actuator.target.name : "(no target)")}"
                 : "(missing actuator)";
+        }
+
+        private static string GeomText(StepGeom geom)
+        {
+            return geom != null ? $"{geom.name}  ({geom.mj.type})" : "(missing geom)";
+        }
+
+        private static void SelectGeom(StepGeom geom)
+        {
+            if (geom == null)
+            {
+                return;
+            }
+            SelectAsset(geom);
+            GameObject part = StepJointSetFactory.FindPart(geom.root, geom.body);
+            if (part != null)
+            {
+                EditorGUIUtility.PingObject(part);
+            }
         }
 
         private static void SelectJoint(StepJoint joint)

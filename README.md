@@ -31,7 +31,7 @@ Unity. Only Linux x86_64 is exercised end to end.
 | `crates/importer-host` | Unity-facing cdylib — flat, version-gated C ABI over the projection |
 | `crates/greyhound-export-mjc` | CLI exporting a STEP file as a naive rigid-tree MJCF model plus binary STL meshes (reference implementation of the emitted schema) |
 | `crates/step-stats` | CLI that prints geometry stats (solids/faces/edges/bbox) for a STEP file |
-| `package/com.greyhound.step` | Tracked UPM package sources: the C# `Runtime/` P/Invoke layer, mass-properties components, the joint/actuator annotation asset family with its `Mj*` MJCF mirrors, and the `Editor/` ScriptedImporter, authoring editors, scene tools, reimport validator, and MJCF exporter |
+| `package/com.greyhound.step` | Tracked UPM package sources: the C# `Runtime/` P/Invoke layer, mass-properties components, the joint/actuator/geom annotation asset family with its `Mj*` MJCF mirrors, and the `Editor/` ScriptedImporter, authoring editors, scene tools, reimport validator, and MJCF exporter |
 | `tools/verify-package.py` | End-to-end verification of the assembled package against measured constants |
 | `justfile` | `just assemble-package` stages package + native payload into `dist/`; `just verify-package` checks it from a copied layout |
 | `assets/` | Sample STEP files (single part `rod-clamp-16mm.stp`, assembly `cart-asy.step`) |

@@ -104,9 +104,9 @@ needs the user's Unity editor, use the dist-first loop.
   sources (`package.json`, `Third Party Notices.md`, and the C# code:
   the `Runtime/` P/Invoke layer with struct mirrors, the
   `StepMassProperties` component and the `StepAssemblyMassProperties`
-  aggregator, the joint/actuator annotation asset family
-  (`StepJointSet`/`StepJoint`/`StepActuator` with the `Mj*` MJCF
-  payload mirrors), and the `Editor/` `ScriptedImporter`, authoring
+  aggregator, the joint/actuator/geom annotation asset family
+  (`StepJointSet`/`StepJoint`/`StepActuator`/`StepGeom` with the `Mj*`
+  MJCF payload mirrors), and the `Editor/` `ScriptedImporter`, authoring
   editors, scene tools, reimport validator/pruner, and the MJCF
   exporter).
   `just assemble-package` stages it with the native
@@ -179,8 +179,8 @@ implementing.
   matters (`perf.md` revisit trigger).
 - The MuJoCo side is settled the same way: the **annotation asset
   family is the source of truth for articulation**
-  (`StepJointSet`/`StepJoint`/`StepActuator` keyed by sibling-index
-  paths — no components on the imported hierarchy), and the **MJCF
+  (`StepJointSet`/`StepJoint`/`StepActuator`/`StepGeom` keyed by
+  sibling-index paths — no components on the imported hierarchy), and the **MJCF
   exporter is C#, in the Unity package**, writing the model directly
   from the `Mj*` payload mirrors (the Rust CLI stays the rigid-tree
   reference). Export artifacts land in `<step file>.stp~` beside the

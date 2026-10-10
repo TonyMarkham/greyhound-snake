@@ -8,5 +8,7 @@
         <ui:ListView name="joints-list" class="list-view" />
         <ui:Label text="Actuators" class="list-header" />
         <ui:ListView name="actuators-list" class="list-view" />
+        <ui:Label text="Geoms" class="list-header" />
+        <ui:ListView name="geoms-list" class="list-view" />
     </ui:VisualElement>
 </ui:UXML>

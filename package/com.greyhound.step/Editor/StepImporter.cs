@@ -135,6 +135,7 @@ namespace Greyhound.Step
                         node.AddComponent<MeshRenderer>().sharedMaterials =
                             SubmeshMaterials(palette, meshSubmeshColors[meshIndex]);
                         StepMassProperties.Create(node.transform, meshProperties[(int)meshIndex], DefaultDensityGPerCm3);
+                        StepGeomProperties.Create(node.transform);
                         if (node.TryGetComponent<Rigidbody>(out Rigidbody body))
                         {
                             node.GetComponent<StepMassProperties>().ApplyTo(body);

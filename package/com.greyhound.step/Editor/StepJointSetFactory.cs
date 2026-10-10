@@ -119,6 +119,37 @@ namespace Greyhound.Step
             return joint;
         }
 
+        public static StepGeom CreateGeomAsset(
+            StepJointSet set, GameObject instanceRoot, GameObject part)
+        {
+            var geom = ScriptableObject.CreateInstance<StepGeom>();
+            geom.name = part.name;
+            geom.root = set;
+            geom.body = PathOf(part, instanceRoot);
+            geom.mj.type = StepGeomType.Mesh;
+
+            string folder = SetFolder(set);
+            string path = AssetDatabase.GenerateUniqueAssetPath(
+                $"{folder}/{Sanitize(part.name)}.geom.asset");
+            AssetDatabase.CreateAsset(geom, path);
+            Undo.RegisterCreatedObjectUndo(geom, "Add Step Geom");
+
+            Undo.RecordObject(set, "Add Step Geom");
+            set.geoms.Add(geom);
+            EditorUtility.SetDirty(set);
+            return geom;
+        }
+
+        // A part's geoms are found the way its joints are: the live
+        // sibling-index path against the stored paths.
+        public static List<StepGeom> FindGeoms(StepJointSet set, GameObject part, GameObject instanceRoot)
+        {
+            int[] path = PathIndices(part, instanceRoot);
+            return set.geoms
+                .Where(geom => geom != null && geom.body != null && SamePath(geom.body.indices, path))
+                .ToList();
+        }
+
         // The joint's identity is the sibling-index path, so a part's
         // joint is found by comparing the part's live path against the
         // stored paths. More than one match is ambiguous; callers decide

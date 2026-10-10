@@ -1,0 +1,12 @@
+.section-title {
+    -unity-font-style: bold;
+    font-size: 13px;
+    margin-bottom: 4px;
+}
+
+.warning {
+    color: rgb(230, 110, 80);
+    margin-top: 2px;
+    margin-bottom: 6px;
+    display: none;
+}

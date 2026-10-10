@@ -4,11 +4,25 @@
         <ue:PropertyField binding-path="root" />
         <ue:PropertyField binding-path="target" />
         <ue:PropertyField binding-path="mj.type" />
+        <ue:PropertyField binding-path="mj.group" />
+        <ue:PropertyField binding-path="mj.delay" />
         <ue:PropertyField binding-path="mj.ctrllimited" />
         <ue:PropertyField name="ctrl-lo" binding-path="mj.ctrlLo" />
         <ue:PropertyField name="ctrl-hi" binding-path="mj.ctrlHi" />
         <ue:PropertyField binding-path="mj.forcelimited" />
         <ue:PropertyField name="force-lo" binding-path="mj.forceLo" />
         <ue:PropertyField name="force-hi" binding-path="mj.forceHi" />
+        <ue:PropertyField name="lengthrange-lo" binding-path="mj.lengthrangeLo" />
+        <ue:PropertyField name="lengthrange-hi" binding-path="mj.lengthrangeHi" />
+        <ue:PropertyField binding-path="mj.gear" />
+        <ue:PropertyField binding-path="mj.cranklength" />
+        <ue:PropertyField binding-path="mj.kp" />
+        <ue:PropertyField binding-path="mj.kv" />
+        <ue:PropertyField binding-path="mj.dampratio" />
+        <ui:Label name="exclusivity-warning" class="warning" text="kv and dampratio are exclusive; inheritrange is exclusive with an authored ctrlrange" />
+        <ue:PropertyField binding-path="mj.timeconst" />
+        <ue:PropertyField binding-path="mj.inheritrange" />
+        <ue:PropertyField binding-path="mj.damping" />
+        <ue:PropertyField binding-path="mj.armature" />
     </ui:VisualElement>
 </ui:UXML>

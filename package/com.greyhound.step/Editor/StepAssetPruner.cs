@@ -20,6 +20,14 @@ namespace Greyhound.Step
                 EditorUtility.SetDirty(joint.root);
             }
 
+            var geom = AssetDatabase.LoadAssetAtPath<StepGeom>(assetPath);
+            if (geom != null && geom.root != null)
+            {
+                Undo.RecordObject(geom.root, "Prune Deleted Geom");
+                geom.root.geoms.Remove(geom);
+                EditorUtility.SetDirty(geom.root);
+            }
+
             var actuator = AssetDatabase.LoadAssetAtPath<StepActuator>(assetPath);
             if (actuator != null && actuator.root != null)
             {

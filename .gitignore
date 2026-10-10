@@ -12,3 +12,7 @@ target/
 
 # disposable
 __WIP__/
+
+# MuJoCo
+MJDATA.TXT
+MJMODEL.TXT

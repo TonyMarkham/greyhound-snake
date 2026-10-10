@@ -87,6 +87,37 @@ namespace Greyhound.Step
                     $"{unmatched.Count} of {total} joints could not be placed for export: {string.Join(", ", unmatched)}");
             }
 
+            var unmatchedGeoms = new List<string>();
+            int geomTotal = 0;
+            var geomsByKey = new Dictionary<string, List<StepGeom>>();
+            foreach (StepGeom geom in set.geoms)
+            {
+                if (geom == null)
+                {
+                    continue;
+                }
+                geomTotal++;
+                GameObject part = Resolve(root.transform, geom.body);
+                if (part == null)
+                {
+                    unmatchedGeoms.Add(geom.name);
+                    continue;
+                }
+                string geomKey = KeyOf(geom.body.indices);
+                if (!geomsByKey.TryGetValue(geomKey, out List<StepGeom> geomList))
+                {
+                    geomList = new List<StepGeom>();
+                    geomsByKey.Add(geomKey, geomList);
+                }
+                geomList.Add(geom);
+            }
+            if (unmatchedGeoms.Count > 0)
+            {
+                problems.Add(
+                    $"{unmatchedGeoms.Count} of {geomTotal} geoms could not be placed for export: " +
+                    $"{string.Join(", ", unmatchedGeoms)}");
+            }
+
             // MuJoCo's own validity rule for moving bodies (its compiler
             // checks the body's own mass, else accepts a static —
             // joint-free — descendant with mass): a massless assembly
@@ -145,6 +176,16 @@ namespace Greyhound.Step
                 }
             }
 
+            var geomNames = new Dictionary<StepGeom, string>();
+            var usedGeomNames = new HashSet<string>();
+            foreach (StepGeom geom in set.geoms)
+            {
+                if (geom != null)
+                {
+                    geomNames.Add(geom, Dedupe(Sanitize(geom.name), usedGeomNames, () => "geom"));
+                }
+            }
+
             string stepFileName = Path.GetFileName(set.stepAssetPath);
             string stem = Path.GetFileNameWithoutExtension(stepFileName);
             string exportDirectory = Path.Combine(
@@ -161,8 +202,9 @@ namespace Greyhound.Step
                 WriteStl(Path.Combine(meshDirectory, $"mesh_{i:D3}.stl"), meshes[i]);
             }
 
+            bool freeRoot = set.rootMobility == StepRootMobilityMode.Free;
             string xmlPath = Path.Combine(exportDirectory, stem + ".xml");
-            int bodyCount = WriteMjcf(xmlPath, stem, root.transform, set, jointsByKey, jointNames, meshIds, firstUsers, actuators);
+            int bodyCount = WriteMjcf(xmlPath, stem, root.transform, freeRoot, jointsByKey, jointNames, geomsByKey, geomNames, meshIds, firstUsers, actuators);
             Debug.Log($"Exported MuJoCo model with {bodyCount} bodies and {meshes.Count} mesh assets to {xmlPath}");
         }
 
@@ -205,9 +247,11 @@ namespace Greyhound.Step
             string path,
             string stem,
             Transform root,
-            StepJointSet set,
+            bool freeRoot,
             Dictionary<string, List<StepJoint>> jointsByKey,
             Dictionary<StepJoint, string> jointNames,
+            Dictionary<string, List<StepGeom>> geomsByKey,
+            Dictionary<StepGeom, string> geomNames,
             Dictionary<Mesh, int> meshIds,
             List<string> firstUsers,
             List<StepActuator> actuators)
@@ -249,10 +293,12 @@ namespace Greyhound.Step
                     Writer = writer,
                     JointsByKey = jointsByKey,
                     JointNames = jointNames,
+                    GeomsByKey = geomsByKey,
+                    GeomNames = geomNames,
                     MeshIds = meshIds,
                     UsedBodyNames = new HashSet<string>(),
                 };
-                int bodyCount = EmitBody(root, "", 0, set.rootMobility == StepRootMobilityMode.Free, context);
+                int bodyCount = EmitBody(root, "", 0, freeRoot, context);
                 writer.WriteEndElement();
 
                 if (actuators.Count > 0)
@@ -264,11 +310,14 @@ namespace Greyhound.Step
                         string name = Dedupe(Sanitize(actuator.name), usedActuatorNames, () => "actuator");
                         writer.WriteStartElement("position");
                         writer.WriteAttributeString("name", name);
-                        writer.WriteAttributeString("joint", jointNames[actuator.target]);
-                        // The spec's own limit switches, emitted verbatim:
-                        // explicit ctrllimited="false" disables clamping
-                        // even with a range present, so the mirror is valid
-                        // under autolimits without heuristics.
+                        // Every attribute of the spec element, verbatim.
+                        // The limit switches emit as "true"/"false" —
+                        // explicit false disables clamping even with a
+                        // range present, so the mirror is valid under
+                        // autolimits. lengthrange "0 0" is the unset
+                        // state and stays absent.
+                        writer.WriteAttributeString("group", actuator.mj.group.ToString(CultureInfo.InvariantCulture));
+                        writer.WriteAttributeString("delay", Format(actuator.mj.delay));
                         writer.WriteAttributeString("ctrllimited", actuator.mj.ctrllimited ? "true" : "false");
                         writer.WriteAttributeString("forcelimited", actuator.mj.forcelimited ? "true" : "false");
                         if (actuator.mj.ctrllimited)
@@ -279,6 +328,42 @@ namespace Greyhound.Step
                         {
                             writer.WriteAttributeString("forcerange", $"{Format(actuator.mj.forceLo)} {Format(actuator.mj.forceHi)}");
                         }
+                        if (actuator.mj.lengthrangeLo != 0f || actuator.mj.lengthrangeHi != 0f)
+                        {
+                            writer.WriteAttributeString("lengthrange", $"{Format(actuator.mj.lengthrangeLo)} {Format(actuator.mj.lengthrangeHi)}");
+                        }
+                        float[] gear = actuator.mj.gear is { Length: 6 } ? actuator.mj.gear : new[] { 1f, 0f, 0f, 0f, 0f, 0f };
+                        writer.WriteAttributeString(
+                            "gear",
+                            $"{Format(gear[0])} {Format(gear[1])} {Format(gear[2])} {Format(gear[3])} {Format(gear[4])} {Format(gear[5])}");
+                        // cranklength's PRESENCE is invalid outside a
+                        // slider-crank transmission (the compiler errors
+                        // even at the default 0) — emit only when
+                        // authored nonzero; for a joint transmission a
+                        // nonzero value is an authoring mistake MuJoCo
+                        // will then report loudly.
+                        if (actuator.mj.cranklength != 0f)
+                        {
+                            writer.WriteAttributeString("cranklength", Format(actuator.mj.cranklength));
+                        }
+                        writer.WriteAttributeString("joint", jointNames[actuator.target]);
+                        writer.WriteAttributeString("kp", Format(actuator.mj.kp));
+                        // kv and dampratio are presence-exclusive — the
+                        // compiler rejects both being defined even at
+                        // their defaults; emit the authored one only
+                        // (the form warns when both are authored).
+                        if (actuator.mj.dampratio != 0f)
+                        {
+                            writer.WriteAttributeString("dampratio", Format(actuator.mj.dampratio));
+                        }
+                        else if (actuator.mj.kv != 0f)
+                        {
+                            writer.WriteAttributeString("kv", Format(actuator.mj.kv));
+                        }
+                        writer.WriteAttributeString("timeconst", Format(actuator.mj.timeconst));
+                        writer.WriteAttributeString("inheritrange", Format(actuator.mj.inheritrange));
+                        writer.WriteAttributeString("damping", Format(actuator.mj.damping));
+                        writer.WriteAttributeString("armature", Format(actuator.mj.armature));
                         writer.WriteEndElement();
                     }
                     writer.WriteEndElement();
@@ -298,9 +383,82 @@ namespace Greyhound.Step
 
             public Dictionary<StepJoint, string> JointNames;
 
+            public Dictionary<string, List<StepGeom>> GeomsByKey;
+
+            public Dictionary<StepGeom, string> GeomNames;
+
             public Dictionary<Mesh, int> MeshIds;
 
             public HashSet<string> UsedBodyNames;
+        }
+
+        // One <geom> element from the MjGeom mirror, verbatim. pos/quat
+        // are conjugated into the MJCF frame like every body-local
+        // frame quantity; size, fromto, and surfacevel are spatial
+        // quantities and permute component-wise; the contact-solver and
+        // appearance scalars emit as authored. The mesh reference
+        // attaches only for mesh-typed geoms. Baseline geoms are
+        // unnamed.
+        private static void WriteGeom(XmlWriter writer, string name, MjGeom mj, bool hasMesh, int meshId)
+        {
+            writer.WriteStartElement("geom");
+            if (name != null)
+            {
+                writer.WriteAttributeString("name", name);
+            }
+            writer.WriteAttributeString("type", mj.type.ToString().ToLowerInvariant());
+            writer.WriteAttributeString("pos", FormatVector(Permute(mj.pos)));
+            // The orientation: the spec allows at most one mechanism and
+            // its own saver always writes the canonical quat ("all frame
+            // orientations are expressed as quaternions"), so the
+            // authored mechanism is normalized: reconstructed as a
+            // rotation in the Unity frame, conjugated into the MJCF
+            // frame (M·R·M), emitted as quat. euler is interpreted with
+            // MuJoCo's default eulerseq (xyz, intrinsic).
+            writer.WriteAttributeString("quat", FormatQuat(Conjugated(Oriented(mj))));
+            writer.WriteAttributeString("size", FormatVector(Permute(mj.size)));
+            writer.WriteAttributeString("contype", mj.contype.ToString(CultureInfo.InvariantCulture));
+            writer.WriteAttributeString("conaffinity", mj.conaffinity.ToString(CultureInfo.InvariantCulture));
+            writer.WriteAttributeString("condim", mj.condim.ToString(CultureInfo.InvariantCulture));
+            writer.WriteAttributeString("group", mj.group.ToString(CultureInfo.InvariantCulture));
+            writer.WriteAttributeString("priority", mj.priority.ToString(CultureInfo.InvariantCulture));
+            writer.WriteAttributeString("friction", FormatVector(mj.friction));
+            writer.WriteAttributeString("solmix", Format(mj.solmix));
+            writer.WriteAttributeString("solref", $"{Format(mj.solref.x)} {Format(mj.solref.y)}");
+            writer.WriteAttributeString("solimp", FormatArray(mj.solimp));
+            writer.WriteAttributeString("margin", Format(mj.margin));
+            writer.WriteAttributeString("gap", Format(mj.gap));
+            if (mj.mass != 0f)
+            {
+                writer.WriteAttributeString("mass", Format(mj.mass));
+            }
+            writer.WriteAttributeString("density", Format(mj.density));
+            writer.WriteAttributeString(
+                "rgba", $"{Format(mj.rgba.x)} {Format(mj.rgba.y)} {Format(mj.rgba.z)} {Format(mj.rgba.w)}");
+            writer.WriteAttributeString("shellinertia", mj.shellinertia ? "true" : "false");
+            if (mj.fromto is { Length: 6 })
+            {
+                writer.WriteAttributeString(
+                    "fromto",
+                    $"{Format(mj.fromto[0])} {Format(mj.fromto[2])} {Format(mj.fromto[1])} " +
+                    $"{Format(mj.fromto[3])} {Format(mj.fromto[5])} {Format(mj.fromto[4])}");
+            }
+            writer.WriteAttributeString("fitscale", Format(mj.fitscale));
+            writer.WriteAttributeString("fluidshape", mj.fluidshape.ToString().ToLowerInvariant());
+            writer.WriteAttributeString("fluidcoef", FormatArray(mj.fluidcoef));
+            if (mj.surfacevel is { Length: 6 })
+            {
+                writer.WriteAttributeString(
+                    "surfacevel",
+                    $"{Format(mj.surfacevel[0])} {Format(mj.surfacevel[2])} {Format(mj.surfacevel[1])} " +
+                    $"{Format(mj.surfacevel[3])} {Format(mj.surfacevel[5])} {Format(mj.surfacevel[4])}");
+            }
+            writer.WriteAttributeString("adhesion", Format(mj.adhesion));
+            if (mj.type == StepGeomType.Mesh && hasMesh)
+            {
+                writer.WriteAttributeString("mesh", $"mesh_{meshId:D3}");
+            }
+            writer.WriteEndElement();
         }
 
         private static int EmitBody(Transform node, string pathKey, int nodeIndex, bool isRoot, EmissionContext context)
@@ -343,13 +501,29 @@ namespace Greyhound.Step
                 }
             }
 
+            // Geom precedence: an authored StepGeom asset (persistent
+            // intent) overrides the importer's StepGeomProperties
+            // baseline (derived data, regenerated per reimport). The
+            // attributes are the MjGeom mirror verbatim; pos/quat are
+            // conjugated into the MJCF frame like every body-local
+            // frame quantity, and the mesh reference follows the
+            // authored type. Baseline geoms are unnamed.
             MeshFilter filter = node.GetComponent<MeshFilter>();
-            if (filter != null && filter.sharedMesh != null && context.MeshIds.TryGetValue(filter.sharedMesh, out int meshId))
+            int meshId = -1;
+            bool hasMesh = filter != null && filter.sharedMesh != null
+                && context.MeshIds.TryGetValue(filter.sharedMesh, out meshId);
+            bool wroteGeom = false;
+            if (context.GeomsByKey.TryGetValue(pathKey, out List<StepGeom> geoms))
             {
-                writer.WriteStartElement("geom");
-                writer.WriteAttributeString("type", "mesh");
-                writer.WriteAttributeString("mesh", $"mesh_{meshId:D3}");
-                writer.WriteEndElement();
+                foreach (StepGeom geom in geoms)
+                {
+                    WriteGeom(writer, context.GeomNames[geom], geom.mj, hasMesh, meshId);
+                    wroteGeom = true;
+                }
+            }
+            if (!wroteGeom && node.GetComponent<StepGeomProperties>() is StepGeomProperties baseline)
+            {
+                WriteGeom(writer, null, baseline.mj, hasMesh, meshId);
             }
 
             StepMassProperties properties = node.GetComponent<StepMassProperties>();
@@ -508,6 +682,114 @@ namespace Greyhound.Step
         private static string KeyOf(int[] indices)
         {
             return indices == null ? "" : string.Join("/", indices);
+        }
+
+        // The authored orientation mechanism reconstructed as a Unity
+        // frame rotation. Precedence follows the spec's "at most one":
+        // axisangle, euler (MuJoCo's default eulerseq: xyz, intrinsic —
+        // R = Rx·Ry·Rz), xyaxes, zaxis; quat is the fallback and the
+        // canonical emission form (MuJoCo's own saver writes quat).
+        private static Quaternion Oriented(MjGeom mj)
+        {
+            if (mj.axisangle is { Length: 4 })
+            {
+                Vector3 unityAxis = new Vector3(mj.axisangle[0], mj.axisangle[1], mj.axisangle[2]);
+                return Quaternion.AngleAxis(
+                    mj.axisangle[3] * Mathf.Rad2Deg, unityAxis.normalized);
+            }
+            if (mj.euler is { Length: 3 })
+            {
+                var rotation = Multiply(RotationX(mj.euler[0]), Multiply(RotationY(mj.euler[1]), RotationZ(mj.euler[2])));
+                return FromConjugatedColumns(rotation);
+            }
+            if (mj.xyaxes is { Length: 6 })
+            {
+                Vector3 xAxis = new Vector3(mj.xyaxes[0], mj.xyaxes[1], mj.xyaxes[2]);
+                Vector3 yAxis = new Vector3(mj.xyaxes[3], mj.xyaxes[4], mj.xyaxes[5]);
+                var rotation = new double[3, 3];
+                rotation[0, 0] = xAxis.x; rotation[1, 0] = xAxis.y; rotation[2, 0] = xAxis.z;
+                rotation[0, 1] = yAxis.x; rotation[1, 1] = yAxis.y; rotation[2, 1] = yAxis.z;
+                Vector3 zAxis = Vector3.Cross(xAxis, yAxis);
+                rotation[0, 2] = zAxis.x; rotation[1, 2] = zAxis.y; rotation[2, 2] = zAxis.z;
+                return FromConjugatedColumns(rotation);
+            }
+            if (mj.zaxis is { Length: 3 })
+            {
+                Vector3 direction = new Vector3(mj.zaxis[0], mj.zaxis[1], mj.zaxis[2]).normalized;
+                Vector3 axis = Vector3.Cross(Vector3.forward, direction);
+                float sine = axis.magnitude;
+                float cosine = Vector3.Dot(Vector3.forward, direction);
+                if (sine < 1e-10f)
+                {
+                    // Parallel (identity) or antiparallel: the minimal
+                    // rotation for antiparallel is 180° about any
+                    // perpendicular axis; X is deterministic.
+                    return cosine > 0f ? Quaternion.identity
+                        : Quaternion.AngleAxis(180f, Vector3.right);
+                }
+                float angle = Mathf.Atan2(sine, cosine) * Mathf.Rad2Deg;
+                return Quaternion.AngleAxis(angle, axis.normalized);
+            }
+            return mj.quat;
+        }
+
+        // Conjugates a Unity-frame rotation expressed as orthonormal
+        // columns (R' = M·R·M) and returns the quaternion.
+        private static Quaternion FromConjugatedColumns(double[,] columns)
+        {
+            var conjugated = new double[3, 3];
+            for (int i = 0; i < 3; i++)
+            {
+                for (int j = 0; j < 3; j++)
+                {
+                    conjugated[i, j] = columns[AxisMap[i], AxisMap[j]];
+                }
+            }
+            return InertiaTensorMath.Rotation(conjugated);
+        }
+
+        private static double[,] Multiply(double[,] a, double[,] b)
+        {
+            var result = new double[3, 3];
+            for (int i = 0; i < 3; i++)
+            {
+                for (int j = 0; j < 3; j++)
+                {
+                    double sum = 0.0;
+                    for (int k = 0; k < 3; k++)
+                    {
+                        sum += a[i, k] * b[k, j];
+                    }
+                    result[i, j] = sum;
+                }
+            }
+            return result;
+        }
+
+        private static double[,] RotationX(float radians)
+        {
+            double c = System.Math.Cos(radians);
+            double s = System.Math.Sin(radians);
+            return new double[3, 3] { { 1, 0, 0 }, { 0, c, -s }, { 0, s, c } };
+        }
+
+        private static double[,] RotationY(float radians)
+        {
+            double c = System.Math.Cos(radians);
+            double s = System.Math.Sin(radians);
+            return new double[3, 3] { { c, 0, s }, { 0, 1, 0 }, { -s, 0, c } };
+        }
+
+        private static double[,] RotationZ(float radians)
+        {
+            double c = System.Math.Cos(radians);
+            double s = System.Math.Sin(radians);
+            return new double[3, 3] { { c, -s, 0 }, { s, c, 0 }, { 0, 0, 1 } };
+        }
+
+        private static string FormatArray(float[] values)
+        {
+            return string.Join(" ", System.Array.ConvertAll(values, value => Format(value)));
         }
 
         private static string JointTypeString(StepJointType type)

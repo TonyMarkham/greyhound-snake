@@ -38,17 +38,21 @@ namespace Greyhound.Step
             PropertyField ctrlHi = root.Q<PropertyField>("ctrl-hi");
             PropertyField forceLo = root.Q<PropertyField>("force-lo");
             PropertyField forceHi = root.Q<PropertyField>("force-hi");
-            UpdateSwitches(ctrlLo, ctrlHi, forceLo, forceHi);
+            Label exclusivityWarning = root.Q<Label>("exclusivity-warning");
+            UpdateSwitches(ctrlLo, ctrlHi, forceLo, forceHi, exclusivityWarning);
             root.RegisterCallback<SerializedPropertyChangeEvent>(change =>
-                UpdateSwitches(ctrlLo, ctrlHi, forceLo, forceHi));
+                UpdateSwitches(ctrlLo, ctrlHi, forceLo, forceHi, exclusivityWarning));
             return root;
         }
 
         // The range fields are their limit switch's payload: with the
         // switch off they are inert, so they grey out (the joint form's
-        // pattern).
+        // pattern). The exclusivity warning covers the spec's
+        // exclusive pairs: kv vs dampratio, inheritrange vs an authored
+        // ctrlrange.
         private void UpdateSwitches(
-            PropertyField ctrlLo, PropertyField ctrlHi, PropertyField forceLo, PropertyField forceHi)
+            PropertyField ctrlLo, PropertyField ctrlHi, PropertyField forceLo, PropertyField forceHi,
+            Label exclusivityWarning)
         {
             SerializedProperty ctrl = serializedObject.FindProperty("mj.ctrllimited");
             SerializedProperty force = serializedObject.FindProperty("mj.forcelimited");
@@ -58,6 +62,17 @@ namespace Greyhound.Step
             ctrlHi?.SetEnabled(ctrlOn);
             forceLo?.SetEnabled(forceOn);
             forceHi?.SetEnabled(forceOn);
+
+            SerializedProperty kv = serializedObject.FindProperty("mj.kv");
+            SerializedProperty dampratio = serializedObject.FindProperty("mj.dampratio");
+            SerializedProperty inheritrange = serializedObject.FindProperty("mj.inheritrange");
+            bool conflict = (kv != null && kv.floatValue != 0f && dampratio != null && dampratio.floatValue != 0f)
+                || (inheritrange != null && inheritrange.floatValue != 0f && ctrlOn);
+            if (exclusivityWarning != null)
+            {
+                exclusivityWarning.style.display =
+                    conflict ? DisplayStyle.Flex : DisplayStyle.None;
+            }
         }
     }
 }

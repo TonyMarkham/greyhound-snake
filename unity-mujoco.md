@@ -205,16 +205,67 @@ Data model (`Greyhound.Step`, Runtime assembly):
 - `StepActuator` (one .asset per actuator): the SO carries `root` (the
   required affordance), the asset's own `name`, `target joint` (object
   reference to a `StepJoint`) — plus `mj`, an `MjActuator` payload: the
-  `[Serializable]` MJCF `<position>` mirror (`type`, `forcerange lo/hi`,
-  `ctrlrange lo/hi` in joint units). Nothing deployment-side lives in
-  the schema: calibration (homing end, approach speed, zero offset) and
-  transmission constants (the belt pitch radius) enter when their
+  `[Serializable]` mirror of the **full 3.15.0 `<position>` attribute
+  surface**, names verbatim, defaults equal to the spec defaults so a
+  fresh asset is a fresh spec element: `group`, `delay`, `ctrllimited`
+  + `ctrlLo/Hi`, `forcelimited` + `forceLo/Hi`, `lengthrangeLo/Hi`,
+  `gear` (6 floats), `cranklength`, `kp` (defaults 1), `kv`,
+  `dampratio`, `timeconst`, `inheritrange`, `damping`, `armature`.
+  `type` is the element selector and `joint` is the target reference.
+  Deliberately unmirrored, each recorded: `class` (no defaults tree is
+  emitted; absent means "main" and no other value is expressible),
+  `jointinparent` (semantically identical to `joint` for hinge/slide
+  transmissions; the authoring model carries exactly one joint target),
+  the other transmission attributes (`tendon`, `cranksite`,
+  `slidersite`, `site`, `refsite` — the authoring model is
+  joint-transmission by construction), `user` (requires
+  `nuser_actuator`, never set); `nsample`/`interp` are not part of
+  `<position>` at 3.15.0. The form greys each range behind its switch
+  and warns on the spec's exclusive pairs (`kv`/`dampratio`,
+  `inheritrange`/authored `ctrlrange`). Nothing deployment-side lives
+  in the schema: calibration (homing end, approach speed, zero offset)
+  and transmission constants (the belt pitch radius) enter when their
   consumer exists — at M3 or on the deployment side — never as schema
   fields. Mirrors MJCF, where `<actuator>` is a separate element
   referencing a joint by name — the joint asset stays kinematics-only.
-- The `Mj*` payload classes (`MjJoint`, `MjActuator`) are pure,
-  attribute-verbatim MJCF mirrors and the future seam for MJCF XML
-  serialization: the M3 exporter writes XML elements from them, and
+- `StepGeom` (one .asset per authored geom): the SO carries `root`, the
+  asset's own `name` (the MJCF geom name), and `body` — the
+  sibling-index path of the part it sits on, exactly like `StepJoint` —
+  plus `mj`, an `MjGeom` payload: the mirror of the **full 3.15.0
+  `<geom>` attribute surface**, names verbatim, defaults equal to the
+  spec defaults: `type` (`[plane,hfield,sphere,capsule,ellipsoid,
+  cylinder,box,mesh,sdf]`), `pos`, `quat`, the orientation
+  alternatives (`axisangle` (4), `euler` (3), `xyaxes` (6), `zaxis`
+  (3) — the spec allows at most one orientation mechanism per geom;
+  the exporter normalizes to the canonical `quat`, which is MuJoCo's
+  own saver behavior, interpreting `euler` with the default eulerseq
+  xyz intrinsic), `size` (3), `contype`, `conaffinity`, `condim`,
+  `group`, `priority`, `friction` (3), `solmix`, `solref` (2),
+  `solimp` (5), `margin`, `gap`, `mass` (optional — 0 = unset,
+  attribute omitted), `density`, `rgba` (4), `shellinertia`, `fromto`
+  (6, unset = omitted), `fitscale`, `fluidshape`, `fluidcoef` (5),
+  `surfacevel` (6), `adhesion`. Collision is per-geom through
+  `contype`/`conaffinity` (two geoms collide iff their bitmask
+  cross-products are nonzero) — there is no global switch.
+  Deliberately unmirrored, each recorded: `name` (the asset name),
+  `class`, `mesh` (derived from the part's MeshFilter and emitted as
+  the exported mesh reference), `material`/`hfield`/`sdf` (asset kinds
+  we do not author), `user`. A meshed part with **no** `StepGeom`
+  asset falls back
+  to the importer's baseline: the importer attaches a
+  `StepGeomProperties` component to every meshed part (the derived-data
+  lifecycle of `StepMassProperties` — regenerated on every reimport,
+  never user-authored), whose `MjGeom` payload is visible but
+  collisionless (`contype=0`, `conaffinity=0`, `type=mesh`) and exports
+  unnamed. Edits on the component die with the next reimport;
+  persistent intent belongs in a `StepGeom` asset, which the exporter
+  prefers over the baseline. Creation: right-click a meshed part →
+  `Add > Geom` (one asset per part; the menu validates meshedness and
+  existing geoms). The family survives reimports through the same
+  validator/pruner coverage as joints and actuators.
+- The `Mj*` payload classes (`MjJoint`, `MjActuator`, `MjGeom`) are
+  pure, attribute-verbatim MJCF mirrors and the future seam for MJCF
+  XML serialization: the M3 exporter writes XML elements from them, and
   Unity-specific concerns never leak into them.
 - The asset family is the **data source of truth for articulation** —
   STEP has no joint semantics to import — while geometry remains the
@@ -344,15 +395,37 @@ Decided at M3 start (2026-10-10):
   #actuator-general-ctrllimited`), which makes the emitted file valid
   under autolimits with no heuristic. Ranges are emitted only when
   their limit switch is true (a default `0 0` range would otherwise
-  trip the strict lo<hi validation). Joint `range` follows the joint's
-  limit switch the same way. The range split maps verbatim per field:
-  joint `rangeLo/Hi` → `<joint range>`, actuator `ctrlLo/Hi`/`forceLo/Hi`
-  → the `<position>` attributes.
+  trip the strict lo<hi validation); the actuator's `lengthrange`
+  follows the same unset convention (omitted when both ends are 0).
+  `cranklength` is emitted only when nonzero — its *presence* is
+  invalid outside a slider-crank transmission (the compiler errors even
+  at the default 0; found by compiling the full-mirror output). `kv`
+  and `dampratio` are presence-exclusive — at most one is emitted
+  (the authored one; both-default means both absent), another
+  compiler rule found by compiling the full-mirror output. Joint
+  `range` follows the joint's limit switch the same way. The range
+  split maps verbatim per field: joint `rangeLo/Hi` →
+  `<joint range>`, actuator `ctrlLo/Hi`/`forceLo/Hi` → the
+  `<position>` attributes.
 - **Actuation is 1:1**: `<position name joint=... ctrlrange forcerange>`
   with no `gear` attribute — transmission constants (belt pitch radius)
   enter only when their consumer exists, never as schema fields (the
   M2a purge already settled this; the stale "gear scaling vs ctrl
   semantics" question is struck).
+- **Collision policy: a collisionless import baseline, authored intent
+  on top.** The importer gives every meshed part a `StepGeomProperties`
+  baseline (visible, collisionless: `contype=0`, `conaffinity=0`) — so
+  the compiled model renders the whole machine but no contact ever
+  exists by default; press-fit CAD parts interpenetrate volumetrically
+  (up to 27 mm measured in cart-pole-asm), and the compiler's default
+  contact friction (µ = 1) would turn those pressed pairs into a force
+  sink. A `StepGeom` asset (authored intent, per part) overrides the
+  baseline at export — that is where real collision and real friction
+  are authored, with the spec's per-geom `contype`/`conaffinity`
+  bitmasks; there is no global switch (an earlier container-level
+  `selfCollision` toggle was retired the day it was born: collision is
+  geom data). Per-pair contact machinery (`<contact><exclude>`,
+  `<pair>`) stays with the later contact-design bite.
 - **A moving body needs mass — MuJoCo's own rule**: the exporter
   transcribes the compiler's `CheckBodyMassInertia` (checked against
   `user_model.cc`, current main): a jointed body or free root is

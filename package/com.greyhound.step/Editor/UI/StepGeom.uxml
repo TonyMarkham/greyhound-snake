@@ -1,0 +1,37 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:ue="UnityEditor.UIElements">
+    <ui:VisualElement class="geom-form">
+        <ui:Label text="Step Geom" class="section-title" />
+        <ue:PropertyField binding-path="root" />
+        <ue:PropertyField binding-path="body" />
+        <ue:PropertyField binding-path="mj.type" />
+        <ue:PropertyField binding-path="mj.pos" />
+        <ue:PropertyField binding-path="mj.quat" />
+        <ue:PropertyField binding-path="mj.axisangle" />
+        <ue:PropertyField binding-path="mj.xyaxes" />
+        <ue:PropertyField binding-path="mj.zaxis" />
+        <ue:PropertyField binding-path="mj.euler" />
+        <ui:Label name="orientation-warning" class="warning" text="at most one orientation mechanism may be authored (quat, axisangle, xyaxes, zaxis, euler)" />
+        <ue:PropertyField binding-path="mj.size" />
+        <ue:PropertyField binding-path="mj.contype" />
+        <ue:PropertyField binding-path="mj.conaffinity" />
+        <ue:PropertyField binding-path="mj.condim" />
+        <ue:PropertyField binding-path="mj.group" />
+        <ue:PropertyField binding-path="mj.priority" />
+        <ue:PropertyField binding-path="mj.friction" />
+        <ue:PropertyField binding-path="mj.solmix" />
+        <ue:PropertyField binding-path="mj.solref" />
+        <ue:PropertyField binding-path="mj.solimp" />
+        <ue:PropertyField binding-path="mj.margin" />
+        <ue:PropertyField binding-path="mj.gap" />
+        <ue:PropertyField binding-path="mj.mass" />
+        <ue:PropertyField binding-path="mj.density" />
+        <ue:PropertyField binding-path="mj.rgba" />
+        <ue:PropertyField binding-path="mj.shellinertia" />
+        <ue:PropertyField binding-path="mj.fromto" />
+        <ue:PropertyField binding-path="mj.fitscale" />
+        <ue:PropertyField binding-path="mj.fluidshape" />
+        <ue:PropertyField binding-path="mj.fluidcoef" />
+        <ue:PropertyField binding-path="mj.surfacevel" />
+        <ue:PropertyField binding-path="mj.adhesion" />
+    </ui:VisualElement>
+</ui:UXML>

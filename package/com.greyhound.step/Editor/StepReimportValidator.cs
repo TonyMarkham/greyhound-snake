@@ -70,6 +70,14 @@ namespace Greyhound.Step
                     pruned = true;
                 }
             }
+            for (int i = set.geoms.Count - 1; i >= 0; i--)
+            {
+                if (set.geoms[i] == null)
+                {
+                    set.geoms.RemoveAt(i);
+                    pruned = true;
+                }
+            }
             if (pruned)
             {
                 EditorUtility.SetDirty(set);
@@ -94,6 +102,27 @@ namespace Greyhound.Step
                 Debug.LogError(
                     $"{stepPath}: {unmatched.Count} of {total} joints could not be placed " +
                     $"after reimport: {string.Join(", ", unmatched)}");
+            }
+
+            var unmatchedGeoms = new List<string>();
+            int geomTotal = 0;
+            foreach (StepGeom geom in set.geoms)
+            {
+                if (geom == null)
+                {
+                    continue;
+                }
+                geomTotal++;
+                if (StepJointSetFactory.FindPart(set, geom.body) == null)
+                {
+                    unmatchedGeoms.Add(geom.name);
+                }
+            }
+            if (unmatchedGeoms.Count > 0)
+            {
+                Debug.LogError(
+                    $"{stepPath}: {unmatchedGeoms.Count} of {geomTotal} geoms could not be placed " +
+                    $"after reimport: {string.Join(", ", unmatchedGeoms)}");
             }
         }
     }
