@@ -6,8 +6,11 @@
 #include <XCAFDoc_ShapeTool.hxx>
 #include <XCAFPrs.hxx>
 #include <XCAFPrs_Style.hxx>
+#include <XCAFDoc_Material.hxx>
 #include <XCAFDoc_MaterialTool.hxx>
 #include <TDataStd_Name.hxx>
+#include <TDataStd_TreeNode.hxx>
+#include <XCAFDoc.hxx>
 #include <BRepGProp.hxx>
 #include <GProp_GProps.hxx>
 #include <GProp_PrincipalProps.hxx>
@@ -191,6 +194,21 @@ uint32_t push_node(GreyDoc& doc, uint32_t parent, const std::string& name,
   return static_cast<uint32_t>(doc.nodes.size() - 1);
 }
 
+// Density exactly as stored in the XCAF material table, in g/cm^3.
+// XCAFDoc_MaterialTool::GetDensityForShape would convert to g/mm^3, a
+// unit the Unity consumer does not expect.
+double stored_density_g_per_cm3(const TDF_Label& label) {
+  occ::handle<TDataStd_TreeNode> node;
+  if (!label.FindAttribute(XCAFDoc::MaterialRefGUID(), node) || !node->HasFather()) {
+    return 0.0;
+  }
+  occ::handle<XCAFDoc_Material> material;
+  if (!node->Father()->Label().FindAttribute(XCAFDoc_Material::GetID(), material)) {
+    return 0.0;
+  }
+  return material->GetDensity();
+}
+
 // Meshes the label's simple shape once (or reuses the mesh recorded for a
 // previously seen referred label) and returns its index.
 uint32_t mesh_for_label(GreyDoc& doc, const TDF_Label& label) {
@@ -199,7 +217,7 @@ uint32_t mesh_for_label(GreyDoc& doc, const TDF_Label& label) {
   }
   GreyMesh mesh;
   mesh.shape = XCAFDoc_ShapeTool::GetShape(label);
-  mesh.file_density = XCAFDoc_MaterialTool::GetDensityForShape(label);
+  mesh.file_density = stored_density_g_per_cm3(label);
   resolve_face_colors(doc, label, mesh.face_color_indices);
   doc.meshes.push_back(std::move(mesh));
   const uint32_t index = static_cast<uint32_t>(doc.meshes.size() - 1);
