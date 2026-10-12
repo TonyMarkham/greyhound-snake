@@ -115,6 +115,8 @@ needs the user's Unity editor, use the dist-first loop.
   (`tools/verify-package.py`).
 - `tmp/`: disposable OCCT source and build scaffolding; currently gitignored.
 - `assets/`: sample assets, including a single part and an assembly STEP file.
+- `crates/aruco/`, `crates/aruco-cli/`: planned — ArUco 4x4 marker SVG
+  generator (`aruco-svg.md`); not yet implemented.
 
 Design reference docs (source of truth for their facts; consult before
 mesh, projection, or export work instead of re-deriving):
@@ -140,6 +142,9 @@ mesh, projection, or export work instead of re-deriving):
 - `better-occt-bins.md`: the neutral-OCCT-install + selective-staging
   workflow (payload facts, `just stage-occt` design, the STEP-resources
   needs-test).
+- `aruco-svg.md`: the ArUco 4x4 SVG generator plan — OpenCV-compatible
+  dictionary tables, selection mode (`--count`/`--seed`/`--min-distance`),
+  SVG output model, and the bite breakdown.
 - `perf.md`: benchmark plan (criterion, micro/macro layers, assets),
   the scalar-first SIMD decision and its revisit trigger, and rules for
   recording timings.

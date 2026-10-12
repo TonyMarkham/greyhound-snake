@@ -144,6 +144,9 @@ when a decision lands.
 - `potpori.md` — *Detector training (synthetic labeling loop)*:
   rationale, randomization design, three-datasets-from-one-run,
   real-image fine-tune set, open item 7.
+- `aruco-svg.md` — printable 4x4 ArUco marker designs as SVGs
+  (OpenCV-compatible dictionary tables, selection mode); the physical
+  sticker side this plan's marker quads mirror.
 - `occt-to-unity.md` — scene forest facts and the gap table.
 - `unity-mujoco.md` / `mujoco-schema.md` — MJCF exporter facts the
   `NO_MESH` exporter check leans on.
