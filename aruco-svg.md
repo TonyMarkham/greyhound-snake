@@ -84,9 +84,12 @@ Sources, cited as `hpp:<line>` / `cpp:<function>`:
 `modules/objdetect/src/aruco/predefined_dictionaries.hpp` (hpp),
 `modules/objdetect/src/aruco/aruco_dictionary.cpp` (cpp), and
 `modules/objdetect/include/opencv2/objdetect/aruco_dictionary.hpp`
-(dict-hpp) — github.com/opencv/opencv, `4.x` branch. Every claim below
-was checked in those files at the cited location; anything not checkable
-there lives in *Open verification items*.
+(dict-hpp) — github.com/opencv/opencv, `4.x` branch. Byte-level
+layout is additionally documented in OpenCV's official class docs
+(<https://docs.opencv.org/4.13.0/d5/d0b/classcv_1_1aruco_1_1Dictionary.html>,
+verified 2026-10-12); the MSB-first bit order appears only in the cpp.
+Every claim below was checked in those files at the cited location;
+anything not checkable there lives in *Open verification items*.
 
 - **Marker geometry.** dict-hpp `generateImageMarker(int id, int
   sidePixels, OutputArray _img, int borderBits = 1)` — default
@@ -153,6 +156,23 @@ there lives in *Open verification items*.
 - Pure-rust SVG output needs no OCCT, no Unity, no native code — all
   three bites validate entirely with `cargo test`/`cargo build` in the
   worktree loop.
+- **Measured greedy behavior** (Rust implementation, SplitMix64
+  Fisher-Yates, verified via the CLI 2026-10-12): on `DICT_4X4_1000`,
+  12 picks at a 6-bit floor succeed for seed 6 and fail (reaching 5)
+  for seeds 1–5, 7, 8; 24 picks reach 5. The floor is therefore
+  **seed-dependent by design**: a refused floor names the achieved
+  value in its error; retry other seeds or lower the floor. Tests pin
+  both the reachable (seed 6) and refusing (seed 42) cases.
+- **Dependency status, stated in full.** `crates/aruco` has **no
+  OpenCV link-time or runtime dependency** — the committed table is
+  self-contained data and the crate never touches OpenCV. The bite
+  *does* carry a **generation-time dependency**: reproducing the table
+  requires OpenCV's `predefined_dictionaries.hpp` at pinned commit
+  `802cf95aa3d42816995695bf68a86b3532f12760` (network fetch at
+  transcription time; the commit URL is the provenance anchor). If
+  offline reproducibility of the provenance chain is required, the
+  alternative is vendoring the pinned hpp into `third_party/opencv/`
+  (~640 KB) — an open call, not silently decided.
 
 ## Open verification items
 
@@ -260,43 +280,25 @@ clippy::panic)] mod tests;`, then `pub use` re-exports.
 - **Tests out of line** in `src/tests/`, never inline in source
   files; tests may unwrap, library code may not.
 
-## CLI specification
+## CLI spec (summary)
 
-```text
-# single marker
-aruco 7 --dict 4x4_50 -o marker_7.svg [--size 256] [--units px|mm]
-       [--margin 1] [--label]
+The user manual lives in `crates/aruco-cli/README.md` (the binary
+crate's own README) — that is the usage reference: modes, `-o`
+semantics per mode, flag rules, selection-floor behavior, output
+naming, exit codes. `aruco --help` renders the same facts live.
+What belongs in this plan doc is the shape only:
 
-# whole dictionary (individual files into a directory)
-aruco all --dict 4x4_50 -o dir/ [--size] [--margin] [--label]
-
-# whole dictionary as one contact sheet
-aruco all --dict 4x4_50 --sheet -o sheet.svg [--cols 10] [--size] [--margin]
-
-# selection mode
-aruco --count 12 --dict 4x4_1000 -o dir/ [--seed 42]
-      [--min-distance 6] [--size] [--margin] [--label]
-```
-
-- Positional `id|all`: `all` is the keyword; anything else parses as a
-  numeric id — **id 0 is valid**.
-- Flag requirements (clap-enforced conflicts):
-  - `--seed` and `--min-distance` require `--count` (error otherwise).
-  - `--sheet` requires `all` or `--count` (meaningless for a single
-    id); `--cols` requires `--sheet`.
-  - `--units`/`--margin`/`--label`/`--size` are valid in every mode.
-- `-o` semantics: single-id mode takes a **file** path; `all` and
-  `--count` take a **directory**, created if missing; existing files
-  are overwritten silently (the print pipeline regenerates).
-- `--count` must be ≥ 1; error when N exceeds the filtered pool, and
-  in MaxDistance mode when the D floor is unreachable.
-- `--dict` default `4x4_50`; `--size` default 256 — the full square
-  side length in `--units` (`px`/`mm`), emitted as `width`/`height`;
-  the viewBox stays in cells so the vector output is unit-independent;
-  `--margin` default 1 cell; `--cols` default 10.
-- File naming: `marker_{id:04}.svg` (zero-padded so directory listings
-  sort numerically).
-- Exit non-zero with a listed error for every case above.
+- Modes: `<id>` (one file), `all` (a directory of files or, with
+  `--sheet`, one contact sheet), `--count N` (a selected set — same
+  outputs as `all`).
+- Flags: `--dict` (default `4x4_50`), `--size`/`--units`,
+  `--margin` (default 0 — OpenCV `generateImageMarker` parity: the
+  ring sits flush to the edge; quiet zone opt-in), `--label`,
+  `--sheet`/`--cols`,
+  `--seed`/`--min-distance` (selection only).
+- Cross-flag rules clap enforces: positional xor `--count`;
+  `--seed`/`--min-distance` require `--count`; `--cols` requires
+  `--sheet`. One runtime rule: `--sheet` rejects a single id.
 
 ## SVG output model
 
@@ -340,25 +342,33 @@ aruco --count 12 --dict 4x4_1000 -o dir/ [--seed 42]
 
 ## Bites
 
-- **Bite A — dictionary tables + core model** (worktree loop).
-  `crates/aruco` skeleton: `Cargo.toml`, error module, `Marker`,
-  `ArucoDictionary`, `rotation.rs`, `hamming.rs`, `data/` table module,
-  `src/tests/` with the full invariant suite (rotation reproduction of
-  the stored rotations, documented distances 4/3/3/2, self-symmetry
-  count, known-id spot checks). Gate: `cargo test -p aruco` and
-  `cargo clippy -p aruco -- -D warnings` green in the worktree; the
-  invariants are the correctness proof for the transcription. Also
-  lands the `THIRD_PARTY_NOTICES.md` entry (Apache-2.0 attribution).
-- **Bite B — SVG renderer + single/whole-dict CLI** (worktree loop).
-  `render.rs`, `sheet.rs`, snapshot tests; `crates/aruco-cli` with
-  `<id|all>`, `--dict`, `--size`, `--units`, `--margin`, `--label`,
-  `--sheet`, `--cols`. Gate: `cargo test` and `cargo clippy -- -D
-  warnings` green; user eyeballs 2–3 SVGs.
-- **Bite C — selection mode** (worktree loop). `prng.rs`, `select.rs`,
-  selection property tests; CLI `--count`/`--seed`/`--min-distance`,
-  stdout id report, pool-size errors. Gate: `cargo test` and
-  `cargo clippy -- -D warnings` green; `cv2.aruco` detection check on
-  a selected set.
+- **Bite A — dictionary tables + core model** — **implemented and
+  validated** (worktree `../greyhound-snake-aruco-a`, doc
+  `aruco-bite-a.md`): `crates/aruco` skeleton, table extraction
+  script, Apache-2.0 notice, invariant suite (rotation reproduction
+  of all 1000×3 stored rotations, distances 4/3/3/2, self-symmetry
+  count 0, marker-0 spot check). Gate green: tests/clippy/fmt.
+- **Bite B — SVG renderer + single/whole-dict CLI** — **implemented
+  and validated** (worktree, doc `aruco-bite-bc.md`): `units.rs`,
+  `render.rs` (cell-grid SVG, snapshot-pinned; caught and fixed a
+  data-offset bug — data hugs the ring at `m+1`), `sheet.rs`
+  (marker-set-driven: `SheetSvg::new(dict)`/`from_markers`),
+  `crates/aruco-cli` (`<id|all>`, `--dict`, `--size`, `--units`,
+  `--margin`, `--label`, `--sheet`, `--cols`), clap parse + run smoke
+  tests. Deviations recorded in `aruco-bite-bc.md` (sheet `--size` =
+  full width with aspect-derived height; cols clamp to marker count).
+- **Bite C — selection mode** — **implemented and validated**
+  (worktree, doc `aruco-bite-bc.md`): `prng.rs` (SplitMix64, Lemire
+  debiased draws, golden-vector test), `select.rs` (`FirstN`/
+  `Seeded`/`MaxDistance`, property tests for rotation uniqueness and
+  floor refusals), CLI `--count`/`--seed`/`--min-distance` with the
+  chosen ids printed to stdout. Gate green: 48 lib + 18 CLI tests,
+  clippy/fmt clean, whole workspace green.
+- **Open item carried by the user:** `cv2.aruco.detectMarkers` check
+  on generated SVGs (`cv2` is not installed on this machine; open
+  verification item 2). Sample outputs wait in
+  the worktree's gitignored `tmp/aruco-samples/` for the eyeball +
+  detection check.
 
 Each bite's implementation doc is written mechanically from its
 worktree diff per the AGENTS.md bite workflow; this doc holds the
