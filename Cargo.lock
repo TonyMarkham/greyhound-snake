@@ -53,6 +53,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "aruco"
+version = "0.1.0"
+dependencies = [
+ "error-location",
+ "thiserror",
+]
+
+[[package]]
+name = "aruco-cli"
+version = "0.1.0"
+dependencies = [
+ "aruco",
+ "clap",
+ "tempfile",
+]
+
+[[package]]
 name = "bitflags"
 version = "2.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

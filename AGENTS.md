@@ -28,6 +28,16 @@ the macOS/Windows integration is not yet exercised.
   Do not turn a question into an implementation task.
 - Clearly distinguish source inspection from an executed build or test.
   Do not claim validation that has not actually happened.
+- **The user understands before anything lands.** The user owns this repo
+  and its distribution and is never a passenger or observer: code,
+  comments, and bite docs are written so the reader can verify claims by
+  hand and never have to ask what a value means. A question from the user
+  is a defect report — the artifact failed to transfer the knowledge; fix
+  the artifact at every copy, not just the conversation.
+- **Comments state the invariant, the hand-checkable rule, or the
+  rationale** — the things a signature cannot show (a rule the reader can
+  apply by hand, a worked example, the why behind a non-obvious choice).
+  Never recite what the adjacent code or the cited source already says.
 - Preserve existing user changes. Do not commit, stage, or discard changes
   unless explicitly requested.
 
