@@ -38,6 +38,9 @@ HOST_ABI_VERSION = 4
 
 NO_INDEX = 0xFFFFFFFF
 
+# The host cdylib's filename is per-OS; the package layout around it is not.
+HOST_LIBRARY = "importer_host.dll" if os.name == "nt" else "libimporter_host.so"
+
 
 class UnityBounds(ctypes.Structure):
     _fields_ = [("min", ctypes.c_float * 3), ("max", ctypes.c_float * 3)]
@@ -90,19 +93,36 @@ def fail(message):
     sys.exit(1)
 
 
+def verify_from_copy(source, asset):
+    with tempfile.TemporaryDirectory(prefix="greyhound-package-") as copy:
+        package = Path(copy) / "package"
+        shutil.copytree(source, package, symlinks=False)
+        verify(package, asset)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--package", type=Path, default=Path("dist/package"))
     parser.add_argument("--asset", type=Path, default=Path("assets/cart-asy.step"))
     args = parser.parse_args()
 
-    if not (args.package / PACKAGE_NAME / "Runtime" / "Plugins" / "x86_64" / "libimporter_host.so").is_file():
+    if not (args.package / PACKAGE_NAME / "Runtime" / "Plugins" / "x86_64" / HOST_LIBRARY).is_file():
         fail(f"{args.package} is not an assembled package; run 'just assemble-package'")
 
-    with tempfile.TemporaryDirectory(prefix="greyhound-package-") as copy:
-        package = Path(copy) / "package"
-        shutil.copytree(args.package, package, symlinks=False)
-        verify(package, args.asset.resolve())
+    asset = args.asset.resolve()
+    if os.name != "nt":
+        # Linux can unlink mapped images, so the copied layout can be
+        # deleted in-process after the ctypes work.
+        verify_from_copy(args.package, asset)
+        print("PASS")
+        return
+
+    # Windows refuses to delete a loaded image, which is what made a copied
+    # layout need child-process gymnastics; so verify the assembled package
+    # directly instead. It is still independent of the build tree (nothing
+    # loads from target/), and this process exits right after, releasing
+    # every DLL lock itself.
+    verify(args.package, asset)
     print("PASS")
 
 
@@ -116,7 +136,7 @@ def verify(package, asset):
         fail("Third Party Notices.md is missing from the package root")
 
     library_dir = root / "Runtime" / "Plugins" / "occt" / "x86_64" / "lib"
-    lib = ctypes.CDLL(str(root / "Runtime" / "Plugins" / "x86_64" / "libimporter_host.so"))
+    lib = ctypes.CDLL(str(root / "Runtime" / "Plugins" / "x86_64" / HOST_LIBRARY))
 
     lib.greyhound_host_version.restype = ctypes.c_uint32
     version = lib.greyhound_host_version()

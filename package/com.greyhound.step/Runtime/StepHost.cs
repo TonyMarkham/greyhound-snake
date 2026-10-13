@@ -42,7 +42,7 @@ namespace Greyhound.Step
 
             IntPtr handle = NativeMethods.NewHost(
                 NativeMethods.OcctLibraryDirectory(),
-                NativeMethods.ShimPath());
+                NativeMethods.ShimDirectory());
             if (handle == IntPtr.Zero)
             {
                 throw new InvalidOperationException(NativeMethods.TakeLastError());

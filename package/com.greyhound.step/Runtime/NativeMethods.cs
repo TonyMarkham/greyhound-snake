@@ -17,9 +17,12 @@ namespace Greyhound.Step
             return Path.Combine(PluginsDirectory(), "occt", "x86_64", "lib");
         }
 
-        public static string ShimPath()
+        // The shim is passed as a directory: the native loader appends the
+        // per-OS shim filename itself (compiled in from occt-sys's
+        // config.toml), so this side must never name the file.
+        public static string ShimDirectory()
         {
-            return Path.Combine(PluginsDirectory(), "shim", "x86_64", "libgreyhound_occt.so");
+            return Path.Combine(PluginsDirectory(), "shim", "x86_64");
         }
 
         private static string PluginsDirectory()
@@ -34,7 +37,7 @@ namespace Greyhound.Step
         public static extern IntPtr LastError();
 
         [DllImport(Library, EntryPoint = "greyhound_host_new", ExactSpelling = true)]
-        public static extern IntPtr NewHost(string occtDir, string shimPath);
+        public static extern IntPtr NewHost(string occtDir, string shimDir);
 
         [DllImport(Library, EntryPoint = "greyhound_host_free", ExactSpelling = true)]
         public static extern void FreeHost(IntPtr host);
