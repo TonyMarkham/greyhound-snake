@@ -4,7 +4,10 @@ use crate::units::Units;
 
 /// Marker 0 (bits 0xb532), defaults: margin 0 (the black ring sits
 /// flush to the SVG edge — OpenCV `generateImageMarker` parity),
-/// 256 px, no caption.
+/// 256 px, no caption. Bits render with OpenCV's polarity: bit 1 =
+/// white, bit 0 = black (`generateImageMarker` paints bits × 255
+/// onto an all-black canvas), so the black rects sit at the *clear*
+/// bits — the complement of the 0xb532 grid.
 #[test]
 fn marker_zero_document_matches_the_expected_svg() {
     let svg = MarkerSvg::new(Marker {
@@ -20,14 +23,14 @@ fn marker_zero_document_matches_the_expected_svg() {
 <rect x=\"0\" y=\"1\" width=\"1\" height=\"4\" fill=\"#000000\"/>
 <rect x=\"5\" y=\"1\" width=\"1\" height=\"4\" fill=\"#000000\"/>
 <rect x=\"0\" y=\"5\" width=\"6\" height=\"1\" fill=\"#000000\"/>
-<rect x=\"1\" y=\"1\" width=\"1\" height=\"1\" fill=\"#000000\"/>
-<rect x=\"3\" y=\"1\" width=\"1\" height=\"1\" fill=\"#000000\"/>
-<rect x=\"4\" y=\"1\" width=\"1\" height=\"1\" fill=\"#000000\"/>
-<rect x=\"2\" y=\"2\" width=\"1\" height=\"1\" fill=\"#000000\"/>
-<rect x=\"4\" y=\"2\" width=\"1\" height=\"1\" fill=\"#000000\"/>
-<rect x=\"3\" y=\"3\" width=\"1\" height=\"1\" fill=\"#000000\"/>
-<rect x=\"4\" y=\"3\" width=\"1\" height=\"1\" fill=\"#000000\"/>
-<rect x=\"3\" y=\"4\" width=\"1\" height=\"1\" fill=\"#000000\"/>
+<rect x=\"2\" y=\"1\" width=\"1\" height=\"1\" fill=\"#000000\"/>
+<rect x=\"1\" y=\"2\" width=\"1\" height=\"1\" fill=\"#000000\"/>
+<rect x=\"3\" y=\"2\" width=\"1\" height=\"1\" fill=\"#000000\"/>
+<rect x=\"1\" y=\"3\" width=\"1\" height=\"1\" fill=\"#000000\"/>
+<rect x=\"2\" y=\"3\" width=\"1\" height=\"1\" fill=\"#000000\"/>
+<rect x=\"1\" y=\"4\" width=\"1\" height=\"1\" fill=\"#000000\"/>
+<rect x=\"2\" y=\"4\" width=\"1\" height=\"1\" fill=\"#000000\"/>
+<rect x=\"4\" y=\"4\" width=\"1\" height=\"1\" fill=\"#000000\"/>
 </svg>
 ";
     assert_eq!(svg, expected);

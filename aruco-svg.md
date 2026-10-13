@@ -94,8 +94,15 @@ anything not checkable there lives in *Open verification items*.
 - **Marker geometry.** dict-hpp `generateImageMarker(int id, int
   sidePixels, OutputArray _img, int borderBits = 1)` — default
   `borderBits = 1`. cpp `generateImageMarker` builds a
-  `(markerSize + 2*borderBits)`-cell grid (`tinyMarker`), fills the
-  inner `borderBits … rows-borderBits` region with the marker bits.
+  `(markerSize + 2*borderBits)`-cell grid (`tinyMarker`) from
+  `Scalar::all(0)` — all black — then scales the marker bits by 255
+  (`bits.convertTo(bits, CV_8U, 255.0)`) and copies them into the
+  inner `borderBits … rows-borderBits` region. **Bit 1 = white cell,
+  bit 0 = black cell** — the set bit becomes pixel 255 on the black
+  canvas, and the black border ring is the untouched canvas
+  (verified in the cpp 2026-10-12; rendered markers with the opposite
+  polarity failed to decode as their own ids in standard OpenCV
+  dictionaries, and the inverse rendered exactly the intended ids).
   So a 4x4 marker renders as a **6x6 cell grid: a 1-cell solid black
   border ring surrounding the 4x4 data field**. 16 data bits per
   marker; 2^16 total patterns (arithmetic).
@@ -305,7 +312,10 @@ What belongs in this plan doc is the shape only:
 - viewBox in cells: `(6 + 2*margin) × (6 + 2*margin)`.
 - White background rect (quiet zone), 1-cell black border ring
   (verified: OpenCV renders `borderBits = 1` by default), data cells:
-  one `<rect>` per black data cell over the white background.
+  one `<rect>` per black data cell over the white background — a
+  black data cell is a **clear** bit (bit 1 = white; OpenCV
+  `generateImageMarker` paints `bits × 255` onto an all-black
+  canvas).
 - `--label` adds a caption row (one cell tall) below the marker with the
   id text; the viewBox extends accordingly.
 - No styling beyond fill colors; consumers (print pipeline) control the

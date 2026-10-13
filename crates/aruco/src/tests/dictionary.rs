@@ -24,14 +24,15 @@ fn marker_counts_match_the_predefined_sizes() {
 #[test]
 fn marker_zero_is_the_stored_rotation0_bytes() {
     // hpp:4121: marker 0 rotation 0 = {181, 50} = rows
-    // 1011 / 0101 / 0011 / 0010 = 0xb532.
+    // 1011 / 0101 / 0011 / 0010 = 0xb532. Bits are cell polarity in
+    // OpenCV's convention: 1 = white, 0 = black.
     let marker = ArucoDictionary::Dict4x4_50
         .marker(0)
         .expect("id 0 is valid");
     assert_eq!(marker.id, 0);
     assert_eq!(marker.bits, 0xb532);
-    assert_eq!(marker.bits & 0x8000, 0x8000, "row 0 column 0 is black");
-    assert_eq!(marker.bits & 0x0001, 0, "row 3 column 3 is white");
+    assert_eq!(marker.bits & 0x8000, 0x8000, "row 0 column 0 is white");
+    assert_eq!(marker.bits & 0x0001, 0, "row 3 column 3 is black");
 }
 
 #[test]

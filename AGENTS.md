@@ -125,8 +125,10 @@ needs the user's Unity editor, use the dist-first loop.
   (`tools/verify-package.py`).
 - `tmp/`: disposable OCCT source and build scaffolding; currently gitignored.
 - `assets/`: sample assets, including a single part and an assembly STEP file.
-- `crates/aruco/`, `crates/aruco-cli/`: planned — ArUco 4x4 marker SVG
-  generator (`aruco-svg.md`); not yet implemented.
+- `crates/aruco/`, `crates/aruco-cli/`: ArUco 4x4 marker SVG generator
+  — OpenCV-compatible dictionary tables, selection mode
+  (`--count`/`--seed`/`--min-distance`), SVG rendering; the CLI
+  crate's `README.md` is its user manual (`aruco-svg.md`).
 
 Design reference docs (source of truth for their facts; consult before
 mesh, projection, or export work instead of re-deriving):

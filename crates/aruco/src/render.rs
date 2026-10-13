@@ -95,7 +95,11 @@ impl MarkerSvg {
 /// The black geometry of one marker: the border ring, one `<rect>`
 /// per black data cell (row-major bit order, matching the table's
 /// `b = row*4 + column` at position `15 - b`), and the optional
-/// caption. Positions are in viewBox cells relative to the marker's
+/// caption. A black data cell is a *clear* bit: OpenCV's
+/// `generateImageMarker` scales the bits by 255 onto an all-black
+/// canvas, so a set bit renders white and only bit 0 draws black.
+/// Painting the set bits instead would emit every marker's inverse,
+/// which no standard dictionary decodes as the intended id. Positions are in viewBox cells relative to the marker's
 /// own origin; a sheet wraps calls in `<g transform>` translations.
 pub(crate) fn write_content(marker: &Marker, margin: u32, label: bool, out: &mut String) {
     let m = margin;
@@ -116,7 +120,7 @@ pub(crate) fn write_content(marker: &Marker, margin: u32, label: bool, out: &mut
         m + 5,
     ));
     for bit in 0..16u32 {
-        if marker.bits & (1u16 << (15 - bit)) != 0 {
+        if marker.bits & (1u16 << (15 - bit)) == 0 {
             // The data field hugs the border ring: ring occupies cell
             // m, data starts at m+1 — a data rect at m+2 would leave a
             // one-cell white gap inside the border.

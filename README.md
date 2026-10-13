@@ -18,7 +18,10 @@ actuators, exact-BRep inertials) with binary STL meshes into a
 `<step file>.stp~` folder beside the file (`unity-mujoco.md` holds the
 facts and decisions). A standalone Rust CLI,
 `crates/greyhound-export-mjc`, exports the same rigid-tree MJCF without
-Unity. Only Linux x86_64 is exercised end to end.
+Unity. A second standalone Rust CLI, `crates/aruco-cli`, generates 4x4
+ArUco marker SVGs — OpenCV-compatible, rotationally unique, and
+reproducible (`crates/aruco-cli/README.md` is its manual). Only Linux
+x86_64 is exercised end to end.
 
 ## Repository layout
 
@@ -31,6 +34,8 @@ Unity. Only Linux x86_64 is exercised end to end.
 | `crates/importer-host` | Unity-facing cdylib — flat, version-gated C ABI over the projection |
 | `crates/greyhound-export-mjc` | CLI exporting a STEP file as a naive rigid-tree MJCF model plus binary STL meshes (reference implementation of the emitted schema) |
 | `crates/step-stats` | CLI that prints geometry stats (solids/faces/edges/bbox) for a STEP file |
+| `crates/aruco` | 4x4 ArUco dictionary model: OpenCV's embedded bit tables, rotations, standard Hamming error checks, marker selection, SVG rendering |
+| `crates/aruco-cli` | CLI generating 4x4 ArUco marker SVGs (manual: `crates/aruco-cli/README.md`) |
 | `package/com.greyhound.step` | Tracked UPM package sources: the C# `Runtime/` P/Invoke layer, mass-properties components, the joint/actuator/geom annotation asset family with its `Mj*` MJCF mirrors, and the `Editor/` ScriptedImporter, authoring editors, scene tools, reimport validator, and MJCF exporter |
 | `tools/verify-package.py` | End-to-end verification of the assembled package against measured constants |
 | `justfile` | `just assemble-package` stages package + native payload into `dist/`; `just verify-package` checks it from a copied layout |
@@ -38,6 +43,8 @@ Unity. Only Linux x86_64 is exercised end to end.
 | `config.toml` | Runtime config for `step-stats`: OCCT `library_dir` and `shim_path` |
 | `.cargo/config.toml` | Sets `OCCT_PREFIX` and `OCCT_SHIM_DIR` so OCCT installs and the shim compiles into the package layout |
 | `third_party/occt` | OCCT license and exception texts bundled with the binaries |
+| `third_party/opencv` | OpenCV Apache-2.0 license text (the embedded 4x4 dictionary bit tables are OpenCV source data — see `THIRD_PARTY_NOTICES.md`) |
+| `tools/extract_aruco_dict.py` | Regenerates `crates/aruco/src/data/dict_4x4_1000.rs` verbatim from OpenCV's pinned source |
 | `dist/` | Gitignored native output (see below) |
 | `tmp/` | Gitignored OCCT source/build scratch area, including the stage logs (see `occt-linux.md`) |
 
@@ -51,6 +58,8 @@ Unity. Only Linux x86_64 is exercised end to end.
 - `mujoco-schema.md` — MJCF facts checked against the MuJoCo stable docs
   (compiler, body/joint/inertial, `<position>` actuation)
 - `perf.md` — benchmark plan and the scalar-first SIMD decision
+- `aruco-svg.md` — the ArUco 4x4 SVG generator: OpenCV source-verified
+  dictionary facts, plan, and landed decisions
 
 ## Native output layout
 
@@ -135,4 +144,7 @@ Code in this repository is licensed under the [MIT](LICENSE). It uses
 [Open CASCADE Technology](https://github.com/Open-Cascade-SAS/OCCT), which is
 LGPL-2.1 with the Open CASCADE exception — see
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md); the OCCT license and
-exception texts are bundled under `third_party/occt/`.
+exception texts are bundled under `third_party/occt/`. The embedded ArUco
+dictionary bit tables are [OpenCV](https://github.com/opencv/opencv) source
+data under the Apache License, Version 2.0 — notice and license text in
+`THIRD_PARTY_NOTICES.md` and `third_party/opencv/`.

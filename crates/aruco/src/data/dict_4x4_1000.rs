@@ -1,8 +1,14 @@
 //! OpenCV's predefined 4x4 ArUco dictionary, transcribed verbatim.
 //!
-//! Reading the table: a marker is a 4x4 field of cells (1 = black),
+//! Reading the table: a marker is a 4x4 field of cells (1 = white),
 //! stored as bytes whose **binary representation is the cell
-//! pattern**. Each rotation's two bytes split the field in half:
+//! pattern**. Polarity ground truth: cpp `generateImageMarker` starts
+//! from an all-black canvas (`Scalar::all(0)`) and copies the marker
+//! bits scaled by 255 (`bits.convertTo(bits, CV_8U, 255.0)`) into the
+//! inner region — so a set bit renders white, a clear bit black. The
+//! black border ring is the untouched canvas. Rendering with the
+//! opposite polarity emits every marker's bit-inverse, which decodes
+//! as a different marker (or nothing) in any standard dictionary. Each rotation's two bytes split the field in half:
 //! byte 0 = rows 0-1, byte 1 = rows 2-3; within a byte, cells fill
 //! MSB-first down the rows, so bit index `b = row*4 + column` sits at
 //! position `15 - b` of the pair read as one 16-bit integer.

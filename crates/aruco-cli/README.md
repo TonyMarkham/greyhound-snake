@@ -11,6 +11,20 @@ the Apache License, Version 2.0 — attribution in the repo's
 `THIRD_PARTY_NOTICES.md` and `third_party/opencv/`. Everything else is
 the repo's license.
 
+## Prerequisites
+
+- **Rust toolchain** — `cargo` builds the CLI
+  ([rustup](https://rustup.rs) if missing).
+- **An SVG rasterizer** — needed only to turn the generated SVGs into
+  PNG textures; the crate emits SVG and ships no rasterizer. On
+  Ubuntu:
+
+  ```bash
+  sudo apt install librsvg2-bin
+  ```
+
+  ImageMagick, Inkscape, or CairoSVG work the same.
+
 ## Build and run
 
 ```bash
@@ -39,10 +53,14 @@ Each file is a standalone SVG document — the **6x6-cell grid itself**
 (black border ring flush to the SVG edge, 4x4 data field inside,
 OpenCV `generateImageMarker` geometry; 256 px default). No baked-in
 white padding; add a quiet zone with `--margin` if a consumer wants
-one. Rasterize one per texture:
+one. Rasterize one per texture (any SVG rasterizer — see
+Prerequisites):
 
 ```bash
 rsvg-convert -w 256 -h 256 out/marker_0376.svg -o marker_0376.png
+# equivalents: magick -background none out/marker_0376.svg -resize 256x256 marker_0376.png
+#              inkscape out/marker_0376.svg -w 256 -h 256 -o marker_0376.png
+#              cairosvg out/marker_0376.svg -o marker_0376.png -W 256 -H 256
 ```
 
 What the flags guarantee:
@@ -64,10 +82,15 @@ Notes on the floor:
   target is `tau = 10`.
 - The floor is **seed-dependent by design**: the greedy selection
   maximizes the achieved minimum, and if that stays under D the tool
-  errors naming the floor and the achieved value (`cannot pick 12
-  markers with minimum distance 6; the greedy pass reached 5`) —
-  retry other seeds or lower D. Larger counts saturate toward 5;
-  more headroom means more data bits (5x5/6x6 — not in v1).
+  errors naming the floor, the achieved value, and the paper's
+  theoretical target — `cannot pick 12 markers with minimum distance
+  6; the greedy pass reached 5 (paper target tau = 10)` — so retry
+  other seeds or lower D. What floor a count can reach depends on
+  dictionary size (measured with seed 6): `4x4_1000` picks 12 markers
+  at distance 6 (floor 7 fails, reaching 6) but 50 markers top out at
+  4; `4x4_50` picks 12 at distance 5 (floor 6 fails, reaching 5).
+  Larger dictionaries have more headroom; more data bits (5x5/6x6)
+  are not in v1.
 - Every selected marker keeps its OpenCV id — detection with
   `cv2.aruco` reports that id.
 
