@@ -4,6 +4,7 @@ mod dependencies;
 pub mod error;
 pub mod grey_box;
 mod native_api;
+mod native_library;
 pub mod occt;
 pub mod scene;
 pub mod step_doc;

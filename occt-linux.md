@@ -68,7 +68,7 @@ Unity importer or its UPM package.
 
 > ## 2. Configure, build, install to the repo's dist
 >
-> Run from the repo root. OCCT installs **directly into the repo's vendored dist** — the directory `OCCT_PREFIX` in `.cargo/config.toml` must point at — so there is no external install and no copy step afterwards.
+> Run from the repo root. OCCT installs **directly into the repo's vendored dist** — the directory `occt_prefix` in the `[linux]` section of `crates/occt-sys/config.toml` must point at — so there is no external install and no copy step afterwards.
 >
 > **Disable library versioning in the source** before configuring. In `tmp/occt/OCCT/adm/cmake/occt_toolkit.cmake`, replace:
 >
@@ -139,7 +139,7 @@ Unity importer or its UPM package.
 > cmake --install tmp/occt/build 2>&1 | tee tmp/occt/install.log
 > ```
 >
-> The whole install — headers, libraries, resources, CMake package config — lands inside the package at `dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64/`, which is the path `.cargo/config.toml`'s `OCCT_PREFIX` points at. The prefix is read from `INSTALL_DIR` at **configure time** — `cmake --install --prefix <dir>` afterwards does **not** fully work: OCCT bakes absolute header-install paths into the generated scripts, so only some files would follow the new prefix.
+> The whole install — headers, libraries, resources, CMake package config — lands inside the package at `dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64/`, which is the path the `[linux]` section's `occt_prefix` of `crates/occt-sys/config.toml` points at. The prefix is read from `INSTALL_DIR` at **configure time** — `cmake --install --prefix <dir>` afterwards does **not** fully work: OCCT bakes absolute header-install paths into the generated scripts, so only some files would follow the new prefix.
 >
 > Useful switches (add to the `cmake -S` line):
 >
@@ -205,13 +205,13 @@ Unity importer or its UPM package.
 > assets/rod-clamp-16mm.stp        # validation asset
 > ```
 
-> `OCCT_PREFIX` in `.cargo/config.toml` must point at the repo-relative `dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64` — the install prefix from step 2 — and `OCCT_SHIM_DIR` at `dist/package/com.greyhound.step/Runtime/Plugins/shim/x86_64` (update the values if they differ). `build.rs` uses `include/opencascade` and `lib` under `OCCT_PREFIX`, compiles the three C++ shims as C++17, and links these eleven toolkits (the XCAF pair carry the color/assembly document layer):
+> `crates/occt-sys/config.toml` — the sole input source for `build.rs` — must point the `[linux]` section's `occt_prefix` at the repo-relative `dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64` — the install prefix from step 2 — and the top-level `shim_dir` at `dist/package/com.greyhound.step/Runtime/Plugins/shim/x86_64` (update the values if they differ). `build.rs` uses `include/opencascade` and `lib` under `occt_prefix`, compiles the three C++ shims as C++17, and links these eleven toolkits (the XCAF pair carry the color/assembly document layer):
 >
 > ```
 > TKernel TKMath TKGeomBase TKBRep TKPrim TKTopAlgo TKMesh TKXSBase TKDESTEP TKLCAF TKXCAF
 > ```
 >
-> It writes the shim to `dist/package/com.greyhound.step/Runtime/Plugins/shim/x86_64/libgreyhound_occt.so` — its own first-party plugins directory beside the third-party OCCT tree — with `RPATH=$ORIGIN`, using `--disable-new-dtags`. `$ORIGIN` means the directory of the ELF object carrying that path; the shim's real dependency resolution happens through the loader's explicit pre-dlopen below, so the split directories need no rpath setup. Nothing links the shim into a Rust binary. At runtime the loader reads `config.toml`, which points `library_dir` at `Runtime/Plugins/occt/x86_64/lib` and `shim_path` at the shim (values resolve relative to the config file's directory), preloads every OCCT library reachable through the shim's `DT_NEEDED` chain, and then opens the shim and resolves the C ABI symbols. This config-driven loading already matches the package layout; Unity still needs the managed Scripted Importer on top.
+> It writes the shim to `dist/package/com.greyhound.step/Runtime/Plugins/shim/x86_64/libgreyhound_occt.so` — its own first-party plugins directory beside the third-party OCCT tree — with `RPATH=$ORIGIN`, using `--disable-new-dtags`. `$ORIGIN` means the directory of the ELF object carrying that path; the shim's real dependency resolution happens through the loader's explicit pre-dlopen below, so the split directories need no rpath setup. Nothing links the shim into a Rust binary. At runtime the loader reads `config.toml`, which points `library_dir` at `Runtime/Plugins/occt/x86_64/lib` and `shim_dir` at the shim's own directory (values resolve relative to the config file's directory; the loader appends the platform's shim filename from the crate config's compiled environment), preloads every OCCT library reachable through the shim's `DT_NEEDED` chain, and then opens the shim and resolves the C ABI symbols. This config-driven loading already matches the package layout; Unity still needs the managed Scripted Importer on top.
 >
 > After installing OCCT, validate against the repo's test asset:
 >
@@ -245,5 +245,5 @@ Unity importer or its UPM package.
 > - **CMake can't find FreeType** — make sure `libfreetype-dev` is installed; check `CMakeError` output for the missing component name.
 > - **`X11` or `GL/gl.h` not found** — install `libx11-dev`/`libgl1-mesa-dev` (Ubuntu) or `libX11-devel`/`mesa-libGL-devel` (Fedora).
 > - **`file cannot create directory: /usr/local/include/opencascade`** (or headers land in `/usr/local` despite `--prefix`) — the prefix was not set at configure time. Re-run the configure step with `-DINSTALL_DIR="$PWD/dist/occt/x86_64-linux"`, then `cmake --build tmp/occt/build --parallel` and `cmake --install tmp/occt/build`. Use the same build directory throughout.
-> - **`libTK*.so` not found at runtime** — confirm installation succeeded and check `config.toml`: `library_dir` must point at `dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64/lib` and `shim_path` at `dist/package/com.greyhound.step/Runtime/Plugins/shim/x86_64/libgreyhound_occt.so`, both resolved relative to the config file's directory. The same layout must be reachable when the package is relocated, which `just verify-package` checks from a copied layout.
+> - **`libTK*.so` not found at runtime** — confirm installation succeeded and check `config.toml`: `library_dir` must point at `dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64/lib` and `shim_dir` at `dist/package/com.greyhound.step/Runtime/Plugins/shim/x86_64`, both resolved relative to the config file's directory; the loader appends the platform's shim filename itself. The same layout must be reachable when the package is relocated, which `just verify-package` checks from a copied layout.
 > - **Libraries still have symlinks or version suffixes** — confirm both `VERSION` and `SOVERSION` were removed, the postfix is empty, and you reconfigured and rebuilt before installing. Remove leftovers from an older dist; reinstalling does not clean them up.

@@ -1,6 +1,5 @@
-use crate::{OcctError, OcctResult, grey_box::GreyBbox};
+use crate::{OcctError, OcctResult, grey_box::GreyBbox, native_library::Library};
 
-use libloading::os::unix::{Library, RTLD_LOCAL, RTLD_NOW};
 use std::{
     ffi::{CStr, c_char, c_void},
     path::Path,
@@ -35,20 +34,26 @@ pub(crate) struct NativeApi {
 }
 
 impl NativeApi {
-    pub(crate) fn load(directory: &Path, shim_path: &Path) -> OcctResult<Self> {
+    pub(crate) fn load(directory: &Path, shim_dir: &Path) -> OcctResult<Self> {
         let directory = directory
             .canonicalize()
-            .map_err(|error| OcctError::load(directory, shim_path, error.to_string()))?;
+            .map_err(|error| OcctError::load(directory, shim_dir, error.to_string()))?;
 
-        let shim = shim_path.canonicalize().map_err(|error| {
+        // The shim's filename is the crate config's per-OS value compiled
+        // into this library; callers hand over the shim directory only.
+        let resolved_shim_dir = shim_dir.canonicalize().map_err(|error| {
             OcctError::load(
                 &directory,
-                shim_path,
-                format!("cannot locate shim: {error}"),
+                shim_dir,
+                format!("cannot locate shim directory: {error}"),
             )
         })?;
+        let shim = resolved_shim_dir.join(env!("OCCT_SHIM_FILENAME"));
 
-        let kernel = directory.join("libTKernel.so");
+        // The runtime toolkit name comes from the crate config through
+        // build.rs (single source of truth): GREYHOUND_RUNTIME_PATTERN
+        // carries lib{tk}.so / {tk}.dll, {tk} replaced by the toolkit name.
+        let kernel = directory.join(env!("OCCT_RUNTIME_PATTERN").replace("{tk}", "TKernel"));
         if !kernel.is_file() {
             return Err(OcctError::load(
                 &directory,
@@ -59,14 +64,13 @@ impl NativeApi {
 
         let dependencies = crate::dependencies::load(&shim, &directory)?;
 
-        // SAFETY: load our compatible bridge after its OCCT dependencies.
-        // Both the bridge and dependency handles remain owned by NativeApi.
-        let library = unsafe { Library::open(Some(&shim), RTLD_NOW | RTLD_LOCAL) }
-            .map_err(|error| OcctError::load(&directory, &shim, error.to_string()))?;
+        // The bridge loads after its OCCT dependencies; both the bridge and
+        // dependency handles remain owned by NativeApi.
+        let library = Library::open(&shim, &directory, &shim)?;
 
-        // SAFETY: the version probe's signature is fixed by our C ABI.
+        // The version probe's signature is fixed by our C ABI.
         let version: unsafe extern "C" fn() -> u32 =
-            unsafe { symbol(&library, &shim, b"greyhound_abi_version\0")? };
+            library.get(b"greyhound_abi_version\0", &shim)?;
 
         // SAFETY: library owns the resolved probe.
         let actual = unsafe { version() };
@@ -74,25 +78,23 @@ impl NativeApi {
             return Err(OcctError::abi(&shim, 6, actual));
         }
 
-        // SAFETY: these signatures match ABI version 6. Nothing is published
-        // until every lookup succeeds and the owning handles are stored.
-        unsafe {
-            Ok(Self {
-                box_volume: symbol(&library, &shim, b"greyhound_box_volume\0")?,
-                step_open: symbol(&library, &shim, b"greyhound_step_open\0")?,
-                step_info: symbol(&library, &shim, b"greyhound_step_info\0")?,
-                scene_counts: symbol(&library, &shim, b"greyhound_scene_counts\0")?,
-                scene_fill: symbol(&library, &shim, b"greyhound_scene_fill\0")?,
-                color_fill: symbol(&library, &shim, b"greyhound_color_fill\0")?,
-                mesh_properties: symbol(&library, &shim, b"greyhound_mesh_properties\0")?,
-                mesh_counts: symbol(&library, &shim, b"greyhound_mesh_counts\0")?,
-                mesh_fill: symbol(&library, &shim, b"greyhound_mesh_fill\0")?,
-                step_close: symbol(&library, &shim, b"greyhound_step_close\0")?,
-                last_error: symbol(&library, &shim, b"greyhound_last_error\0")?,
-                _library: library,
-                _dependencies: dependencies,
-            })
-        }
+        // The signatures match ABI version 6. Nothing is published until
+        // every lookup succeeds and the owning handles are stored.
+        Ok(Self {
+            box_volume: library.get(b"greyhound_box_volume\0", &shim)?,
+            step_open: library.get(b"greyhound_step_open\0", &shim)?,
+            step_info: library.get(b"greyhound_step_info\0", &shim)?,
+            scene_counts: library.get(b"greyhound_scene_counts\0", &shim)?,
+            scene_fill: library.get(b"greyhound_scene_fill\0", &shim)?,
+            color_fill: library.get(b"greyhound_color_fill\0", &shim)?,
+            mesh_properties: library.get(b"greyhound_mesh_properties\0", &shim)?,
+            mesh_counts: library.get(b"greyhound_mesh_counts\0", &shim)?,
+            mesh_fill: library.get(b"greyhound_mesh_fill\0", &shim)?,
+            step_close: library.get(b"greyhound_step_close\0", &shim)?,
+            last_error: library.get(b"greyhound_last_error\0", &shim)?,
+            _library: library,
+            _dependencies: dependencies,
+        })
     }
 
     pub(crate) fn native_error(&self, operation: &str) -> OcctError {
@@ -109,12 +111,4 @@ impl NativeApi {
         };
         OcctError::step(format!("{operation}: {message}"))
     }
-}
-
-unsafe fn symbol<T: Copy>(library: &Library, shim: &Path, name: &[u8]) -> OcctResult<T> {
-    // SAFETY: callers supply the exact ABI function-pointer type. The copied
-    // pointer remains private and is stored with this owning Library.
-    let value = unsafe { library.get::<T>(name) }
-        .map_err(|error| OcctError::symbol(shim, name, error.to_string()))?;
-    Ok(*value)
 }

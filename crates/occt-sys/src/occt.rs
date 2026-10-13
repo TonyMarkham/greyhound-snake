@@ -7,9 +7,9 @@ pub struct Occt {
 }
 
 impl Occt {
-    pub fn load(library_dir: &Path, shim_path: &Path) -> OcctResult<Self> {
+    pub fn load(library_dir: &Path, shim_dir: &Path) -> OcctResult<Self> {
         Ok(Self {
-            api: Rc::new(NativeApi::load(library_dir, shim_path)?),
+            api: Rc::new(NativeApi::load(library_dir, shim_dir)?),
         })
     }
 

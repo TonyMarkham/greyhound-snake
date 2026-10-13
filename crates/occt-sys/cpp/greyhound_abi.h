@@ -1,7 +1,20 @@
 #pragma once
 #include <stdint.h>
 
+// The C ABI surface is the DLL's product: every entry point must be
+// exported. MSVC exports nothing without __declspec(dllexport); ELF and
+// Mach-O toolchains default to exporting unless visibility is narrowed,
+// which the attribute pins. clang-cl understands the attribute, so the
+// GCC form stays for any clang front end. Consumers may predefine
+// GREYHOUND_API (the loader-test fixtures neutralize it and export
+// through their own macro); the guard keeps that redefinition legal.
+#ifndef GREYHOUND_API
+#if defined(_MSC_VER) && !defined(__clang__)
+#define GREYHOUND_API __declspec(dllexport)
+#else
 #define GREYHOUND_API __attribute__((visibility("default")))
+#endif
+#endif
 
 // Sentinel solid index for faces that belong to no solid (open shells,
 // sheet bodies, loose faces); all such faces merge into one group.

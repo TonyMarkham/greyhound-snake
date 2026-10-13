@@ -5,17 +5,17 @@ use std::fs;
 fn library_path_is_relative_to_config() -> Result<(), Box<dyn std::error::Error>> {
     let root = tempfile::tempdir()?;
     let library = root.path().join("native");
+    let shim = root.path().join("shim");
     fs::create_dir(&library)?;
-    let shim = library.join("libgreyhound_occt.so");
-    fs::write(&shim, b"")?;
+    fs::create_dir(&shim)?;
     let config = root.path().join("config.toml");
     fs::write(
         &config,
-        "[occt]\nlibrary_dir = 'native'\nshim_path = 'native/libgreyhound_occt.so'\n",
+        "[occt]\nlibrary_dir = 'native'\nshim_dir = 'shim'\n",
     )?;
     let loaded = AppConfig::load(&config)?;
     assert_eq!(loaded.occt.library_dir, library.canonicalize()?);
-    assert_eq!(loaded.occt.shim_path, shim.canonicalize()?);
+    assert_eq!(loaded.occt.shim_dir, shim.canonicalize()?);
     Ok(())
 }
 

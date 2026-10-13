@@ -51,9 +51,9 @@ project (Unity projection, once it exists)
 - Use `Instant` splits around each ABI call, aggregated by criterion as a
   normal timed routine.
 - Runtime needs the real shim + OCCT libraries from `dist/` — same
-  resolution as the loader tests (`OCCT_PREFIX` via `.cargo/config.toml`;
-  see `src/tests/runtime_loading.rs`). No mocks: the numbers only mean
-  something against the real libraries.
+  resolution as the loader tests (`occt_prefix` via
+  `crates/occt-sys/config.toml`; see `src/tests/runtime_loading.rs`).
+  No mocks: the numbers only mean something against the real libraries.
 - Report both **absolute stage time** and **µs per 1k triangles**
   (triangle count from `greyhound_step_info`/mesh counts) — normalized
   numbers survive deflection changes; absolute ones expose fixed overhead.

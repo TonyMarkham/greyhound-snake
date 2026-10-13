@@ -1,3 +1,0 @@
-[env]
-OCCT_PREFIX = { value = "dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64", relative = true }
-OCCT_SHIM_DIR = { value = "dist/package/com.greyhound.step/Runtime/Plugins/shim/x86_64", relative = true }

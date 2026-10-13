@@ -44,9 +44,10 @@ Payload at `dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64/`:
    the new path; the existing install can be `mv`-ed — no rebuild required
    (the shim has no rpath into the old location; it loads via
    `dependencies.rs` from the package).
-2. **`.cargo/config.toml`**: `OCCT_PREFIX` points at `dist/occt/x86_64`
-   (shim compilation: headers + link libs); `OCCT_SHIM_DIR` unchanged — the
-   shim still compiles into the package layout.
+2. **`crates/occt-sys/config.toml`**: the `[linux]` section's `occt_prefix`
+   points at `dist/occt/x86_64` (shim compilation: headers + link libs);
+   the top-level `shim_dir` unchanged — the shim still compiles into the
+   package layout.
 3. **`just stage-occt`**: derives the closure from the freshly built shim's
    `DT_NEEDED` list (`readelf`), copies those libs plus
    `LICENSE_LGPL_21.txt` and `OCCT_LGPL_EXCEPTION.txt` (the LGPL
@@ -60,7 +61,7 @@ Payload at `dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64/`:
    no `cmake/`; Unity-visible file count drops from ~15,000 to ~25.
 
 **Unchanged** (paths still valid, now with less content): the root
-`config.toml` (`library_dir`/`shim_path` point into the package),
+`config.toml` (`library_dir`/`shim_dir` point into the package),
 `NativeMethods.cs` (package-relative plugin dirs), `verify-package.py`,
 `dependencies.rs`.
 

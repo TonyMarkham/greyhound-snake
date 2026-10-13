@@ -19,6 +19,57 @@ release since V7_8_0. This doc installs the latest stable release,
   official CI uses VS 2022.
 - CMake 3.10+ if you will consume OCCT from CMake projects (bundled with VS 2022).
 
+## How this relates to the repo
+
+This is a standalone, per-machine install. The whole workspace compiles
+and the test suite passes on Windows:
+
+- `crates/occt-sys/build.rs` compiles the shim cross-platform from its
+  crate-local `config.toml`; the `[windows]` section points at the neutral
+  install below (msvc toolchain, `inc\` headers, `TK*.lib` import
+  libraries) and writes `greyhound_occt.dll` into the package's shim
+  directory.
+- `build.rs` then stages the runtime payload: it derives the shim's DLL
+  closure from the freshly built shim's PE import table and copies it —
+  plus the LGPL license texts — from the neutral install's `bin\` and
+  third-party tree into the package's `occt\x86_64\lib\`.
+- The runtime loader is cross-platform in code: `native_library.rs` wraps
+  the open flags (`RTLD_NOW | RTLD_LOCAL` on Linux,
+  `LOAD_WITH_ALTERED_SEARCH_PATH` on Windows) and `dependencies.rs` walks
+  the shim's dependency chain as ELF (Linux) or PE (Windows); the runtime
+  toolkit and shim names reach the loader from the crate config through
+  the compiled `OCCT_RUNTIME_PATTERN`/`OCCT_SHIM_FILENAME` values.
+- `cargo test --workspace` passes here, including the real-OCCT tests
+  (export and import against the sample assets). `just assemble-package` /
+  `just verify-package` still expect a Unix-layout install and stage `.so`
+  files; the neutral-install + `stage-occt` workflow in
+  `better-occt-bins.md` is a design plan, not landed.
+
+This install feeds the shim build plus sections 3–4 — the DRAWEXE check
+and a standalone CMake consumer; the runtime payload staging arrives with
+the Windows loader bite.
+
+The tracked configs are shared with Linux and must not be edited per
+machine: `crates/occt-sys/config.toml` carries one section per OS
+(`[linux]`, `[windows]`, `[macos]`) selected by `CARGO_CFG_TARGET_OS`, and
+the root `config.toml` (`library_dir`/`shim_dir`) resolves relative to
+its own directory. That gives this install two distinct roles:
+
+- `dist\occt\win64\` (step 2) is the **build-time source** — the neutral
+  per-machine install the `[windows]` section's `occt_prefix` points at
+  for headers and import libraries, and the source the staging step copies
+  the runtime DLL closure from.
+- `dist\package\...\occt\x86_64\` is the **payload destination** the root
+  `config.toml` pins. On Linux `cmake --install` materializes it directly
+  (`occt-linux.md` step 2); on Windows the build script's staging step
+  fills its `lib\` with the shim's DLL closure and the license texts.
+
+So do not unpack the zip into the package path as a shortcut: the layout
+is wrong (`inc\`, `win64\vc14\{bin,lib}` vs `lib/`,
+`include/opencascade/`), and `dist/package/com.greyhound.step` is the
+tree Unity imports wholesale once a project consumes it via a `file:`
+manifest entry.
+
 ## 1. Download the release assets
 
 From <https://github.com/Open-Cascade-SAS/OCCT/releases/latest> (V8.0.1), download **one** of:
@@ -45,6 +96,10 @@ Checksums (sha256, from the release page):
 12d04f688c583b8e896758f65cd7012458fee921cedb792ec6caaf469b372598  3rdparty-vc14-64.zip
 ```
 
+Check a download before extracting (PowerShell):
+`Get-FileHash -Algorithm SHA256 <downloads>\occt-combined-release-pch.zip`
+— the printed hash must match the corresponding line above.
+
 ## 2. Extract (twice)
 
 Each asset is **a zip containing a single inner zip** (CI packaging quirk):
@@ -56,13 +111,31 @@ occt-combined-release-pch.zip
     └── 3rdparty-vc14-64/                        (tcltk, freetype, tbb, qt, vtk, ...)
 ```
 
-Extract the downloaded zip, then extract the inner zip inside it. Recommended
-location: `C:\OpenCASCADE\` (short path, avoids long-path issues).
-
-Final layout (combined variant):
+Extract with bsdtar — built into Windows 10/11 as `C:\Windows\System32\tar.exe`,
+it reads zip archives directly and skips Explorer's per-file shell path:
 
 ```
-C:\OpenCASCADE\
+mkdir dist\occt\win64
+cd dist\occt\win64
+tar -xf <downloads>\occt-combined-release-pch.zip
+tar -xf opencascade-8.0.1-vc14-64-pch-combined.zip
+```
+
+The first command unpacks the inner zip beside it; the second unpacks the
+two trees. Any other tool extracts too. The
+location is your choice — nothing installs globally: `env.bat`/`draw.bat`
+configure only the shell that runs them. Two rules: keep
+`opencascade-8.0.1-vc14-64\` and `3rdparty-vc14-64\` **side by side as
+siblings** (`env.bat` defaults to `THIRDPARTY_DIR=..\3rdparty-vc14-64`,
+sibling of the OCCT root), and prefer a short path (avoids long-path
+issues).
+
+For this repo, unpack into the gitignored `dist` tree — the **staging
+source** the future Windows bite stages the payload from (see "How this
+relates to the repo"):
+
+```
+dist\occt\win64\
 ├── opencascade-8.0.1-vc14-64\
 │   ├── env.bat  draw.bat  custom.bat  custom_vc14_64.bat
 │   ├── win64\vc14\bin\    (TK*.dll, DRAWEXE.exe)
@@ -77,8 +150,9 @@ C:\OpenCASCADE\
     └── angle-gles2, draco, ffmpeg, gl2ps, glfw, jemalloc, lzma, openvr, rapidjson, zlib, ...
 ```
 
-> Keep the two folders **side by side as siblings** — `env.bat` defaults to
-> `THIRDPARTY_DIR=..\3rdparty-vc14-64` (sibling of the OCCT root).
+A standalone location (for example `C:\OpenCASCADE\`) works identically for
+sections 3–4 with the paths substituted. Do **not** unpack into
+`dist\package\` — see "How this relates to the repo".
 
 If you downloaded the non-combined pair, extract `opencascade-release-pch.zip`
 (the same double-extraction) and place `3rdparty-vc14-64\` next to the
@@ -89,12 +163,14 @@ If you downloaded the non-combined pair, extract `opencascade-release-pch.zip`
 Open a **VS developer prompt** ("x64 Native Tools Command Prompt for VS 2022"):
 
 ```
-cd C:\OpenCASCADE\opencascade-8.0.1-vc14-64
+cd dist\occt\win64\opencascade-8.0.1-vc14-64
 draw.bat
 ```
 
 `draw.bat` calls `env.bat` (sets `CASROOT`, `CSF_*` resource paths, prepends
-third-party DLL dirs to `PATH`) and starts `DRAWEXE.exe`. Then:
+third-party DLL dirs to `PATH`) and starts `DRAWEXE.exe`. Everything
+resolves relative to `env.bat`'s own location, so any install root works.
+Then:
 
 ```
 pload ALL
@@ -114,9 +190,13 @@ so pointing `CMAKE_PREFIX_PATH` at the OCCT root is enough:
 
 ```cmake
 cmake -S . -B build -G "Visual Studio 17 2022" -A x64 ^
-      -DCMAKE_PREFIX_PATH="C:/OpenCASCADE/opencascade-8.0.1-vc14-64" ^
+      -DCMAKE_PREFIX_PATH="<extract root>/opencascade-8.0.1-vc14-64" ^
       -DCMAKE_BUILD_TYPE=Release
 ```
+
+`<extract root>` is the folder holding the two sibling trees — for the
+repo-local layout above, `D:/git/greyhound-snake/dist/occt/win64`. CMake
+accepts forward slashes.
 
 ```cmake
 # CMakeLists.txt

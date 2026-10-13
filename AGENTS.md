@@ -26,6 +26,28 @@ the macOS/Windows integration is not yet exercised.
   remedy or making additional edits.
 - Reading files and inspecting source to answer a question is appropriate.
   Do not turn a question into an implementation task.
+- **A stated decision is settled.** When the user states intent or a design
+  choice, record it as a constraint. Do not re-evaluate it, argue for an
+  alternative, or re-open it in later answers. The only acceptable
+  objection is one sentence showing a contradiction with an established
+  constraint or a verified fact.
+- **Answer what was asked.** Direct answer first, scoped to the file,
+  config, or system the user named. No adjacent tours, no burying the
+  answer under "for completeness" coverage of nearby topics.
+- **A consequence is named once.** State it attached to the decision it
+  follows from. Once the user assigns it a home or acknowledges it, it is
+  closed — do not re-raise it later.
+- **Do not invent decision points.** If a design replaces a mechanism, the
+  capabilities that existed only to serve the replaced design are dropped
+  with it. Do not re-introduce them as optional extras or "your call"
+  questions.
+- **Plans are not truth.** Design docs (`better-occt-bins.md`, bite plans,
+  gap tables) state intent, not current state. Before asserting what the
+  repo does today, verify against what is landed — recipes, tracked
+  configs, source. When citing a plan, name it as a plan.
+- **Separate requirement from recommendation.** State invariants as
+  requirements and defaults as choices. A recommendation never hardens
+  into an instruction.
 - Clearly distinguish source inspection from an executed build or test.
   Do not claim validation that has not actually happened.
 - **The user understands before anything lands.** The user owns this repo
@@ -104,10 +126,11 @@ needs the user's Unity editor, use the dist-first loop.
   (open STEP, scene counts/fill, color fill, per-mesh two-phase counts/fill,
   per-mesh mass properties) that loads OCCT via `occt-sys` and emits
   projected Unity buffers.
-- `.cargo/config.toml`: points `OCCT_PREFIX` at the OCCT install inside the
-  package (`dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64`)
-  and `OCCT_SHIM_DIR` at the shim's own plugins directory — OCCT installs
-  and the shim compiles directly into the package layout.
+- `crates/occt-sys/config.toml`: the sole input source for `build.rs` —
+  per-OS OCCT prefix (Linux/macOS: the package payload; Windows: the
+  neutral `dist/occt` install for build-time headers and import libs), the
+  shim's own plugins directory, and the `[linux]`/`[windows]`/`[macos]`
+  deltas (toolchain, include/lib dirs, library naming).
 - `dist/`: repo-local native distributions, including the fully assembled
   UPM package in `dist/package/`; currently gitignored.
 - `package/com.greyhound.step/`: tracked UPM package — authored

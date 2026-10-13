@@ -52,17 +52,17 @@ impl AppConfig {
         }
         config.occt.library_dir = resolved;
 
-        if config.occt.shim_path.as_os_str().is_empty() {
+        if config.occt.shim_dir.as_os_str().is_empty() {
             return Err(ConfigError::Invalid {
                 path: config_path,
-                message: "occt.shim_path must not be empty".to_owned(),
+                message: "occt.shim_dir must not be empty".to_owned(),
             });
         }
 
-        let requested_shim = if config.occt.shim_path.is_absolute() {
-            config.occt.shim_path.clone()
+        let requested_shim = if config.occt.shim_dir.is_absolute() {
+            config.occt.shim_dir.clone()
         } else {
-            parent.join(&config.occt.shim_path)
+            parent.join(&config.occt.shim_dir)
         };
 
         let resolved_shim =
@@ -70,17 +70,20 @@ impl AppConfig {
                 .canonicalize()
                 .map_err(|error| ConfigError::Invalid {
                     path: config_path.clone(),
-                    message: format!("occt.shim_path {}: {error}", requested_shim.display(),),
+                    message: format!("occt.shim_dir {}: {error}", requested_shim.display(),),
                 })?;
 
-        if !resolved_shim.is_file() {
+        if !resolved_shim.is_dir() {
             return Err(ConfigError::Invalid {
                 path: config_path,
-                message: format!("occt.shim_path {} is not a file", resolved_shim.display(),),
+                message: format!(
+                    "occt.shim_dir {} is not a directory",
+                    resolved_shim.display(),
+                ),
             });
         }
 
-        config.occt.shim_path = resolved_shim;
+        config.occt.shim_dir = resolved_shim;
 
         Ok(config)
     }

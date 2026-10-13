@@ -1,6 +1,20 @@
 #include "greyhound_abi.h"
+#if defined(_MSC_VER) && !defined(__clang__)
+#include <windows.h>
+#endif
 #include <cstdio>
 #include <new>
+
+// Export control: the header's GREYHOUND_API is neutralized (see build.rs)
+// so exports are decided at link time. On ELF/Mach-O definitions carry
+// explicit default visibility; on MSVC exports come from build.rs's
+// /EXPORT directives, letting the missing-symbol case genuinely lack its
+// symbol (declaration-driven dllexport would emit it anyway).
+#if defined(_MSC_VER) && !defined(__clang__)
+#define FIXTURE_API
+#else
+#define FIXTURE_API __attribute__((visibility("default")))
+#endif
 
 namespace {
 struct FixtureDoc {};
@@ -11,24 +25,37 @@ void event(const char* text) noexcept {
 }
 }
 
+// Load/unload events: GCC constructor/destructor attributes on ELF/Mach-O;
+// DllMain on Windows, mirroring the same events for the loader tests.
+#if defined(_MSC_VER) && !defined(__clang__)
+BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID) {
+  switch (reason) {
+    case DLL_PROCESS_ATTACH: event("load"); break;
+    case DLL_PROCESS_DETACH: event("unload"); break;
+    default: break;
+  }
+  return TRUE;
+}
+#else
 __attribute__((constructor)) static void loaded() { event("load"); }
 __attribute__((destructor)) static void unloaded() { event("unload"); }
+#endif
 
-extern "C" uint32_t greyhound_abi_version() noexcept {
+extern "C" FIXTURE_API uint32_t greyhound_abi_version() noexcept {
 #ifdef FIXTURE_BAD_ABI
   return 42;
 #else
   return 6;
 #endif
 }
-extern "C" const char* greyhound_last_error() noexcept { return error_text; }
-extern "C" int32_t greyhound_box_volume(
+extern "C" FIXTURE_API const char* greyhound_last_error() noexcept { return error_text; }
+extern "C" FIXTURE_API int32_t greyhound_box_volume(
     double dx, double dy, double dz, double* volume) noexcept {
   if (!volume) return 1;
   *volume = dx * dy * dz;
   return 0;
 }
-extern "C" void* greyhound_step_open(const char*) noexcept {
+extern "C" FIXTURE_API void* greyhound_step_open(const char*) noexcept {
   auto* doc = new (std::nothrow) FixtureDoc;
   if (!doc) return nullptr;
 #ifdef FIXTURE_OPEN_FAIL
@@ -41,7 +68,7 @@ extern "C" void* greyhound_step_open(const char*) noexcept {
   return doc;
 #endif
 }
-extern "C" int32_t greyhound_step_info(
+extern "C" FIXTURE_API int32_t greyhound_step_info(
     void* doc, int32_t* solids, int32_t* faces, int32_t* edges,
     GreyBbox* bbox) noexcept {
   if (!doc || !solids || !faces || !edges || !bbox) return 1;
@@ -50,7 +77,7 @@ extern "C" int32_t greyhound_step_info(
   event("info");
   return 0;
 }
-extern "C" int32_t greyhound_scene_counts(
+extern "C" FIXTURE_API int32_t greyhound_scene_counts(
     void* doc, uint32_t* nnodes, uint32_t* nmeshes, uint32_t* ncolors,
     uint32_t* nname_bytes) noexcept {
   if (!doc || !nnodes || !nmeshes || !ncolors || !nname_bytes) return 1;
@@ -60,7 +87,7 @@ extern "C" int32_t greyhound_scene_counts(
   *nname_bytes = 0;
   return 0;
 }
-extern "C" int32_t greyhound_scene_fill(
+extern "C" FIXTURE_API int32_t greyhound_scene_fill(
     void* doc, uint32_t* nodes, float* transforms, char* names) noexcept {
   if (!doc || !nodes || !transforms || !names) return 1;
   nodes[0] = 0; nodes[1] = 0; nodes[2] = 0; nodes[3] = 0;
@@ -68,12 +95,12 @@ extern "C" int32_t greyhound_scene_fill(
   transforms[0] = transforms[5] = transforms[10] = 1.0f;
   return 0;
 }
-extern "C" int32_t greyhound_color_fill(void* doc, float* colors) noexcept {
+extern "C" FIXTURE_API int32_t greyhound_color_fill(void* doc, float* colors) noexcept {
   if (!doc || !colors) return 1;
   colors[0] = 0.72f; colors[1] = 0.72f; colors[2] = 0.72f; colors[3] = 1.0f;
   return 0;
 }
-extern "C" int32_t greyhound_mesh_properties(
+extern "C" FIXTURE_API int32_t greyhound_mesh_properties(
     void* doc, uint32_t mesh, double, double* out) noexcept {
   if (!doc || mesh != 0 || !out) return 1;
   // A 2x1x1 box (mm3 volume 2) centred at the origin: principal axes are
@@ -89,7 +116,7 @@ extern "C" int32_t greyhound_mesh_properties(
   out[16] = 0.0;
   return 0;
 }
-extern "C" int32_t greyhound_mesh_counts(
+extern "C" FIXTURE_API int32_t greyhound_mesh_counts(
     void* doc, uint32_t mesh, double, double, uint32_t* nverts,
     uint32_t* nindices, uint32_t* nfaces) noexcept {
   if (!doc || mesh != 0 || !nverts || !nindices || !nfaces) return 1;
@@ -98,7 +125,7 @@ extern "C" int32_t greyhound_mesh_counts(
   return 0;
 }
 #ifndef FIXTURE_MISSING_FILL
-extern "C" int32_t greyhound_mesh_fill(
+extern "C" FIXTURE_API int32_t greyhound_mesh_fill(
     void* doc, uint32_t mesh, float* verts, float* normals, uint32_t* indices,
     uint32_t* face_counts, uint32_t* face_attribs) noexcept {
   if (!doc || mesh != 0 || !verts || !normals || !indices || !face_counts ||
@@ -117,7 +144,7 @@ extern "C" int32_t greyhound_mesh_fill(
   return 0;
 }
 #endif
-extern "C" void greyhound_step_close(void* doc) noexcept {
+extern "C" FIXTURE_API void greyhound_step_close(void* doc) noexcept {
   delete static_cast<FixtureDoc*>(doc);
   event("close");
 }

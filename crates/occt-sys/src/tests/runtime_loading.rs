@@ -1,4 +1,7 @@
-use crate::{Occt, OcctError};
+use crate::{
+    Occt, OcctError,
+    tests::{kernel_name, shim_name},
+};
 use std::{
     env, fs,
     path::{Path, PathBuf},
@@ -11,7 +14,9 @@ fn fixture(name: &str) -> PathBuf {
 
 fn load_fixture(name: &str) -> Result<Occt, OcctError> {
     let directory = fixture(name);
-    Occt::load(&directory, &directory.join("libgreyhound_occt.so"))
+    // The fixture dir doubles as the shim directory: it carries both the
+    // shim artifact and the stub toolkit file the presence check requires.
+    Occt::load(&directory, &directory)
 }
 
 fn probe(name: &str) -> Result<Output, Box<dyn std::error::Error>> {
@@ -32,7 +37,7 @@ fn probe(name: &str) -> Result<Output, Box<dyn std::error::Error>> {
 fn lifetime_normal_return() -> Result<(), Box<dyn std::error::Error>> {
     let output = probe("probe_normal_return")?;
     assert!(output.status.success());
-    let events = String::from_utf8(output.stderr)?;
+    let events = String::from_utf8(output.stderr)?.replace("\r\n", "\n");
     assert_eq!(events.matches("fixture:open\n").count(), 1);
     assert_eq!(events.matches("fixture:close\n").count(), 1);
     let opened = events.find("fixture:open\n").ok_or("missing open event")?;
@@ -56,7 +61,7 @@ fn probe_normal_return() -> Result<(), Box<dyn std::error::Error>> {
 fn lifetime_exit_without_drop() -> Result<(), Box<dyn std::error::Error>> {
     let output = probe("probe_exit_without_drop")?;
     assert!(output.status.success());
-    let events = String::from_utf8(output.stderr)?;
+    let events = String::from_utf8(output.stderr)?.replace("\r\n", "\n");
     assert_eq!(events.matches("fixture:open\n").count(), 1);
     assert_eq!(events.matches("fixture:close\n").count(), 0);
     Ok(())
@@ -75,7 +80,7 @@ fn lifetime_load_failure_cleanup() -> Result<(), Box<dyn std::error::Error>> {
     for name in ["probe_missing_symbol", "probe_bad_abi"] {
         let output = probe(name)?;
         assert!(output.status.success());
-        let events = String::from_utf8(output.stderr)?;
+        let events = String::from_utf8(output.stderr)?.replace("\r\n", "\n");
         assert_eq!(events.matches("fixture:load\n").count(), 1);
         assert_eq!(events.matches("fixture:open\n").count(), 0);
         // These simple fixtures contain no retaining native TLS destructor.
@@ -88,10 +93,11 @@ fn lifetime_load_failure_cleanup() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 #[ignore = "subprocess helper; invoked by lifetime_load_failure_cleanup"]
 fn probe_missing_symbol() {
-    assert!(matches!(
-        load_fixture("missing-symbol"),
-        Err(OcctError::Symbol { .. })
-    ));
+    match load_fixture("missing-symbol") {
+        Err(OcctError::Symbol { .. }) => {}
+        Err(error) => panic!("expected Symbol error, got {error}"),
+        Ok(_) => panic!("expected Symbol error, got Ok"),
+    }
 }
 
 #[test]
@@ -107,7 +113,7 @@ fn probe_bad_abi() {
 fn lifetime_open_failure_cleanup() -> Result<(), Box<dyn std::error::Error>> {
     let output = probe("probe_open_failure")?;
     assert!(output.status.success());
-    let events = String::from_utf8(output.stderr)?;
+    let events = String::from_utf8(output.stderr)?.replace("\r\n", "\n");
     assert_eq!(events.matches("fixture:partial-cleanup\n").count(), 1);
     assert_eq!(events.matches("fixture:open\n").count(), 0);
     assert_eq!(events.matches("fixture:close\n").count(), 0);
@@ -126,20 +132,17 @@ fn probe_open_failure() -> Result<(), Box<dyn std::error::Error>> {
 fn shim_only_directory() -> Result<(), Box<dyn std::error::Error>> {
     let directory = tempfile::tempdir()?;
     fs::copy(
-        fixture("valid").join("libgreyhound_occt.so"),
-        directory.path().join("libgreyhound_occt.so"),
+        fixture("valid").join(shim_name()),
+        directory.path().join(shim_name()),
     )?;
-    let result = Occt::load(
-        directory.path(),
-        &directory.path().join("libgreyhound_occt.so"),
-    );
+    let result = Occt::load(directory.path(), directory.path());
     let Err(error @ OcctError::Load { .. }) = result else {
         return Err("shim-only directory did not produce a Load error".into());
     };
     let message = error.to_string();
     assert!(message.contains(&directory.path().display().to_string()));
-    assert!(message.contains("libgreyhound_occt.so"));
-    assert!(message.contains("libTKernel.so"));
+    assert!(message.contains(shim_name()));
+    assert!(message.contains(&kernel_name()));
     assert!(message.contains("missing OCCT library"));
     Ok(())
 }

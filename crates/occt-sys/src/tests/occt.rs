@@ -4,8 +4,7 @@ use std::path::Path;
 #[test]
 fn lifetime_context_dropped_first() -> Result<(), Box<dyn std::error::Error>> {
     let directory = Path::new(env!("OCCT_TEST_FIXTURE_DIR")).join("valid");
-    let shim = directory.join("libgreyhound_occt.so");
-    let occt = Occt::load(&directory, &shim)?;
+    let occt = Occt::load(&directory, &directory)?;
     let weak = occt.weak_api();
     let doc = occt.open_step(Path::new("fixture.step"))?;
     drop(occt);
@@ -19,8 +18,7 @@ fn lifetime_context_dropped_first() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn lifetime_doc_dropped_first() -> Result<(), Box<dyn std::error::Error>> {
     let directory = Path::new(env!("OCCT_TEST_FIXTURE_DIR")).join("valid");
-    let shim = directory.join("libgreyhound_occt.so");
-    let occt = Occt::load(&directory, &shim)?;
+    let occt = Occt::load(&directory, &directory)?;
     let weak = occt.weak_api();
     let doc = occt.open_step(Path::new("fixture.step"))?;
     drop(doc);

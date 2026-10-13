@@ -7,7 +7,6 @@ use unity_projection::{UnitySubMesh, UnityVertex};
 
 use std::{
     ffi::{CStr, OsStr, c_char},
-    os::unix::ffi::OsStrExt,
     path::PathBuf,
 };
 
@@ -23,7 +22,13 @@ fn path_from(pointer: *const c_char, what: &str) -> HostResult<PathBuf> {
     if bytes.is_empty() {
         return Err(HostError::host(format!("{what} is empty")));
     }
-    Ok(PathBuf::from(OsStr::from_bytes(bytes)))
+    // SAFETY: the C# caller marshals UTF-8 bytes, which are valid OsStr
+    // bytes on every platform (raw bytes on Linux; UTF-8 is valid WTF-8 on
+    // Windows) — the same unchecked raw-byte construction OsStrExt::
+    // from_bytes performed.
+    Ok(PathBuf::from(unsafe {
+        OsStr::from_encoded_bytes_unchecked(bytes)
+    }))
 }
 
 #[unsafe(no_mangle)]

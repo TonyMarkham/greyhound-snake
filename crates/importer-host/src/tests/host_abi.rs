@@ -5,7 +5,6 @@ use unity_projection::{ProjectionSettings, UnitySubMesh, UnityVertex, project_sc
 use libloading::{Library, Symbol};
 use std::{
     ffi::{CStr, CString, c_char, c_void},
-    os::unix::ffi::OsStrExt,
     path::{Path, PathBuf},
 };
 
@@ -34,21 +33,27 @@ fn workspace_root() -> PathBuf {
 
 fn host_artifact() -> PathBuf {
     // The workspace shares one target tree; plain `cargo test` builds the
-    // cdylib into the debug profile directory.
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/debug/libimporter_host.so")
+    // cdylib into the debug profile directory. The cdylib filename is
+    // platform-specific.
+    let name = if cfg!(target_os = "windows") {
+        "importer_host.dll"
+    } else {
+        "libimporter_host.so"
+    };
+    Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../../target/debug/{name}"))
 }
 
 fn occt_dirs(root: &Path) -> (PathBuf, PathBuf) {
+    // The loader derives the platform's shim filename from the crate
+    // config; callers hand over the shim directory only.
     (
         root.join("dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64/lib"),
-        root.join(
-            "dist/package/com.greyhound.step/Runtime/Plugins/shim/x86_64/libgreyhound_occt.so",
-        ),
+        root.join("dist/package/com.greyhound.step/Runtime/Plugins/shim/x86_64"),
     )
 }
 
 fn c_string(path: &Path) -> CString {
-    CString::new(path.as_os_str().as_bytes()).unwrap()
+    CString::new(path.as_os_str().as_encoded_bytes()).unwrap()
 }
 
 fn last_error_text(last_error: &Symbol<LastErrorFn>) -> String {

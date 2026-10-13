@@ -1,0 +1,81 @@
+# Native-build configuration for occt-sys — the sole input source for
+# build.rs. Every path resolves against the repository root (two levels
+# above this crate), so all checkouts on all platforms parse identical
+# values; the section matching CARGO_CFG_TARGET_OS supplies the per-OS
+# deltas. A missing section is the platform gate: the shim has no story
+# for that OS yet.
+#
+# Keys per section:
+#   occt_prefix       OCCT install root: headers under
+#                     <occt_prefix>/<include_dir>, link libraries under
+#                     <occt_prefix>/<lib_dir>.
+#   toolchain         "gnu" (clang/g++ as linker driver) or "msvc" (cl.exe
+#                     driving link.exe).
+#   include_dir       OCCT headers, relative to occt_prefix.
+#   lib_dir           OCCT link libraries, relative to occt_prefix.
+#   toolkit_pattern   Build-time link-library filename per toolkit, {tk}
+#                     replaced by the toolkit name (TKernel, ...).
+#   runtime_pattern   Runtime library filename per toolkit, {tk} replaced;
+#                     the loader-test fixture stubs carry this name.
+#   shim_filename     The shim artifact build.rs writes into shim_dir.
+#   link_all_toolkits MSVC only: link every TK*.lib in lib_dir. link.exe
+#                     has no ELF-style transitive search through a DLL's
+#                     own dependencies, while an unused import library
+#                     adds no DLL dependency — so the closed import set
+#                     is whatever the shim actually uses.
+
+# The runtime payload destination — the directory the runtime consumers
+# (root config.toml's library_dir/shim_dir) point at. On Linux the install
+# IS this directory ([linux].occt_prefix equals it; occt-linux.md installs
+# straight into it); on Windows the staging step fills its lib/ with the
+# freshly built shim's DLL closure.
+payload_dir = "dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64"
+
+# The LGPL license and exception texts that travel with the binaries.
+license_dir = "third_party/occt"
+
+shim_dir = "dist/package/com.greyhound.step/Runtime/Plugins/shim/x86_64"
+
+[linux]
+# The install IS the package payload (occt-linux.md step 2): build-time
+# inputs and the runtime payload live in one tree.
+occt_prefix = "dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64"
+toolchain = "gnu"
+include_dir = "include/opencascade"
+lib_dir = "lib"
+toolkit_pattern = "lib{tk}.so"
+runtime_pattern = "lib{tk}.so"
+shim_filename = "libgreyhound_occt.so"
+
+[windows]
+# Build-time inputs come from the neutral install (occt-win.md step 2) —
+# the payload carries runtime DLLs only, so headers and import libraries
+# are never staged into it.
+occt_prefix = "dist/occt/win64/opencascade-8.0.1-vc14-64"
+toolchain = "msvc"
+include_dir = "inc"
+lib_dir = "win64/vc14/lib"
+toolkit_pattern = "{tk}.lib"
+runtime_pattern = "{tk}.dll"
+shim_filename = "greyhound_occt.dll"
+link_all_toolkits = true
+# Runtime DLLs for the payload: the OCCT bin directory carries all
+# TK*.dll; the third-party tree is searched one level deep for
+# <package>/bin. The staging step derives the shim's DLL closure from
+# these. Both paths are relative to occt_prefix; the third-party tree is
+# the OCCT root's sibling (env.bat's own convention).
+runtime_dir = "win64/vc14/bin"
+thirdparty_dir = "../3rdparty-vc14-64"
+
+[macos]
+# Unexercised (AGENTS.md: the macOS integration is not yet exercised).
+# Follows the Linux model — the install is the package payload; the
+# current occt-mac.md example ($HOME/opt/occt-8.0.1) is machine-local and
+# gains the matching install target when the mac flow is exercised.
+occt_prefix = "dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64"
+toolchain = "gnu"
+include_dir = "include/opencascade"
+lib_dir = "lib"
+toolkit_pattern = "lib{tk}.dylib"
+runtime_pattern = "lib{tk}.dylib"
+shim_filename = "libgreyhound_occt.dylib"

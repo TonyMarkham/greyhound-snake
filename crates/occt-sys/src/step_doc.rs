@@ -7,7 +7,6 @@ use mesh::{FaceAttrib, FaceRange, Mesh, MeshBuilder, MeshProperties, Node, Scene
 
 use std::{
     ffi::{CString, c_char, c_void},
-    os::unix::ffi::OsStrExt,
     path::Path,
     ptr::NonNull,
     rc::Rc,
@@ -20,7 +19,10 @@ pub struct StepDoc {
 
 impl StepDoc {
     pub(crate) fn open(api: Rc<NativeApi>, path: &Path) -> OcctResult<Self> {
-        let path_string = CString::new(path.as_os_str().as_bytes())
+        // Raw path bytes: identical to OsStrExt::as_bytes on Linux; on
+        // Windows they are WTF-8, which the shim's narrow char* path
+        // receives unchanged for the ASCII subset.
+        let path_string = CString::new(path.as_os_str().as_encoded_bytes())
             .map_err(|_| OcctError::step("path contains interior NUL"))?;
         // SAFETY: path is NUL-terminated for the call; api owns the function.
         let raw = unsafe { (api.step_open)(path_string.as_ptr()) };

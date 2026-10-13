@@ -30,7 +30,7 @@ fn main() -> ExitCode {
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse(); // --help exits before config or native loading.
     let config = AppConfig::load(&args.config)?;
-    let occt = Occt::load(&config.occt.library_dir, &config.occt.shim_path)?;
+    let occt = Occt::load(&config.occt.library_dir, &config.occt.shim_dir)?;
     let doc = occt.open_step(&args.path)?;
     let info = doc.info()?;
 

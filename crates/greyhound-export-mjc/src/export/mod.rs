@@ -27,7 +27,7 @@ const ANGLE_RAD: f64 = 0.5;
 
 pub fn export(options: &ExportOptions) -> Result<ExportSummary> {
     let config = AppConfig::load(&options.config_path).map_err(Error::config)?;
-    let occt = Occt::load(&config.occt.library_dir, &config.occt.shim_path).map_err(Error::step)?;
+    let occt = Occt::load(&config.occt.library_dir, &config.occt.shim_dir).map_err(Error::step)?;
     let doc = occt.open_step(&options.step_path).map_err(Error::step)?;
     let scene = doc.scene(DEFLECTION, ANGLE_RAD).map_err(Error::step)?;
     let mesh_count = scene.meshes().len();

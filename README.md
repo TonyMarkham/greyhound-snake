@@ -40,8 +40,8 @@ x86_64 is exercised end to end.
 | `tools/verify-package.py` | End-to-end verification of the assembled package against measured constants |
 | `justfile` | `just assemble-package` stages package + native payload into `dist/`; `just verify-package` checks it from a copied layout |
 | `assets/` | Sample STEP files (single part `rod-clamp-16mm.stp`, assembly `cart-asy.step`) |
-| `config.toml` | Runtime config for `step-stats`: OCCT `library_dir` and `shim_path` |
-| `.cargo/config.toml` | Sets `OCCT_PREFIX` and `OCCT_SHIM_DIR` so OCCT installs and the shim compiles into the package layout |
+| `config.toml` | Runtime config for `step-stats` and the MJCF exporter: OCCT `library_dir` and `shim_dir` |
+| `crates/occt-sys/config.toml` | Sole input source for `build.rs`: the per-OS OCCT prefix and shim destination plus the `[linux]`/`[windows]`/`[macos]` deltas (toolchain, include/lib dirs, library naming) |
 | `third_party/occt` | OCCT license and exception texts bundled with the binaries |
 | `third_party/opencv` | OpenCV Apache-2.0 license text (the embedded 4x4 dictionary bit tables are OpenCV source data — see `THIRD_PARTY_NOTICES.md`) |
 | `tools/extract_aruco_dict.py` | Regenerates `crates/aruco/src/data/dict_4x4_1000.rs` verbatim from OpenCV's pinned source |
@@ -96,7 +96,7 @@ Prerequisites: a recent Rust toolchain (edition 2024) and a C++17 compiler.
    ```
 
    `--config` defaults to `config.toml` in the working directory; its
-   `library_dir` and `shim_path` values resolve relative to the config file's
+    `library_dir` and `shim_dir` values resolve relative to the config file's
    directory.
 4. Assemble and verify the UPM package:
 

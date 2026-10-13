@@ -5,5 +5,5 @@ use std::path::PathBuf;
 #[serde(deny_unknown_fields)]
 pub struct OcctConfig {
     pub library_dir: PathBuf,
-    pub shim_path: PathBuf,
+    pub shim_dir: PathBuf,
 }
