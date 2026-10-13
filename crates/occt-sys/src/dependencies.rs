@@ -119,7 +119,7 @@ fn dependency_names(
             format!("invalid ELF file {}: {error}", file.display()),
         )
     })?;
-    Ok(elf.libraries)
+    Ok(elf.libraries.into_iter().map(String::from).collect())
 }
 
 #[cfg(target_os = "windows")]

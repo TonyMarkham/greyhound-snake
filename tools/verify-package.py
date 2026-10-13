@@ -174,7 +174,7 @@ def verify(package, asset):
 
     host = lib.greyhound_host_new(
         os.fsencode(library_dir),
-        os.fsencode(root / "Runtime" / "Plugins" / "shim" / "x86_64" / "libgreyhound_occt.so"),
+        os.fsencode(root / "Runtime" / "Plugins" / "shim" / "x86_64"),
     )
     if not host:
         fail(f"greyhound_host_new: {lib.greyhound_host_last_error().decode()}")
