@@ -1,0 +1,13 @@
+[package]
+name    = "opencv-sys"
+version.workspace = true
+edition.workspace = true
+build   = "build.rs"
+links   = "ghcv"
+
+[lints]
+workspace = true
+
+[build-dependencies]
+cc   = { workspace = true }
+toml = { workspace = true }

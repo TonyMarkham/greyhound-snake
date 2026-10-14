@@ -51,6 +51,17 @@ the macOS/Windows integration is not yet exercised.
   into an instruction.
 - Clearly distinguish source inspection from an executed build or test.
   Do not claim validation that has not actually happened.
+- **No Python in the runtime path.** Runtime-facing workflows must run on
+  machines the project does not control, so no Python, no `uv`, and no
+  pip-resolved dependencies may sit on that path: an environment
+  dependency is a silent failure mode (missing interpreter, cold cache,
+  PATH drift) that the repo cannot diagnose or fix remotely. The native
+  capability goes behind C ABI shims instead, and the orchestration
+  (file handling, ground truth, comparison, reporting) lives in C# or
+  Rust in-process. Python stays acceptable where the machine is owned
+  and the tool is interactive-by-design (e.g. FreeCAD scripting, the gym
+  sender client). Established by bite V1 of the vision integration: the
+  file-based Python checker was retired wholesale, not ported.
 - **The user understands before anything lands.** The user owns this repo
   and its distribution and is never a passenger or observer: code,
   comments, and bite docs are written so the reader can verify claims by

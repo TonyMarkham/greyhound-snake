@@ -21,7 +21,16 @@ fn single_id_writes_the_named_file() {
     crate::run(cli("0", &output)).expect("single-id run succeeds");
     let contents = std::fs::read_to_string(&output).expect("file written");
     assert!(contents.starts_with("<?xml"));
-    assert!(contents.contains("viewBox=\"0 0 6 6\""));
+    assert!(contents.contains("viewBox=\"0 0 8 8\""));
+}
+
+#[test]
+fn single_id_writes_png() {
+    let directory = tempfile::tempdir().expect("temp dir");
+    let output = directory.path().join("marker_0.png");
+    crate::run(cli("0", &output)).expect("single-id png run succeeds");
+    let contents = std::fs::read(&output).expect("file written");
+    assert_eq!(&contents[..4], &[0x89, b'P', b'N', b'G']);
 }
 
 #[test]
@@ -51,7 +60,7 @@ fn sheet_writes_one_document() {
     let output = directory.path().join("sheet.svg");
     crate::run(cli_with("all", &output, &["--sheet"])).expect("sheet run succeeds");
     let contents = std::fs::read_to_string(&output).expect("file written");
-    assert!(contents.contains("viewBox=\"0 0 71 36\""), "{contents}");
+    assert!(contents.contains("viewBox=\"0 0 91 46\""), "{contents}");
 }
 
 #[test]

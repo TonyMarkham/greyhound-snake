@@ -3,8 +3,9 @@
 # windows/linux/macos (a missing OS section is the platform gate); per-role
 # entries (`dev` = build-time headers + link libraries for the shim,
 # `payload` = runtime shared libraries provisioned into the package
-# payload dir). Consumers per role: the `dev` entries feed the shim build
-# via crates/occt-sys/config.toml; the `payload` entries exist as the
+# payload dir). Consumers per role: the `dev` entries feed the shim
+# builds via the `*-sys` crates' config.toml (crates/occt-sys,
+# crates/opencv-sys); the `payload` entries exist as the
 # single pins source that assemble-package stages into the package as
 # Editor/occt-fetch.toml — the C# provisioner reads its pins from that
 # copy and is the ONLY writer of the package payload (only the C#
@@ -79,3 +80,59 @@ dest   = "extern/occt/8.0.1/macos-arm64-dev"
 url    = "https://github.com/TonyMarkham/occt-dev/releases/download/v0.1.0/occt-8.0.1-arm64-macos-libs-only.zip"
 sha256 = "55e79bf9fc01cbdc7bc1886b6bb04e22c06b87842d8373f474931b70ab9925ad"
 dest   = "dist/package/com.greyhound.step/Runtime/Plugins/occt/arm64/lib"
+
+# Dev entries only (bite V1 landed state): the windows hash was verified
+# against downloaded bytes on this machine; linux/macos are pinned from
+# the release page per this file's rule (a run on such a machine verifies
+# them). The windows dev dest is what crates/opencv-sys/config.toml
+# consumes; the linux/macos dests are named for their future -sys builds.
+#
+# Dest naming follows the [occt] convention (linux-x86_64, macos-arm64),
+# not the release assets' reversed forms (x86_64-linux, arm64-macos).
+#
+# NOTE: an extern/opencv tree extracted by hand (no fetch run) carries no
+# provenance marker; the tool fails loudly on it by design — delete it
+# and fetch through the tool to mint the marker.
+#
+# Payload entries (libs-only archives): the pins source staged into the
+# vision package as Editor/opencv-fetch.toml — the package's C#
+# provisioner is the ONLY writer of Runtime/Plugins/opencv (this CLI
+# fetch skips payload entries), so these entries are inert until the
+# package skeleton exists (V2 in vision.md). Dest = the vision package's
+# plugin architecture directories, mirroring the [occt] payload layout;
+# the archives are flattened at the zip root (16 libraries + 3 legal
+# texts), which is the layout the provisioner expects to copy.
+
+[opencv]
+repo = "TonyMarkham/opencv-dev"
+tag  = "v0.1.0"
+
+[opencv.windows.dev]
+url    = "https://github.com/TonyMarkham/opencv-dev/releases/download/v0.1.0/opencv-5.0.0-x86_64-windows-dev.zip"
+sha256 = "bdc47489a883b19e4604dcb0d235276f2374959dcb9c5cae81f6eca1859b3788"
+dest   = "extern/opencv/5.0.0/win64-dev"
+
+[opencv.linux.dev]
+url    = "https://github.com/TonyMarkham/opencv-dev/releases/download/v0.1.0/opencv-5.0.0-x86_64-linux-dev.zip"
+sha256 = "f2b8625777407f8e3e4430fa2927eaa2980a2baef5903ad4b0dee014fc50419a"
+dest   = "extern/opencv/5.0.0/linux-x86_64-dev"
+
+[opencv.macos.dev]
+url    = "https://github.com/TonyMarkham/opencv-dev/releases/download/v0.1.0/opencv-5.0.0-arm64-macos-dev.zip"
+sha256 = "b8a27164e731bd052e67bd299ede45b2cdfa3290e93c481b06f930c603e34eaa"
+dest   = "extern/opencv/5.0.0/macos-arm64-dev"
+
+[opencv.windows.payload]
+url    = "https://github.com/TonyMarkham/opencv-dev/releases/download/v0.1.0/opencv-5.0.0-x86_64-windows-libs-only.zip"
+sha256 = "cc56bbe42ae93bfe0cd08a0a4633168ad7eb3e76be5b40f022c8a146bc7912fa"
+dest   = "dist/package/com.greyhound.vision/Runtime/Plugins/opencv/x86_64/lib"
+
+[opencv.linux.payload]
+url    = "https://github.com/TonyMarkham/opencv-dev/releases/download/v0.1.0/opencv-5.0.0-x86_64-linux-libs-only.zip"
+sha256 = "6ba60dfbea1638874fc123d3e518166fb19a0be6008b095bece638b061db1dc4"
+dest   = "dist/package/com.greyhound.vision/Runtime/Plugins/opencv/x86_64/lib"
+
+[opencv.macos.payload]
+url    = "https://github.com/TonyMarkham/opencv-dev/releases/download/v0.1.0/opencv-5.0.0-arm64-macos-libs-only.zip"
+sha256 = "e231d5dffae44526d31312778aa9fa03d9313d13808cc916c0c3cebf09f2db20"
+dest   = "dist/package/com.greyhound.vision/Runtime/Plugins/opencv/arm64/lib"

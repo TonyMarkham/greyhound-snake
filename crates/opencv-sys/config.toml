@@ -1,0 +1,61 @@
+# opencv-sys native-build configuration — the sole input source for
+# build.rs, the same arrangement as crates/occt-sys/config.toml. One
+# section per OS; a missing section is the platform gate (the section
+# matching CARGO_CFG_TARGET_OS supplies the deltas). Paths are
+# repo-root-relative with forward slashes; the repo root is two levels
+# above this file's directory.
+#
+# opencv_prefix — the extracted `-dev` archive of the pinned
+# TonyMarkham/opencv-dev release (v0.1.0, OpenCV 5.0.0): build-time
+# headers and link libraries. The windows section is exercised (the
+# bite-V1 build ran on this machine); linux/macos are pre-populated
+# from the release page's documented layouts and are NOT yet exercised
+# — expect firsts on those machines (the occt-sys precedent: its macos
+# section needed a flag-table arm and rpath handling before it built).
+#
+# modules — the link-time list, the runtime dependency closure of the
+# shim's calls: core, imgproc (threshold/contours behind detection),
+# imgcodecs (imdecode), objdetect (cv::aruco). On linux/macos the
+# shared libraries carry transitive dependencies (codec vendoring is
+# compiled into the same archives), so the link step may need the
+# dev tree's lib dir on the loader path too (LD_LIBRARY_PATH/rpath) —
+# unexercised; adjust from what the first build there reports.
+
+[windows]
+toolchain      = "msvc"
+opencv_prefix  = "extern/opencv/5.0.0/win64-dev"
+include_dir    = "include"
+lib_dir        = "x64/vc17/lib"
+import_pattern = "opencv_{module}500.lib"
+modules        = ["core", "imgproc", "imgcodecs", "objdetect"]
+shim_dir       = "dist/opencv"
+shim_filename  = "ghcv.dll"
+
+[linux]
+# Pre-populated from the release page's linux layout (NOT exercised):
+# unversioned libopencv_*.so with plain SONAMEs (the local build patch
+# removing VERSION/SOVERSION, opencv-linux.md §2.1). Headers sit
+# directly under include/opencv2 — the archive's actual layout (the
+# release page's include/opencv5 text does not match the tree).
+opencv_prefix  = "extern/opencv/5.0.0/linux-x86_64-dev"
+toolchain      = "gnu"
+include_dir    = "include"
+lib_dir        = "lib"
+import_pattern = "libopencv_{module}.so"
+modules        = ["core", "imgproc", "imgcodecs", "objdetect"]
+shim_dir       = "dist/opencv"
+shim_filename  = "libghcv.so"
+
+[macos]
+# Pre-populated from the release page's macos layout (NOT exercised):
+# unversioned libopencv_*.dylib with @rpath install names — the consumer
+# needs an rpath to the extraction root (release page's DYLD guidance);
+# the shim's own loader-path story on darwin is unexercised.
+opencv_prefix  = "extern/opencv/5.0.0/macos-arm64-dev"
+toolchain      = "gnu"
+include_dir    = "include"
+lib_dir        = "lib"
+import_pattern = "libopencv_{module}.dylib"
+modules        = ["core", "imgproc", "imgcodecs", "objdetect"]
+shim_dir       = "dist/opencv"
+shim_filename  = "libghcv.dylib"

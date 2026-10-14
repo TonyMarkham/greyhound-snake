@@ -14,7 +14,7 @@ fn single_id_parses_with_defaults() {
     assert_eq!(cli.target, Some(Target::Id(7)));
     assert_eq!(cli.dict, ArucoDictionary::Dict4x4_50);
     assert_eq!(cli.size, 256);
-    assert_eq!(cli.margin, 0);
+    assert_eq!(cli.margin, 1);
     assert!(!cli.label);
     assert!(!cli.sheet);
 }

@@ -88,6 +88,33 @@ verify-package: assemble-package
 verify-package: assemble-package
     python tools/verify-package.py
 
+# Fetch every pinned group's dev trees into the extern/ cache
+# (occt + opencv): download -> sha256 verify -> extract -> provenance
+# marker, per group. Dev trees only: package payloads are provisioned
+# exclusively by the packages' C# provisioners, never by this recipe
+# (the config's payload entries are inert here). Unpinned entries
+# extract + report the hash and fail the run; pin the reported hash
+# into crates/extern-fetch/config.toml.
+[windows]
+[linux]
+[macos]
+fetch:
+    cargo run -p extern-fetch -- --group occt
+    cargo run -p extern-fetch -- --group opencv
+
+# Fetch the pinned opencv-dev release archives into the extern/ cache:
+# download -> sha256 verify -> extract -> provenance marker. Dev trees
+# only: the package payload is provisioned exclusively by the vision
+# package's C# provisioner, never by this recipe (the config's payload
+# entries are inert here). Unpinned entries extract + report the hash
+# and fail the run; pin the reported hash into
+# crates/extern-fetch/config.toml.
+[windows]
+[linux]
+[macos]
+fetch-opencv:
+    cargo run -p extern-fetch -- --group opencv
+
 # Fetch the pinned occt-dev release archives into the extern/ cache:
 # download -> sha256 verify -> extract ->
 # provenance marker. Dev trees only: the package payload is provisioned
@@ -99,3 +126,24 @@ verify-package: assemble-package
 [macos]
 fetch-occt:
     cargo run -p extern-fetch -- --group occt
+
+# The full local gate, in dependency order: the native shims first
+# (each build.rs compiles its C++ against the extern/ dev trees — run
+# `just fetch` once before the first build on a new checkout), then the
+# workspace-wide checks in the order each catches its class of failure
+# cheapest: fmt (syntax/style), check (types), clippy (lint, including
+# the deny-panic workspace lints), test (behavior), then the plain
+# debug and release builds (feature unification + release-lint paths
+# the earlier steps don't compile). Exits on the first failure.
+[windows]
+[linux]
+[macos]
+validate:
+    cargo build -p occt-sys
+    cargo build -p opencv-sys
+    cargo fmt
+    cargo check
+    cargo clippy --workspace --all-targets
+    cargo test
+    cargo build
+    cargo build --release

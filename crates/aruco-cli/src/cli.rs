@@ -33,12 +33,17 @@ pub(crate) struct Cli {
     pub(crate) dict: ArucoDictionary,
 
     /// Output: a file path in single-id and `--sheet` mode, a
-    /// directory (created if missing) in `all`/`--count` mode.
+    /// directory (created if missing) in `all`/`--count` mode. The
+    /// format follows the extension: `.png` rasterizes (pixels,
+    /// `--units px`, no `--label`, no `--sheet`), anything else
+    /// writes SVG.
     #[arg(short, long)]
     pub(crate) output: PathBuf,
 
     /// Rendered width: the marker's side length for individual
-    /// files, the sheet's width in `--sheet` mode.
+    /// files, the sheet's width in `--sheet` mode. For `.png` output
+    /// this is the pixel side length and must be a nonzero multiple
+    /// of the module grid (6 + 2*margin cells per side).
     #[arg(long, default_value_t = 256)]
     pub(crate) size: u32,
 
@@ -46,18 +51,23 @@ pub(crate) struct Cli {
     #[arg(long, default_value = "px")]
     pub(crate) units: Units,
 
-    /// Quiet-zone margin around the border, in cells (default 0:
-    /// OpenCV `generateImageMarker` parity — the black ring sits
-    /// flush to the SVG edge; add white surroundings explicitly).
-    #[arg(long, default_value_t = 0)]
+    /// Quiet-zone margin around the border, in cells. Default 1: one
+    /// white cell on every side. The detector requires white around
+    /// the black ring in any image presented to it — a ring-flush 6x6
+    /// never detects (the corner-to-border filter rejects it, and
+    /// disabling that filter via minDistanceToBorder=0 still yields no
+    /// candidates; measured through the ghcv shim, 2026-10-14). OpenCV's
+    /// generator omits the ring and relies on white surroundings; the
+    /// SVG bakes them in so textures inherit a detectable marker.
+    #[arg(long, default_value_t = 1)]
     pub(crate) margin: u32,
 
-    /// Caption row with the marker id below each marker.
+    /// Caption row with the marker id below each marker (SVG only).
     #[arg(long)]
     pub(crate) label: bool,
 
     /// Emit one contact-sheet SVG instead of individual files
-    /// (requires `all` or `--count`).
+    /// (requires `all` or `--count`; SVG only).
     #[arg(long)]
     pub(crate) sheet: bool,
 

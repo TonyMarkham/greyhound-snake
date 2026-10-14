@@ -92,44 +92,44 @@ impl MarkerSvg {
     }
 }
 
-/// The black geometry of one marker: the border ring, one `<rect>`
-/// per black data cell (row-major bit order, matching the table's
-/// `b = row*4 + column` at position `15 - b`), and the optional
-/// caption. A black data cell is a *clear* bit: OpenCV's
-/// `generateImageMarker` scales the bits by 255 onto an all-black
-/// canvas, so a set bit renders white and only bit 0 draws black.
-/// Painting the set bits instead would emit every marker's inverse,
-/// which no standard dictionary decodes as the intended id. Positions are in viewBox cells relative to the marker's
-/// own origin; a sheet wraps calls in `<g transform>` translations.
-pub(crate) fn write_content(marker: &Marker, margin: u32, label: bool, out: &mut String) {
+/// The black geometry of one marker in cell coordinates, relative to
+/// the marker's own origin: the 1-cell border ring and one rect per
+/// black data cell (row-major bit order, matching the table's
+/// `b = row*4 + column` at position `15 - b`). A black data cell is a
+/// *clear* bit: OpenCV's `generateImageMarker` scales the bits by 255
+/// onto an all-black canvas, so a set bit renders white and only bit 0
+/// draws black. Painting the set bits instead would emit every
+/// marker's inverse, which no standard dictionary decodes as the
+/// intended id. Single source for the SVG writer and the raster: the
+/// two outputs must not drift.
+pub(crate) fn black_rects(marker: Marker, margin: u32) -> Vec<[u32; 4]> {
     let m = margin;
-    out.push_str(&format!(
-        "<rect x=\"{m}\" y=\"{m}\" width=\"6\" height=\"1\" fill=\"#000000\"/>\n"
-    ));
-    out.push_str(&format!(
-        "<rect x=\"{m}\" y=\"{}\" width=\"1\" height=\"4\" fill=\"#000000\"/>\n",
-        m + 1,
-    ));
-    out.push_str(&format!(
-        "<rect x=\"{}\" y=\"{}\" width=\"1\" height=\"4\" fill=\"#000000\"/>\n",
-        m + 5,
-        m + 1,
-    ));
-    out.push_str(&format!(
-        "<rect x=\"{m}\" y=\"{}\" width=\"6\" height=\"1\" fill=\"#000000\"/>\n",
-        m + 5,
-    ));
+    let mut rects = vec![
+        [m, m, 6, 1],
+        [m, m + 1, 1, 4],
+        [m + 5, m + 1, 1, 4],
+        [m, m + 5, 6, 1],
+    ];
     for bit in 0..16u32 {
         if marker.bits & (1u16 << (15 - bit)) == 0 {
             // The data field hugs the border ring: ring occupies cell
             // m, data starts at m+1 — a data rect at m+2 would leave a
             // one-cell white gap inside the border.
-            let x = m + 1 + bit % 4;
-            let y = m + 1 + bit / 4;
-            out.push_str(&format!(
-                "<rect x=\"{x}\" y=\"{y}\" width=\"1\" height=\"1\" fill=\"#000000\"/>\n"
-            ));
+            rects.push([m + 1 + bit % 4, m + 1 + bit / 4, 1, 1]);
         }
+    }
+    rects
+}
+
+/// The black geometry of one marker: the border ring, one `<rect>`
+/// per black data cell, and the optional caption. Positions are in
+/// viewBox cells relative to the marker's own origin; a sheet wraps
+/// calls in `<g transform>` translations.
+pub(crate) fn write_content(marker: &Marker, margin: u32, label: bool, out: &mut String) {
+    for [x, y, w, h] in black_rects(*marker, margin) {
+        out.push_str(&format!(
+            "<rect x=\"{x}\" y=\"{y}\" width=\"{w}\" height=\"{h}\" fill=\"#000000\"/>\n"
+        ));
     }
     if label {
         // Caption row: cells [m+6, m+7); the id is centered
@@ -138,8 +138,8 @@ pub(crate) fn write_content(marker: &Marker, margin: u32, label: bool, out: &mut
         // row, leaving 0.2 cells of padding below.
         out.push_str(&format!(
             "<text x=\"{}\" y=\"{}.8\" font-family=\"monospace\" font-size=\"0.8\" text-anchor=\"middle\">{}</text>\n",
-            (6 + 2 * m) / 2,
-            m + 6,
+            (6 + 2 * margin) / 2,
+            margin + 6,
             marker.id,
         ));
     }
