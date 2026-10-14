@@ -126,12 +126,19 @@ namespace Greyhound.Step
             }
             string inner = value.Substring(1, value.Length - 2);
             // No escape sequences: the parser covers exactly the values
-            // this repo writes (urls, hashes, names); a backslash or an
-            // inner quote means the file is not the shape we expect.
+            // this repo writes (urls, hashes, names, paths); a backslash
+            // or an inner quote means the file is not the shape we
+            // expect. The backslash hint names the common case: a
+            // Windows path typed with `\`, which TOML reads as an
+            // escape character.
             if (inner.Contains("\"") || inner.Contains("\\"))
             {
                 throw new InvalidOperationException(
-                    $"line {lineNumber}: unsupported characters in {value}");
+                    inner.Contains("\\")
+                        ? $"line {lineNumber}: unsupported characters in {value} "
+                          + "(a backslash is a TOML escape character; write paths "
+                          + "with forward slashes)"
+                        : $"line {lineNumber}: unsupported characters in {value}");
             }
             return inner;
         }

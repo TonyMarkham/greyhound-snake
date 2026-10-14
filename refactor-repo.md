@@ -231,9 +231,14 @@ Facts this landed run resolved:
   `Editor/occt-fetch.toml` and its prerequisites assert the provisioned
   payload. The C# provisioner (Editor/`StepToml`, `StepFetchConfig`,
   `StepProvenance`, `StepProvisionState`, `StepPayloadProvisioner` in the
-  dist package) does marker check → `UnityWebRequest` download to a temp
-  file → streaming SHA-256 → zip-slip-guarded extract to a staging dir →
-  atomic move → marker write → `AssetDatabase.Refresh()`;
+  dist package) does marker check → `UnityWebRequest` download (held in
+  memory by default; a per-machine `download_location` key at the top of
+  the fetch config — empty in the tracked default, else an absolute
+  pre-existing directory — stages the zip on disk instead, for machines
+  whose IT policy locks down temp dirs; both provisioners honor the
+  key, staging the zip there and deleting it after extraction) → SHA-256 →
+  zip-slip-guarded extract to a staging dir → atomic move → marker
+  write → `AssetDatabase.Refresh()`;
   `StepImporter` calls `EnsureReady()` first so an early import fails
   with a clear provisioning message. **Consequence, superseding D1's
   payload note:** the provisioned payload is the full libs-zip content

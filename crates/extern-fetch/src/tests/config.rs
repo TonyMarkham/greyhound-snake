@@ -137,6 +137,63 @@ fn missing_os_section_is_the_platform_gate() {
 }
 
 #[test]
+fn top_level_download_location_is_tolerated_and_defaulted() {
+    // The key is honored by both consumers (this tool's ensure and the
+    // Unity C# provisioner); here it must parse cleanly (not be
+    // swallowed into the flattened group map), default to empty when
+    // absent, and carry the set value when present.
+    let config = Config::parse(&config_text("", "extern/x")).unwrap();
+    assert!(config.download_location.is_empty());
+    let text = format!(
+        "download_location = \"D:/unity-cache\"\n{}",
+        config_text("", "extern/x")
+    );
+    let config = Config::parse(&text).unwrap();
+    assert_eq!(config.download_location, "D:/unity-cache");
+    config.validate().unwrap();
+}
+
+#[test]
+fn download_location_empty_resolves_to_memory_mode() {
+    let config = Config::parse(&config_text("", "extern/x")).unwrap();
+    assert!(config.download_dir().unwrap().is_none());
+}
+
+#[test]
+fn download_location_relative_is_rejected() {
+    let text = format!(
+        "download_location = \"staging\"\n{}",
+        config_text("", "extern/x")
+    );
+    let error = Config::parse(&text).unwrap().download_dir().unwrap_err();
+    assert!(error.to_string().contains("absolute path"), "{error}");
+}
+
+#[test]
+fn download_location_missing_directory_is_rejected() {
+    // On Windows a relative path is not rooted, so an absolute fake
+    // drive path that does not exist exercises the existence check.
+    let text = format!(
+        "download_location = \"D:/no-such-dir-7f3d\"\n{}",
+        config_text("", "extern/x")
+    );
+    let error = Config::parse(&text).unwrap().download_dir().unwrap_err();
+    assert!(error.to_string().contains("does not exist"), "{error}");
+}
+
+#[test]
+fn download_location_existing_directory_resolves() {
+    let temp = TempDir::new().unwrap();
+    let text = format!(
+        "download_location = \"{}\"\n{}",
+        temp.path().to_string_lossy().replace('\\', "/"),
+        config_text("", "extern/x")
+    );
+    let resolved = Config::parse(&text).unwrap().download_dir().unwrap();
+    assert_eq!(resolved, Some(temp.path().to_path_buf()));
+}
+
+#[test]
 fn repo_root_is_two_levels_above_the_config_directory() {
     let temp = TempDir::new().unwrap();
     let crate_dir = temp.path().join("crates").join("extern-fetch");

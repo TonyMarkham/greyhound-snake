@@ -7,6 +7,7 @@ use crate::{
     group::Group,
     host_os::HostOs,
     provenance::Provenance,
+    staged_archive::StagedArchive,
     tests::archive::zip_bytes,
 };
 
@@ -33,10 +34,10 @@ fn parts(config: &Config) -> (&Group, &Artifact) {
 fn counting_fetch<'a>(
     bytes: &'a [u8],
     calls: &'a Cell<u32>,
-) -> impl Fn(&str) -> ExternFetchResult<Vec<u8>> + 'a {
+) -> impl Fn(&str) -> ExternFetchResult<StagedArchive> + 'a {
     move |_url| {
         calls.set(calls.get() + 1);
-        Ok(bytes.to_vec())
+        Ok(StagedArchive::Bytes(bytes.to_vec()))
     }
 }
 
@@ -190,9 +191,62 @@ fn download_failure_passes_through() {
     let config = Config::parse(&config_text(&"f".repeat(64))).unwrap();
     let (group, artifact) = parts(&config);
     let temp = TempDir::new().unwrap();
-    let fetch = |_url: &str| -> ExternFetchResult<Vec<u8>> {
+    let fetch = |_url: &str| -> ExternFetchResult<StagedArchive> {
         Err(ExternFetchError::download(_url, "offline"))
     };
     let error = ensure_with(&fetch, "occt", "dev", group, artifact, temp.path()).unwrap_err();
     assert!(error.to_string().contains("download failed"), "{error}");
+}
+
+#[test]
+fn staged_file_mode_extracts_then_deletes_the_zip() {
+    let bytes = zip_bytes(&[("a.txt", "hello"), ("dir/b.txt", "world")]);
+    let sha = sha256_hex(&bytes);
+    let config = Config::parse(&config_text(&sha)).unwrap();
+    let (group, artifact) = parts(&config);
+    let temp = TempDir::new().unwrap();
+    let staged_dir = temp.path().join("staged");
+    fs::create_dir_all(&staged_dir).unwrap();
+    let fetch = |_url: &str| -> ExternFetchResult<StagedArchive> {
+        let path = staged_dir.join("occt-dev.zip");
+        fs::write(&path, &bytes).unwrap();
+        Ok(StagedArchive::File(path))
+    };
+
+    let outcome = ensure_with(&fetch, "occt", "dev", group, artifact, temp.path()).unwrap();
+    assert_eq!(outcome, Outcome::Extracted { files: 2 });
+    assert_eq!(
+        fs::read_to_string(temp.path().join("extern/x/dev/dir/b.txt")).unwrap(),
+        "world"
+    );
+    assert!(
+        !staged_dir.join("occt-dev.zip").exists(),
+        "the staged zip is deleted after install"
+    );
+}
+
+#[test]
+fn staged_file_hash_mismatch_extracts_nothing_and_deletes_the_zip() {
+    let bytes = zip_bytes(&[("a.txt", "hello")]);
+    let config = Config::parse(&config_text(&"f".repeat(64))).unwrap();
+    let (group, artifact) = parts(&config);
+    let temp = TempDir::new().unwrap();
+    let staged_dir = temp.path().join("staged");
+    fs::create_dir_all(&staged_dir).unwrap();
+    let fetch = |_url: &str| -> ExternFetchResult<StagedArchive> {
+        let path = staged_dir.join("occt-dev.zip");
+        fs::write(&path, &bytes).unwrap();
+        Ok(StagedArchive::File(path))
+    };
+
+    let error = ensure_with(&fetch, "occt", "dev", group, artifact, temp.path()).unwrap_err();
+    assert!(error.to_string().contains("sha256 mismatch"), "{error}");
+    assert!(
+        !temp.path().join("extern/x/dev").exists(),
+        "nothing was extracted"
+    );
+    assert!(
+        !staged_dir.join("occt-dev.zip").exists(),
+        "the staged zip is deleted even on failure"
+    );
 }

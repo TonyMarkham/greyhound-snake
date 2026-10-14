@@ -119,26 +119,81 @@ namespace Greyhound.Step
             }
         }
 
+        // The staged zip's name inside download_location (file mode
+        // only; memory mode never names a file).
+        private const string ZipFileName = "occt-payload.zip";
+
         private static void BeginDownload(
             StepFetchConfig config, string payloadDir, string markerPath)
         {
-            // The zip is staged outside the package: a partially
-            // downloaded zip inside the package would be imported as
-            // assets on the next focus switch.
-            string tempRoot = Path.Combine(Path.GetTempPath(), "com.greyhound.step");
-            Directory.CreateDirectory(tempRoot);
-            string zipPath = Path.Combine(tempRoot, "occt-payload.zip");
-            var request = new UnityWebRequest(config.Url, UnityWebRequest.kHttpVerbGET)
+            if (config.DownloadLocation.Length == 0)
+            {
+                // Memory mode (the tracked default): the whole archive
+                // lands in a managed byte array (DownloadHandlerBuffer),
+                // never on disk — the behavior for machines whose IT
+                // policy locks down temp directories, and there is no
+                // cleanup step. Cost is a transient managed allocation
+                // of the archive size — tens of MB, once per release.
+                var request = new UnityWebRequest(config.Url, UnityWebRequest.kHttpVerbGET)
+                {
+                    downloadHandler = new DownloadHandlerBuffer(),
+                };
+                UnityWebRequestAsyncOperation operation = request.SendWebRequest();
+                state = StepProvisionState.Running;
+                status = $"downloading {config.Url}";
+                _ = FinishAsync(request, operation, config, payloadDir, markerPath);
+                return;
+            }
+
+            // File mode (per-machine override): stage the zip inside the
+            // configured directory. The directory must already exist —
+            // the provisioner never creates directories on a machine
+            // whose policies govern exactly which paths are approved.
+            if (!Directory.Exists(config.DownloadLocation))
+            {
+                throw new InvalidOperationException(
+                    $"download_location {config.DownloadLocation} does not exist; "
+                    + "the provisioner never creates directories");
+            }
+            string zipPath = Path.Combine(config.DownloadLocation, ZipFileName);
+            var fileRequest = new UnityWebRequest(config.Url, UnityWebRequest.kHttpVerbGET)
             {
                 downloadHandler = new DownloadHandlerFile(zipPath) { removeFileOnAbort = true },
             };
-            UnityWebRequestAsyncOperation operation = request.SendWebRequest();
+            UnityWebRequestAsyncOperation fileOperation = fileRequest.SendWebRequest();
             state = StepProvisionState.Running;
             status = $"downloading {config.Url}";
-            _ = FinishAsync(request, operation, config, payloadDir, markerPath, zipPath);
+            _ = FinishFileAsync(fileRequest, fileOperation, config, payloadDir, markerPath, zipPath);
         }
 
         private static async Task FinishAsync(
+            UnityWebRequest request,
+            UnityWebRequestAsyncOperation operation,
+            StepFetchConfig config,
+            string payloadDir,
+            string markerPath)
+        {
+            try
+            {
+                await AwaitDownload(operation);
+                if (request.result != UnityWebRequest.Result.Success)
+                {
+                    throw new InvalidOperationException(
+                        $"download of {config.Url} failed "
+                        + $"({request.responseCode}): {request.error}");
+                }
+                byte[] zipBytes = request.downloadHandler.data;
+                VerifyHash(config, Sha256Hex(zipBytes));
+                int files = Extract(zipBytes, StagingDir(payloadDir));
+                Install(config, payloadDir, markerPath, files);
+            }
+            catch (Exception exception)
+            {
+                Fail(exception);
+            }
+        }
+
+        private static async Task FinishFileAsync(
             UnityWebRequest request,
             UnityWebRequestAsyncOperation operation,
             StepFetchConfig config,
@@ -148,84 +203,121 @@ namespace Greyhound.Step
         {
             try
             {
-                // Task.Yield resumes on Unity's synchronization context,
-                // so every step below runs on the main thread.
-                while (!operation.isDone)
-                {
-                    await Task.Yield();
-                }
+                await AwaitDownload(operation);
                 if (request.result != UnityWebRequest.Result.Success)
                 {
                     throw new InvalidOperationException(
                         $"download of {config.Url} failed "
                         + $"({request.responseCode}): {request.error}");
                 }
-
-                string actual = Sha256Hex(zipPath);
-                if (!string.Equals(actual, config.Sha256, StringComparison.OrdinalIgnoreCase))
-                {
-                    throw new InvalidOperationException(
-                        "the downloaded OCCT payload hash " + actual
-                        + " does not match the pinned sha256 " + config.Sha256
-                        + "; nothing was extracted");
-                }
-
-                // Extraction targets a staging directory beside the
-                // payload and the result is moved into place (same
-                // volume), so a reader never sees a half-populated lib/
-                // and the move never crosses a filesystem boundary.
-                string stagingDir = payloadDir + ".staging";
-                if (Directory.Exists(stagingDir))
-                {
-                    Directory.Delete(stagingDir, recursive: true);
-                }
-                int files = Extract(zipPath, stagingDir);
-                if (Directory.Exists(payloadDir))
-                {
-                    Directory.Delete(payloadDir, recursive: true);
-                }
-                Directory.Move(stagingDir, payloadDir);
-
-                StepProvenance.ForConfig(config).Write(markerPath);
-                TryDelete(zipPath);
-                AssetDatabase.Refresh();
-                state = StepProvisionState.Ready;
-                Debug.Log(
-                    "[com.greyhound.step] OCCT payload provisioned: "
-                    + $"{files} files into {payloadDir}");
+                VerifyHash(config, Sha256Hex(zipPath));
+                int files = Extract(zipPath, StagingDir(payloadDir));
+                Install(config, payloadDir, markerPath, files);
             }
             catch (Exception exception)
             {
-                state = StepProvisionState.Failed;
-                status = exception.Message;
-                Debug.LogError(
-                    "[com.greyhound.step] OCCT payload provisioning failed: "
-                    + exception.Message);
+                Fail(exception);
             }
             finally
             {
-                // The downloaded zip is disposable; failing to delete it
+                // The staged zip is disposable; failing to delete it
                 // must not fail the provisioning.
                 TryDelete(zipPath);
             }
         }
 
-        private static string Sha256Hex(string path)
+        // Task.Yield resumes on Unity's synchronization context, so the
+        // continuation runs on the main thread.
+        private static async Task AwaitDownload(UnityWebRequestAsyncOperation operation)
         {
-            // Streaming: the archive is tens to hundreds of MB; never
-            // buffer it whole in memory just to hash it.
-            using (var sha = SHA256.Create())
-            using (FileStream stream = File.OpenRead(path))
+            while (!operation.isDone)
             {
-                var buffer = new byte[1024 * 1024];
-                int read;
-                while ((read = stream.Read(buffer, 0, buffer.Length)) > 0)
-                {
-                    sha.TransformBlock(buffer, 0, read, null, 0);
-                }
-                sha.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+                await Task.Yield();
+            }
+        }
+
+        private static void VerifyHash(StepFetchConfig config, string actual)
+        {
+            if (!string.Equals(actual, config.Sha256, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    "the downloaded OCCT payload hash " + actual
+                    + " does not match the pinned sha256 " + config.Sha256
+                    + "; nothing was extracted");
+            }
+        }
+
+        // Extraction targets a staging directory beside the payload and
+        // the result is moved into place (same volume), so a reader
+        // never sees a half-populated lib/ and the move never crosses a
+        // filesystem boundary. Pre-cleaned: a leftover staging tree
+        // from a killed run must not mix into this one.
+        private static string StagingDir(string payloadDir)
+        {
+            string stagingDir = StagingDirName(payloadDir);
+            if (Directory.Exists(stagingDir))
+            {
+                Directory.Delete(stagingDir, recursive: true);
+            }
+            return stagingDir;
+        }
+
+        private static void Install(
+            StepFetchConfig config, string payloadDir, string markerPath, int files)
+        {
+            if (Directory.Exists(payloadDir))
+            {
+                Directory.Delete(payloadDir, recursive: true);
+            }
+            Directory.Move(StagingDirName(payloadDir), payloadDir);
+
+            StepProvenance.ForConfig(config).Write(markerPath);
+            AssetDatabase.Refresh();
+            state = StepProvisionState.Ready;
+            Debug.Log(
+                "[com.greyhound.step] OCCT payload provisioned: "
+                + $"{files} files into {payloadDir}");
+        }
+
+        private static string StagingDirName(string payloadDir)
+        {
+            return payloadDir + ".staging";
+        }
+
+        private static void Fail(Exception exception)
+        {
+            state = StepProvisionState.Failed;
+            status = exception.Message;
+            Debug.LogError(
+                "[com.greyhound.step] OCCT payload provisioning failed: "
+                + exception.Message);
+        }
+
+        private static void TryDelete(string path)
+        {
+            if (!File.Exists(path))
+            {
+                return;
+            }
+            try
+            {
+                File.Delete(path);
+            }
+            catch (IOException)
+            {
+                // Disposable by design; the next run overwrites it.
+            }
+        }
+
+        private static string Sha256Hex(byte[] bytes)
+        {
+            // One pass over the in-memory archive; lowercase hex, the
+            // form the release pages and the pins use.
+            using (var sha = SHA256.Create())
+            {
+                byte[] digest = sha.ComputeHash(bytes);
                 var hex = new StringBuilder(64);
-                foreach (byte b in sha.Hash)
+                foreach (byte b in digest)
                 {
                     hex.Append(b.ToString("x2"));
                 }
@@ -233,40 +325,73 @@ namespace Greyhound.Step
             }
         }
 
-        // Extracts the verified archive into dest, mirroring
-        // crates/extern-fetch's archive.rs rules: refuse any entry that
-        // escapes the extraction root (zip-slip), return the count of
-        // files written.
+        private static string Sha256Hex(string path)
+        {
+            // Streaming: the staged archive is tens to hundreds of MB;
+            // hash it without buffering it whole a second time.
+            using (var sha = SHA256.Create())
+            using (FileStream stream = File.OpenRead(path))
+            {
+                byte[] digest = sha.ComputeHash(stream);
+                var hex = new StringBuilder(64);
+                foreach (byte b in digest)
+                {
+                    hex.Append(b.ToString("x2"));
+                }
+                return hex.ToString();
+            }
+        }
+
+        // Extracts the verified archive held in memory into dest,
+        // mirroring crates/extern-fetch's archive.rs rules: refuse any
+        // entry that escapes the extraction root (zip-slip), return the
+        // count of files written.
+        private static int Extract(byte[] zipBytes, string dest)
+        {
+            Directory.CreateDirectory(dest);
+            using (var zipStream = new MemoryStream(zipBytes, writable: false))
+            using (var archive = new ZipArchive(
+                zipStream, ZipArchiveMode.Read, leaveOpen: false))
+            {
+                return ExtractEntries(archive, dest);
+            }
+        }
+
         private static int Extract(string zipPath, string dest)
         {
             Directory.CreateDirectory(dest);
             using (var archive = new ZipArchive(
                 File.OpenRead(zipPath), ZipArchiveMode.Read, leaveOpen: false))
             {
-                int files = 0;
-                foreach (ZipArchiveEntry entry in archive.Entries)
-                {
-                    string relative = EnclosedName(entry.FullName);
-                    string target = Path.Combine(dest, relative);
-                    if (relative.EndsWith("/", StringComparison.Ordinal))
-                    {
-                        Directory.CreateDirectory(target);
-                        continue;
-                    }
-                    string parent = Path.GetDirectoryName(target);
-                    if (!string.IsNullOrEmpty(parent))
-                    {
-                        Directory.CreateDirectory(parent);
-                    }
-                    using (Stream source = entry.Open())
-                    using (FileStream output = File.Create(target))
-                    {
-                        source.CopyTo(output);
-                    }
-                    files++;
-                }
-                return files;
+                return ExtractEntries(archive, dest);
             }
+        }
+
+        private static int ExtractEntries(ZipArchive archive, string dest)
+        {
+            int files = 0;
+            foreach (ZipArchiveEntry entry in archive.Entries)
+            {
+                string relative = EnclosedName(entry.FullName);
+                string target = Path.Combine(dest, relative);
+                if (relative.EndsWith("/", StringComparison.Ordinal))
+                {
+                    Directory.CreateDirectory(target);
+                    continue;
+                }
+                string parent = Path.GetDirectoryName(target);
+                if (!string.IsNullOrEmpty(parent))
+                {
+                    Directory.CreateDirectory(parent);
+                }
+                using (Stream source = entry.Open())
+                using (FileStream output = File.Create(target))
+                {
+                    source.CopyTo(output);
+                }
+                files++;
+            }
+            return files;
         }
 
         // The zip-slip guard, mirrored from archive.rs: None never
@@ -295,22 +420,6 @@ namespace Greyhound.Step
                 }
             }
             return normalized;
-        }
-
-        private static void TryDelete(string path)
-        {
-            if (!File.Exists(path))
-            {
-                return;
-            }
-            try
-            {
-                File.Delete(path);
-            }
-            catch (IOException)
-            {
-                // Disposable by design; the next run overwrites it.
-            }
         }
 
         private static string PackageRoot()

@@ -25,12 +25,21 @@ namespace Greyhound.Step
         public string Url { get; }
         public string Sha256 { get; }
 
-        private StepFetchConfig(string repo, string tag, string url, string sha256)
+        // Empty: the download is held in memory only (also the right
+        // behavior for machines whose IT policy locks down temp
+        // directories). Set: an absolute path to an existing writable
+        // directory the download stages its zip in before extraction —
+        // a per-machine override of the tracked-default-empty key.
+        public string DownloadLocation { get; }
+
+        private StepFetchConfig(
+            string repo, string tag, string url, string sha256, string downloadLocation)
         {
             Repo = repo;
             Tag = tag;
             Url = url;
             Sha256 = sha256;
+            DownloadLocation = downloadLocation;
         }
 
         // Loads the staged config for the platform the editor runs on.
@@ -48,6 +57,22 @@ namespace Greyhound.Step
             }
             Dictionary<string, Dictionary<string, string>> tables =
                 StepToml.Parse(File.ReadAllText(path));
+
+            // The root-level download_location (before any section
+            // header): empty = in-memory download; set = absolute path
+            // to an existing writable directory. Relative paths are
+            // rejected here — there is no honest root to resolve them
+            // against, and the key's meaning is machine-local.
+            string downloadLocation = tables.TryGetValue("", out Dictionary<string, string> root)
+                && root.TryGetValue("download_location", out string location)
+                ? location
+                : "";
+            if (downloadLocation.Length > 0 && !Path.IsPathRooted(downloadLocation))
+            {
+                throw new InvalidOperationException(
+                    $"{path}: download_location must be an absolute path with forward "
+                    + $"slashes (got {downloadLocation}); empty string = in-memory download");
+            }
 
             if (!tables.TryGetValue(Group, out Dictionary<string, string> group))
             {
@@ -88,7 +113,7 @@ namespace Greyhound.Step
                     + "64-hex-digit sha256 in crates/extern-fetch/config.toml and "
                     + "re-run 'just assemble-package'");
             }
-            return new StepFetchConfig(repo, tag, url, sha256);
+            return new StepFetchConfig(repo, tag, url, sha256, downloadLocation);
         }
 
         // The editor platform as the extern-fetch config's OS section key.

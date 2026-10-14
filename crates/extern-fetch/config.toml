@@ -32,6 +32,20 @@
 #
 # See refactor-repo.md for the design decisions behind this file.
 
+# Where a downloader stages the archive bytes on disk before
+# extraction. Empty (the tracked default): the archive is held in
+# memory only — also the right default for machines whose IT policy
+# locks down temp directories. Set: an absolute path, forward slashes
+# (TOML basic strings treat `\` as an escape), to an EXISTING writable
+# directory on the machine running the consumer — a per-machine
+# override of a tracked-default-empty key, never committed with a real
+# path. Both consumers honor it, staging their zip inside the directory
+# and deleting it after extraction: this tool (`just fetch-occt`) and
+# the Unity package's C# provisioner via the staged copy of this file
+# (Editor/occt-fetch.toml; refactor-repo.md D8). Neither creates the
+# directory — a missing one fails loudly.
+download_location = ""
+
 [occt]
 repo = "TonyMarkham/occt-dev"
 tag  = "v0.1.0"

@@ -11,6 +11,13 @@ use std::{
 /// (`occt`, `opencv`, ...), flattened from the top-level tables.
 #[derive(Debug, Deserialize)]
 pub(crate) struct Config {
+    /// Where downloads may stage archive bytes on disk before
+    /// extraction. Tracked default: empty = in-memory. Both consumers
+    /// honor it: this tool (`ensure`) and the Unity package's C#
+    /// provisioner via the staged copy of this config (see the key's
+    /// comment in config.toml, refactor-repo.md D8).
+    #[serde(default)]
+    pub(crate) download_location: String,
     #[serde(flatten)]
     groups: BTreeMap<String, Group>,
 }
@@ -49,6 +56,37 @@ impl Config {
 
     pub(crate) fn group_names(&self) -> Vec<&str> {
         self.groups.keys().map(String::as_str).collect()
+    }
+
+    /// The validated `download_location`: None = in-memory (the tracked
+    /// default); Some = an absolute path to an EXISTING directory the
+    /// archive may be staged in. Relative paths are rejected (no honest
+    /// root to resolve against; the key's meaning is machine-local) and
+    /// a missing directory fails rather than being created — neither
+    /// consumer creates directories on a machine whose policies govern
+    /// exactly which paths are approved. This tool consumes it only for
+    /// its own download staging; the C# provisioner applies the same
+    /// rule to the staged copy of this config.
+    pub(crate) fn download_dir(&self) -> ExternFetchResult<Option<PathBuf>> {
+        if self.download_location.is_empty() {
+            return Ok(None);
+        }
+        let path = PathBuf::from(&self.download_location);
+        if !path.is_absolute() {
+            return Err(ExternFetchError::config(format!(
+                "download_location must be an absolute path with forward \
+                 slashes, got {:?}",
+                self.download_location
+            )));
+        }
+        if !path.is_dir() {
+            return Err(ExternFetchError::config(format!(
+                "download_location {} does not exist; the tool never \
+                 creates directories",
+                path.display()
+            )));
+        }
+        Ok(Some(path))
     }
 
     /// Every group, or only those named in `filter` when non-empty.

@@ -1,9 +1,17 @@
 use crate::{
-    ExternFetchError, ExternFetchResult, archive, artifact::Artifact, digest::sha256_hex, download,
-    group::Group, provenance::Provenance,
+    ExternFetchError, ExternFetchResult, archive,
+    artifact::Artifact,
+    digest::{sha256_hex, sha256_hex_file},
+    download,
+    group::Group,
+    provenance::Provenance,
+    staged_archive::{StagedArchive, download_to_staged},
 };
 
-use std::path::Path;
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 /// What one ensure step did.
 #[derive(Debug, PartialEq, Eq)]
@@ -20,9 +28,11 @@ pub(crate) enum Outcome {
 
 /// Brings one artifact's destination to the state the config describes.
 /// `fetch` is the network boundary, injected so tests can run the whole
-/// flow without HTTP.
+/// flow without HTTP: it hands back either the archive bytes (memory
+/// mode) or the path of a zip staged inside the configured
+/// `download_location` (file mode).
 pub(crate) fn ensure_with(
-    fetch: &dyn Fn(&str) -> ExternFetchResult<Vec<u8>>,
+    fetch: &dyn Fn(&str) -> ExternFetchResult<StagedArchive>,
     group_name: &str,
     role: &str,
     group: &Group,
@@ -66,8 +76,41 @@ pub(crate) fn ensure_with(
             dest.display()
         )));
     }
-    let bytes = fetch(artifact.url())?;
-    let actual = sha256_hex(&bytes);
+    let staged = fetch(artifact.url())?;
+    let outcome = install(
+        &staged,
+        group_name,
+        role,
+        group,
+        artifact,
+        &dest,
+        &marker_path,
+    );
+    // The staged file is disposable: delete it once the payload is in
+    // (or the attempt failed) — success or failure, never keep it.
+    // Memory mode holds nothing to delete.
+    if let StagedArchive::File(path) = &staged {
+        let _ = fs::remove_file(path);
+    }
+    outcome
+}
+
+/// Hashes, verifies, extracts, and certifies — the tail shared by both
+/// staging modes. Hash verification happens before any extraction, so
+/// a mismatch leaves nothing behind ("nothing was extracted").
+fn install(
+    staged: &StagedArchive,
+    group_name: &str,
+    role: &str,
+    group: &Group,
+    artifact: &Artifact,
+    dest: &Path,
+    marker_path: &Path,
+) -> ExternFetchResult<Outcome> {
+    let actual = match staged {
+        StagedArchive::Bytes(bytes) => sha256_hex(bytes),
+        StagedArchive::File(path) => sha256_hex_file(path)?,
+    };
     if let Some(pinned) = artifact.pinned_sha256()
         && !actual.eq_ignore_ascii_case(pinned)
     {
@@ -75,7 +118,10 @@ pub(crate) fn ensure_with(
             "sha256 mismatch for {group_name}.{role}: expected {pinned}, got {actual}; nothing was extracted"
         )));
     }
-    let files = archive::extract(&bytes, &dest)?;
+    let files = match staged {
+        StagedArchive::Bytes(bytes) => archive::extract(bytes, dest)?,
+        StagedArchive::File(path) => archive::extract_file(path, dest)?,
+    };
     let marker = Provenance::new(
         group_name,
         role,
@@ -84,7 +130,7 @@ pub(crate) fn ensure_with(
         artifact.url(),
         &actual,
     );
-    marker.write(&marker_path)?;
+    marker.write(marker_path)?;
     match artifact.pinned_sha256() {
         Some(_) => Ok(Outcome::Extracted { files }),
         // Unpinned: extract and record the computed hash so the pin and
@@ -94,20 +140,40 @@ pub(crate) fn ensure_with(
     }
 }
 
-/// The real run: network fetch via `download`.
+/// The network boundary `ensure_with` receives: one url in, the staged
+/// archive out (bytes in memory, or a zip path on disk). A type alias
+/// keeps the Box construction below readable; the explicit HRTB is
+/// what the inline `dyn Fn(&str)` elided.
+type Fetch = dyn for<'url> Fn(&'url str) -> ExternFetchResult<StagedArchive>;
+
+/// The real run: network fetch via `download`. `download_dir` selects
+/// the staging mode — None (the tracked default) keeps the archive in
+/// memory; Some(dir) streams it into `dir` under the asset's own file
+/// name and hands the staged path back (the dir is validated up front
+/// by Config::download_dir). Owned because the boxed 'static closure
+/// captures it.
 pub(crate) fn ensure(
     group_name: &str,
     role: &str,
     group: &Group,
     artifact: &Artifact,
     repo_root: &Path,
+    download_dir: Option<PathBuf>,
 ) -> ExternFetchResult<Outcome> {
-    ensure_with(
-        &|url| download::download(url),
-        group_name,
-        role,
-        group,
-        artifact,
-        repo_root,
-    )
+    let fetch: Box<Fetch> = match download_dir {
+        None => Box::new(|url| download::download(url).map(StagedArchive::Bytes)),
+        Some(dir) => Box::new(move |url| match download_to_staged(url, &dir) {
+            Ok(path) => Ok(StagedArchive::File(path)),
+            Err(error) => {
+                // A partial staging file is worthless: remove it so
+                // the next run starts clean. Best effort — the
+                // download error itself is what matters.
+                if let Ok(name) = StagedArchive::zip_name(url) {
+                    let _ = fs::remove_file(dir.join(name));
+                }
+                Err(error)
+            }
+        }),
+    };
+    ensure_with(&*fetch, group_name, role, group, artifact, repo_root)
 }

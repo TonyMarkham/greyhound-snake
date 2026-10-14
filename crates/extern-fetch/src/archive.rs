@@ -13,6 +13,27 @@ use zip::ZipArchive;
 pub(crate) fn extract(zip_bytes: &[u8], dest: &Path) -> ExternFetchResult<usize> {
     let mut archive = ZipArchive::new(Cursor::new(zip_bytes))
         .map_err(|error| ExternFetchError::archive(format!("not a readable zip: {error}")))?;
+    extract_entries(&mut archive, dest)
+}
+
+/// Extracts a zip from disk into `dest` (created if missing) — the
+/// staged-archive path of a `download_location` run. Same zip-slip
+/// rules as the in-memory extract.
+pub(crate) fn extract_file(zip_path: &Path, dest: &Path) -> ExternFetchResult<usize> {
+    let file = fs::File::open(zip_path).map_err(|error| {
+        ExternFetchError::archive(format!("cannot open {}: {error}", zip_path.display()))
+    })?;
+    let mut archive = ZipArchive::new(file)
+        .map_err(|error| ExternFetchError::archive(format!("not a readable zip: {error}")))?;
+    extract_entries(&mut archive, dest)
+}
+
+/// The per-entry rules shared by both entry points: create dest, walk
+/// the entries, refuse escapes, write real files.
+fn extract_entries<R>(archive: &mut ZipArchive<R>, dest: &Path) -> ExternFetchResult<usize>
+where
+    R: io::Read + io::Seek,
+{
     fs::create_dir_all(dest).map_err(|error| {
         ExternFetchError::io(format!("cannot create {}: {error}", dest.display()))
     })?;

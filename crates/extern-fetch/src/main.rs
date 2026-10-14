@@ -10,6 +10,7 @@ mod group;
 mod host_os;
 mod platform;
 mod provenance;
+mod staged_archive;
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
@@ -30,7 +31,6 @@ use crate::{
 
 use clap::Parser;
 use std::process::ExitCode;
-
 fn main() -> ExitCode {
     let cli = Cli::parse();
     match run(&cli) {
@@ -50,6 +50,9 @@ fn run(cli: &Cli) -> ExternFetchResult<bool> {
     let config_path = &cli.config;
     let config = Config::load(config_path)?;
     let repo_root = Config::repo_root(config_path)?;
+    // Validated up front so a bad download_location fails the run
+    // before anything is fetched (the staging mode is run-global).
+    let download_dir = config.download_dir()?;
     let os = HostOs::current()?;
     for name in &cli.group {
         if config.group(name).is_none() {
@@ -73,7 +76,14 @@ fn run(cli: &Cli) -> ExternFetchResult<bool> {
             continue;
         };
         for (role, artifact) in platform.artifacts() {
-            match ensure(name, role, group, artifact, &repo_root) {
+            match ensure(
+                name,
+                role,
+                group,
+                artifact,
+                &repo_root,
+                download_dir.clone(),
+            ) {
                 Ok(Outcome::Skipped) => {
                     println!("{name}/{role}: up to date ({})", artifact.dest());
                 }
