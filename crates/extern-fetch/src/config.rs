@@ -15,7 +15,7 @@ pub(crate) struct Config {
     /// extraction. Tracked default: empty = in-memory. Both consumers
     /// honor it: this tool (`ensure`) and the Unity package's C#
     /// provisioner via the staged copy of this config (see the key's
-    /// comment in config.toml, refactor-repo.md D8).
+    /// comment in config.toml).
     #[serde(default)]
     pub(crate) download_location: String,
     #[serde(flatten)]

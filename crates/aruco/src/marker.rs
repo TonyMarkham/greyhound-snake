@@ -3,7 +3,7 @@
 /// `bits` is the 4x4 data field in OpenCV's rotation-0 orientation:
 /// bit index `b = row*4 + column` sits at position `15 - b`
 /// (row-major, MSB-first per byte — the mapping that reproduces the
-/// stored rotation-0 bytes; see `aruco-svg.md`).
+/// stored rotation-0 bytes).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Marker {
     pub id: u32,

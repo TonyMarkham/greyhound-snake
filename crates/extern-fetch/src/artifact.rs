@@ -62,7 +62,7 @@ impl Artifact {
     /// downloaded. `ident` is the `group.os.role` dotted path used in
     /// error messages.
     pub(crate) fn validate(&self, ident: &str, repo: &str, tag: &str) -> ExternFetchResult<()> {
-        // Same-tag invariant (refactor-repo.md D2) enforced mechanically:
+        // Same-tag invariant, enforced mechanically:
         // every URL of a group must be a release asset of that group's
         // own repo and tag, so the dev zip and the libs zip can never
         // drift onto different releases.

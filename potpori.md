@@ -394,10 +394,9 @@ cameras, and eventually no meshes at all (below).
   `cart-pole-asm` (81 bodies, 29 meshes; cart COM/mass match the M1
   reference numbers). Pending: the MuJoCo compile/viewer smoke test.
 - `../greyhound-snake-m1` worktree is stale (pre-fixes) and dismissed;
-  removal on request. `next-step.md` is an old handoff predating G5/G13 —
-  historical.
+  removal on request.
 - MuJoCo not installed locally; **local from-source install doc is a
-  future session** (pattern: `occt-linux.md` — prerequisites → configure →
+  future session** (pattern: prerequisites → configure →
   build → install → validation, checked against MuJoCo's build docs for a
   pinned tag). The generated `__WIP__/cart/cart-asy.xml` validates both
   the XML and the install (nbody 44, nmesh 20, ngeom 39, Σbody_mass

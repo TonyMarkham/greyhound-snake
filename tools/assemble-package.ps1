@@ -4,8 +4,7 @@
 # occt-sys rebuild so the freshly built shim lands in the package, then
 # add the host cdylib. The OCCT payload (Runtime/Plugins/occt) is NONE
 # of this script's business — not asserted, not read, not written; the
-# package's C# provisioner owns it exclusively (refactor-repo.md D8,
-# amended 2026-10-14). Windows counterpart of the [linux]
+# package's C# provisioner owns it exclusively. Windows counterpart of the [linux]
 # assemble-package recipe body; it lives in a script because just runs
 # Windows recipe lines one process per line, so cross-line variables and
 # multi-line blocks never survive in a recipe.
@@ -18,8 +17,8 @@ $host_dir = "$package/Runtime/Plugins/x86_64"
 # (cargo build output) survive untouched.
 Copy-Item package/com.greyhound.step/* $package -Recurse -Force
 
-# Stage the fetch config the package's C# provisioner reads
-# (refactor-repo.md D8): one source of pins, refreshed on every assembly.
+# Stage the fetch config the package's C# provisioner reads: one
+# source of pins, refreshed on every assembly.
 Copy-Item crates/extern-fetch/config.toml $package/Editor/occt-fetch.toml -Force
 
 # Force build.rs to rerun so the shim rebuilds freshly, mirroring the
@@ -31,8 +30,8 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 $shim = "$package/Runtime/Plugins/shim/x86_64"
 # The package payload (Runtime/Plugins/occt) is none of this script's
 # business — not asserted, not read, not written; the package's C#
-# provisioner owns it exclusively (refactor-repo.md D8, amended
-# 2026-10-14). Only the shim is asserted, because this script just
+# provisioner owns it exclusively. Only the shim is asserted, because
+# this script just
 # built it.
 if (-not (Test-Path "$shim/greyhound_occt.dll")) {
     throw "missing prerequisite: $shim/greyhound_occt.dll (cargo build produced no shim)"

@@ -46,7 +46,7 @@ x86_64 is exercised end to end.
 | `third_party/opencv` | OpenCV Apache-2.0 license text (the embedded 4x4 dictionary bit tables are OpenCV source data — see `THIRD_PARTY_NOTICES.md`) |
 | `tools/extract_aruco_dict.py` | Regenerates `crates/aruco/src/data/dict_4x4_1000.rs` verbatim from OpenCV's pinned source |
 | `dist/` | Gitignored native output (see below) |
-| `tmp/` | Gitignored OCCT source/build scratch area, including the stage logs (see `occt-linux.md`) |
+| `tmp/` | Gitignored OCCT source/build scratch area |
 
 ### Design reference docs
 
@@ -58,15 +58,13 @@ x86_64 is exercised end to end.
 - `mujoco-schema.md` — MJCF facts checked against the MuJoCo stable docs
   (compiler, body/joint/inertial, `<position>` actuation)
 - `perf.md` — benchmark plan and the scalar-first SIMD decision
-- `aruco-svg.md` — the ArUco 4x4 SVG generator: OpenCV source-verified
-  dictionary facts, plan, and landed decisions
 
 ## Native output layout
 
 | Path | Contents |
 |---|---|
 | `dist/package/com.greyhound.step/` | the assembled UPM package: authored sources plus the native payload |
-| `…/Runtime/Plugins/occt/x86_64/` | the OCCT installation (`lib/`, `include/opencascade/`, `share/`, `bin/`) |
+| `…/Runtime/Plugins/occt/x86_64/` | the provisioned OCCT payload: the runtime `libTK*.so` libraries plus license texts and notices |
 | `…/Runtime/Plugins/shim/x86_64/` | `libgreyhound_occt.so` — the C++ shim built by `occt-sys/build.rs` |
 | `…/Runtime/Plugins/x86_64/` | `libimporter_host.so` — the Unity-facing host cdylib |
 
@@ -75,10 +73,12 @@ x86_64 is exercised end to end.
 Prerequisites: a recent Rust toolchain (edition 2024) and a C++17 compiler.
 `build.rs` only accepts native Linux x86_64 builds; other targets are rejected.
 
-1. Install OCCT 8.0.1 into
-   `dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64` by
-   following **`occt-linux.md`** (configure → build → install, then
-   validate with `step-stats` as described there).
+1. Fetch the pinned OCCT archives into the `extern/` cache:
+
+   ```
+   just fetch-occt
+   ```
+
 2. Build the workspace:
 
    ```
@@ -87,8 +87,8 @@ Prerequisites: a recent Rust toolchain (edition 2024) and a C++17 compiler.
 
    `occt-sys/build.rs` compiles the C++ shims into
    `dist/package/com.greyhound.step/Runtime/Plugins/shim/x86_64/libgreyhound_occt.so`,
-   linking the OCCT toolkits it needs. This requires the OCCT installation
-   from step 1.
+   linking the OCCT toolkits it needs. This requires the OCCT dev
+   extraction from step 1.
 3. Inspect the sample STEP file:
 
    ```
@@ -126,17 +126,6 @@ Prerequisites: a recent Rust toolchain (edition 2024) and a C++17 compiler.
 - The shim is built with `RPATH=$ORIGIN`; the loader tests use stub fixtures
   compiled alongside it, so they exercise the loader without touching real
   OCCT libraries at runtime.
-
-## Platform OCCT installation docs
-
-- **`occt-linux.md`** — build OCCT 8.0.1 from source into the repo's dist
-- **`occt-mac.md`** — build OCCT 8.0.1 from source on macOS (Homebrew for
-  third-party libraries)
-- **`occt-win.md`** — install the official prebuilt Windows binaries (MSVC x64)
-
-Only the Linux x86_64 path is exercised by the Rust/C++/Unity integration
-today; the macOS/Windows docs cover OCCT installation, not a working
-integration.
 
 ## License
 

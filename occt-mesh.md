@@ -4,8 +4,9 @@ Reference for the Open CASCADE mesh data model and tessellation API, focused
 on what the STEP importer needs: run BRepMesh over a shape, then pull
 triangle soup out of `Poly_Triangulation` into our Rust mesh model.
 
-Facts below are read **directly from the OCCT 8.0.1 headers installed in this
-repo** (`dist/occt/x86_64-linux/include/opencascade/`, built from the `V8.0.1`
+Facts below are read **directly from the OCCT 8.0.1 headers in this
+repo** (`extern/occt/8.0.1/linux-x86_64-dev/include/opencascade/`, the pinned
+dev extraction built from the `V8.0.1`
 tag) — not from web documentation. Retrieved 2026-10-07. Header paths are
 given as `[Header]` references throughout.
 
@@ -178,7 +179,7 @@ Practical reads for tuning:
 
 ## Mesh interchange in this build (writers/readers present)
 
-Verified from headers + installed libs (`dist/occt/x86_64-linux/`):
+Verified from headers + libraries (`extern/occt/8.0.1/linux-x86_64-dev/`):
 
 | Format | Toolkit | API |
 |---|---|---|
@@ -212,17 +213,17 @@ a later 8.x release before relying on it.
 Primary source for this summary — actual headers in this repo's OCCT 8.0.1
 install:
 
-- `dist/occt/x86_64-linux/include/opencascade/Poly_Triangulation.hxx`
-- `dist/occt/x86_64-linux/include/opencascade/Poly_Triangle.hxx`
-- `dist/occt/x86_64-linux/include/opencascade/Poly_Polygon3D.hxx`
-- `dist/occt/x86_64-linux/include/opencascade/Poly_PolygonOnTriangulation.hxx`
-- `dist/occt/x86_64-linux/include/opencascade/Poly_MeshPurpose.hxx`
-- `dist/occt/x86_64-linux/include/opencascade/Poly_TriangulationParameters.hxx`
-- `dist/occt/x86_64-linux/include/opencascade/BRep_Tool.hxx`
-- `dist/occt/x86_64-linux/include/opencascade/BRepTools.hxx`
-- `dist/occt/x86_64-linux/include/opencascade/BRepMesh_IncrementalMesh.hxx`
-- `dist/occt/x86_64-linux/include/opencascade/IMeshTools_Parameters.hxx`
-- `dist/occt/x86_64-linux/include/opencascade/IMeshData_Status.hxx`
+- `extern/occt/8.0.1/linux-x86_64-dev/include/opencascade/Poly_Triangulation.hxx`
+- `extern/occt/8.0.1/linux-x86_64-dev/include/opencascade/Poly_Triangle.hxx`
+- `extern/occt/8.0.1/linux-x86_64-dev/include/opencascade/Poly_Polygon3D.hxx`
+- `extern/occt/8.0.1/linux-x86_64-dev/include/opencascade/Poly_PolygonOnTriangulation.hxx`
+- `extern/occt/8.0.1/linux-x86_64-dev/include/opencascade/Poly_MeshPurpose.hxx`
+- `extern/occt/8.0.1/linux-x86_64-dev/include/opencascade/Poly_TriangulationParameters.hxx`
+- `extern/occt/8.0.1/linux-x86_64-dev/include/opencascade/BRep_Tool.hxx`
+- `extern/occt/8.0.1/linux-x86_64-dev/include/opencascade/BRepTools.hxx`
+- `extern/occt/8.0.1/linux-x86_64-dev/include/opencascade/BRepMesh_IncrementalMesh.hxx`
+- `extern/occt/8.0.1/linux-x86_64-dev/include/opencascade/IMeshTools_Parameters.hxx`
+- `extern/occt/8.0.1/linux-x86_64-dev/include/opencascade/IMeshData_Status.hxx`
 
 Upstream:
 

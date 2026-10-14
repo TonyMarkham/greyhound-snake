@@ -4,11 +4,14 @@ tmp/
 # dist
 dist/
 
-# extern cache (fetched release archives; refactor-repo.md D3)
+# extern cache (fetched release archives)
 extern/
 
 # Build
 target/
+
+# Python bytecode caches
+__pycache__/
 
 # IDE
 .idea/

@@ -47,7 +47,7 @@ namespace Greyhound.Step
         {
             // A STEP import that arrives before the payload is usable
             // fails with the provisioning message, never with a cryptic
-            // native loader error (refactor-repo.md D5).
+            // native loader error.
             StepPayloadProvisioner.EnsureReady();
 
             string assetName = Path.GetFileNameWithoutExtension(ctx.assetPath);

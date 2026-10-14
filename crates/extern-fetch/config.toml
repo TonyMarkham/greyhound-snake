@@ -7,9 +7,9 @@
 # via crates/occt-sys/config.toml; the `payload` entries exist as the
 # single pins source that assemble-package stages into the package as
 # Editor/occt-fetch.toml — the C# provisioner reads its pins from that
-# copy and is the ONLY writer of the package payload (refactor-repo.md
-# D8, amended 2026-10-14: only the C# fetcher puts anything in the dist
-# package; the CLI fetch skips payload entries). Every platform
+# copy and is the ONLY writer of the package payload (only the C#
+# fetcher puts anything in the dist package; the CLI fetch skips
+# payload entries). Every platform
 # carries dev + payload entries, all pinned (Linux/macOS pins from their
 # release pages / build machines; a run on such a machine verifies the
 # downloaded bytes against the pin).
@@ -17,7 +17,7 @@
 # Rules, all enforced by the tool and checkable by hand:
 #   - Every url must be a GitHub release asset of the group's own repo and
 #     tag (`https://github.com/<repo>/releases/download/<tag>/<asset>`) —
-#     the same-tag invariant (refactor-repo.md D2) enforced mechanically:
+#     the same-tag invariant, enforced mechanically:
 #     the dev zip and the libs zip can never drift onto different releases.
 #   - dest is repo-root-relative with forward slashes, no `..`. The repo
 #     root is two levels above this file's directory, the same rule
@@ -31,8 +31,6 @@
 #     `<dest>.provenance.toml` matches the config entry. A directory with
 #     a matching marker is never touched again; anything else (no marker,
 #     marker/entry mismatch) fails loudly and must be deleted by hand.
-#
-# See refactor-repo.md for the design decisions behind this file.
 
 # Where a downloader stages the archive bytes on disk before
 # extraction. Empty (the tracked default): the archive is held in
@@ -44,7 +42,7 @@
 # path. Both consumers honor it, staging their zip inside the directory
 # and deleting it after extraction: this tool (`just fetch-occt`) and
 # the Unity package's C# provisioner via the staged copy of this file
-# (Editor/occt-fetch.toml; refactor-repo.md D8). Neither creates the
+# (Editor/occt-fetch.toml). Neither creates the
 # directory — a missing one fails loudly.
 download_location = ""
 

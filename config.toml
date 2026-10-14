@@ -9,8 +9,7 @@
 #
 # NOTHING on the Rust side reads or writes the package's provisioned
 # payload (Runtime/Plugins/occt): that directory belongs exclusively to
-# the package's C# provisioner (refactor-repo.md D8, amended
-# 2026-10-14). The dev trees under extern/ are the Rust side's runtime
+# the package's C# provisioner. The dev trees under extern/ are the Rust side's runtime
 # sandbox; paths resolve against the config's parent (the repo root).
 
 [occt.linux]

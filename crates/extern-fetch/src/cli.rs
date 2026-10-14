@@ -2,7 +2,7 @@ use clap::Parser;
 use std::path::PathBuf;
 
 /// Downloads the pinned release archives this repo builds against and
-/// extracts them into the `extern/` cache (refactor-repo.md D3/D4):
+/// extracts them into the `extern/` cache:
 /// download → SHA-256 verify → extract → sibling provenance marker.
 #[derive(Parser, Debug)]
 pub(crate) struct Cli {

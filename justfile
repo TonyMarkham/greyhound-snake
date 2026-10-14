@@ -12,8 +12,7 @@ set windows-shell := ["powershell.exe", "-NoLogo", "-Command"]
 # add the host cdylib; build.rs rebuilds the shim into the package. The
 # OCCT payload (Runtime/Plugins/occt) is NONE of this recipe's business
 # on any platform — not asserted, not read, not written; the package's
-# C# provisioner owns it exclusively (refactor-repo.md D8, amended
-# 2026-10-14).
+# C# provisioner owns it exclusively.
 [linux]
 [macos]
 assemble-package:
@@ -51,9 +50,8 @@ assemble-package:
 
     # The package payload (Runtime/Plugins/occt) is none of this
     # recipe's business — not asserted, not read, not written; the
-    # package's C# provisioner owns it exclusively (refactor-repo.md
-    # D8, amended 2026-10-14). Only the shim is asserted, because this
-    # recipe just built it.
+    # package's C# provisioner owns it exclusively. Only the shim is
+    # asserted, because this recipe just built it.
     if [ ! -e "$shim/libgreyhound_occt.$extension" ]; then
         echo "missing prerequisite: $shim/libgreyhound_occt.$extension (cargo build produced no shim)" >&2
         exit 1
@@ -90,8 +88,8 @@ verify-package: assemble-package
 verify-package: assemble-package
     python tools/verify-package.py
 
-# Fetch the pinned occt-dev release archives into the extern/ cache
-# (refactor-repo.md D3/D4): download -> sha256 verify -> extract ->
+# Fetch the pinned occt-dev release archives into the extern/ cache:
+# download -> sha256 verify -> extract ->
 # provenance marker. Dev trees only: the package payload is provisioned
 # exclusively by the package's C# provisioner, never by this recipe.
 # Unpinned entries extract + report the hash and fail the run; pin the

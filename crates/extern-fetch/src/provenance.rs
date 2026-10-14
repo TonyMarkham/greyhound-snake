@@ -11,7 +11,7 @@ use std::{fs, path::Path};
 ///
 /// Ownership is the coordinates plus hash, not the writing tool: the
 /// `tool` field is informational. Two provisioners share the package
-/// payload destination (refactor-repo.md D8) — this tool via `just
+/// payload destination — this tool via `just
 /// fetch-occt`, and the Unity package's C# provisioner (tool
 /// `com.greyhound.step`) via the staged fetch config — and because both
 /// verify the same pinned sha256, a marker either wrote certifies the

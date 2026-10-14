@@ -8,7 +8,7 @@ namespace Greyhound.Step
 {
     // The pins the C# provisioner fetches with: the copy of
     // crates/extern-fetch/config.toml that `just assemble-package` stages
-    // as Editor/occt-fetch.toml (refactor-repo.md D8). One source of
+    // as Editor/occt-fetch.toml. One source of
     // pins — the staged copy is refreshed on every package assembly, so
     // the package and the repository can never disagree about a release.
     // The provisioner reads exactly one entry: [occt.<platform>.payload];
@@ -85,11 +85,8 @@ namespace Greyhound.Step
             if (!tables.TryGetValue(section, out Dictionary<string, string> entry))
             {
                 throw new InvalidOperationException(
-                    $"[{section}] is missing from {path}"
-                    + (PlatformKey() == "linux"
-                        ? "; on Linux the payload comes from the OCCT install itself "
-                          + "(occt-linux.md) and no provisioning entry exists"
-                        : "; no payload is configured for this platform"));
+                    $"[{section}] is missing from {path}; "
+                    + "no payload is configured for this platform");
             }
             string url = Require(entry, "url", path);
             // An empty pin is the unpinned state (the extern-fetch
@@ -97,7 +94,7 @@ namespace Greyhound.Step
             // not with a generic missing-key message.
             string sha256 = entry.TryGetValue("sha256", out string pinned) ? pinned : "";
 
-            // Same-tag invariant (refactor-repo.md D2), mirrored from the
+            // Same-tag invariant, mirrored from the
             // extern-fetch validator: the url must name this group's own
             // repo and tag.
             string prefix = $"https://github.com/{repo}/releases/download/{tag}/";

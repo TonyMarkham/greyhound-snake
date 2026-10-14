@@ -65,8 +65,8 @@ def dev_occt_runtime(repo_root):
     # The verify replay's OCCT runtime libraries come from the extern/
     # dev tree, NOT from the package's provisioned payload
     # (Runtime/Plugins/occt) — the payload belongs exclusively to the
-    # package's C# provisioner and nothing in this chain opens it
-    # (refactor-repo.md D8, amended 2026-10-14). The dev trees' runtime
+    # package's C# provisioner and nothing in this chain opens it.
+    # The dev trees' runtime
     # directory is per-OS (bin/ on Windows, lib/ elsewhere), mirroring
     # the root config.toml.
     if os.name == "nt":
@@ -132,8 +132,7 @@ def verify_from_copy(source, asset):
         package = Path(copy) / "package"
         # The copy excludes the package payload (Runtime/Plugins/occt)
         # — nothing in this verify chain reads it; it belongs
-        # exclusively to the package's C# provisioner (refactor-repo.md
-        # D8, amended 2026-10-14). The shim and host are copied and
+        # exclusively to the package's C# provisioner. The shim and host are copied and
         # loaded from the copy, so path independence is still exercised.
         shutil.copytree(
             source,

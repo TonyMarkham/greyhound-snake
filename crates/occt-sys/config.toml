@@ -29,8 +29,8 @@
 #                     provisioned from the [occt.<os>.payload] entry of
 #                     crates/extern-fetch/config.toml — by the Unity
 #                     package's C# provisioner from the copy of that
-#                     config staged into the package (refactor-repo.md
-#                     D5/D8). Build-time inputs come from the
+#                     config staged into the package. Build-time inputs
+#                     come from the
 #                     [occt.<os>.dev] extractions under extern/.
 #   link_all_toolkits MSVC only: link every TK*.lib in lib_dir. link.exe
 #                     has no ELF-style transitive search through a DLL's

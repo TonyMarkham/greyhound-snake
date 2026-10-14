@@ -14,8 +14,9 @@ the macOS/Windows integration is not yet exercised.
 
 - Follow the scope of the user's explicit request. Do not assume permission
   to perform additional work merely because it would advance the project.
-- **The user builds OCCT themselves.** The platform documents give the user
-  instructions to execute; they are not instructions for the agent to run.
+- **The user builds OCCT themselves.** Any OCCT build instructions or
+  release records are documents for the user to execute; they are not
+  instructions for the agent to run.
 - Do not run OCCT configure, build, install, or cleanup commands, install
   system dependencies, or launch native validation examples unless the user
   explicitly asks you to execute them. This also applies to commands that
@@ -41,8 +42,8 @@ the macOS/Windows integration is not yet exercised.
   capabilities that existed only to serve the replaced design are dropped
   with it. Do not re-introduce them as optional extras or "your call"
   questions.
-- **Plans are not truth.** Design docs (`better-occt-bins.md`, bite plans,
-  gap tables) state intent, not current state. Before asserting what the
+- **Plans are not truth.** Design docs (bite plans, gap tables) state
+  intent, not current state. Before asserting what the
   repo does today, verify against what is landed — recipes, tracked
   configs, source. When citing a plan, name it as a plan.
 - **Separate requirement from recommendation.** State invariants as
@@ -118,8 +119,6 @@ needs the user's Unity editor, use the dist-first loop.
 
 ## Repository map
 
-- `occt-linux.md`, `occt-mac.md`, `occt-win.md`: user-facing OCCT build,
-  installation, validation, and distribution instructions.
 - `crates/occt-sys/`: Rust OCCT integration with C++ shims, including STEP
   loading, document information, and tessellation.
 - `crates/importer-host/`: Unity-facing cdylib — a flat, version-gated C ABI
@@ -152,11 +151,11 @@ needs the user's Unity editor, use the dist-first loop.
 - `crates/aruco/`, `crates/aruco-cli/`: ArUco 4x4 marker SVG generator
   — OpenCV-compatible dictionary tables, selection mode
   (`--count`/`--seed`/`--min-distance`), SVG rendering; the CLI
-  crate's `README.md` is its user manual (`aruco-svg.md`).
+  crate's `README.md` is its user manual.
 - `crates/extern-fetch/` + its `config.toml`: fetches the pinned
   `occt-dev` release archives into the gitignored `extern/` cache
   (download → SHA-256 verify → extract → sibling provenance marker);
-  `just fetch-occt` runs it. Design record: `refactor-repo.md`.
+  `just fetch-occt` runs it.
 
 Design reference docs (source of truth for their facts; consult before
 mesh, projection, or export work instead of re-deriving):
@@ -179,12 +178,6 @@ mesh, projection, or export work instead of re-deriving):
 - `mujoco-schema.md`: MJCF facts checked against the MuJoCo stable
   docs (compiler, body/joint/inertial, `<position>` actuation) — the
   source the C# exporter's emission was checked against.
-- `better-occt-bins.md`: the neutral-OCCT-install + selective-staging
-  workflow (payload facts, `just stage-occt` design, the STEP-resources
-  needs-test).
-- `aruco-svg.md`: the ArUco 4x4 SVG generator plan — OpenCV-compatible
-  dictionary tables, selection mode (`--count`/`--seed`/`--min-distance`),
-  SVG output model, and the bite breakdown.
 - `perf.md`: benchmark plan (criterion, micro/macro layers, assets),
   the scalar-first SIMD decision and its revisit trigger, and rules for
   recording timings.

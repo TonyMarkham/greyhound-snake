@@ -9,7 +9,7 @@ use std::{
 /// (the tracked default — `download_location` empty) or the path of the
 /// zip staged inside the configured `download_location` directory (the
 /// per-machine override; the same key the Unity package's C#
-/// provisioner consumes from the staged config, refactor-repo.md D8).
+/// provisioner consumes from the staged config).
 /// The staged file is disposable: the caller deletes it once the hash
 /// is verified and the payload extracted — success or failure.
 pub(crate) enum StagedArchive {

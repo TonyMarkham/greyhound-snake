@@ -15,8 +15,8 @@ namespace Greyhound.Step
 {
     // Provisions the OCCT payload — the native shared libraries the
     // importer dlopen's — into the package's
-    // Runtime/Plugins/occt/<arch>/lib at editor load (refactor-repo.md
-    // D5/D6), <arch> from NativeMethods.PluginArch(): the UPM package
+    // Runtime/Plugins/occt/<arch>/lib at editor load, <arch> from
+    // NativeMethods.PluginArch(): the UPM package
     // ships light and downloads the pinned
     // release archive instead. UPM has no install-time hook, so the
     // handshake point is editor assembly load; a STEP import that
@@ -25,8 +25,8 @@ namespace Greyhound.Step
     // error.
     //
     // The archive, its hash, and the destination contract come from the
-    // staged copy of crates/extern-fetch/config.toml (refactor-repo.md
-    // D8); `just fetch-occt` provisions the same destination from the
+    // staged copy of crates/extern-fetch/config.toml; `just fetch-occt`
+    // provisions the same destination from the
     // same pins, and the sibling provenance marker keeps the two
     // provisioners idempotent against each other.
     // NoAutoStaticsCleanup: the state fields intentionally outlive any

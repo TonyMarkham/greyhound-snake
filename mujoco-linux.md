@@ -4,7 +4,7 @@ This repository exports **MuJoCo MJCF models** from Unity (the joint set's
 Export button). The simulation side — validating exported XML, the future
 training loop's MuJoCo workers — needs a local MuJoCo installation on the
 **x86_64 Linux** machine. MuJoCo is **not** a Unity-package payload: unlike
-the OCCT binaries (`occt-linux.md`), it ships in no UPM package and is never
+the OCCT binaries, it ships in no UPM package and is never
 redistributed to Unity users.
 
 **Policy: install from the official release artifact. Build from source

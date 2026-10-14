@@ -4,8 +4,9 @@ Generates **4x4 ArUco marker SVG files** — OpenCV-compatible (every
 marker is detectable by stock `cv2.aruco` with the matching
 predefined dictionary), rotationally unique, and reproducible.
 
-Part of the `greyhound-snake` workspace. Plan and OpenCV
-source-verified facts: `aruco-svg.md` (repo root). License: the
+Part of the `greyhound-snake` workspace. OpenCV
+source-verified facts: the dictionary module's table documentation
+(`crates/aruco/src/data/dict_4x4_1000.rs`). License: the
 dictionary bit patterns are OpenCV source data, redistributed under
 the Apache License, Version 2.0 — attribution in the repo's
 `THIRD_PARTY_NOTICES.md` and `third_party/opencv/`. Everything else is

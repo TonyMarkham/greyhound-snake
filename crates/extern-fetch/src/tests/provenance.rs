@@ -53,7 +53,7 @@ fn matches_requires_equal_coordinates() {
 #[test]
 fn matches_ignores_the_tool_field() {
     // The Unity package's C# provisioner leaves its own marker on the
-    // shared payload destination (refactor-repo.md D8), recording its
+    // shared payload destination, recording its
     // tool name; ownership is the coordinates plus hash, so its marker
     // is honored here and this tool's markers are honored in Unity.
     let temp = TempDir::new().unwrap();
