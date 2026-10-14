@@ -1,0 +1,10 @@
+{
+  "name": "com.greyhound.vision",
+  "version": "0.1.0",
+  "displayName": "Greyhound Vision",
+  "description": "ArUco marker authoring, detection, and joint-driver annotation via OpenCV.",
+  "unity": "6000.0",
+  "dependencies": {
+    "com.greyhound.step": "0.1.0"
+  }
+}

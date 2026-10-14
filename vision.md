@@ -265,8 +265,9 @@ companion package, **R** = re-homed as a Rust CLI (Python retired),
   max_ids)` → detection count (negative = decode/internal error);
   encoded image bytes in, ids out, no OpenCV type crosses, stateless.
   Corners are not exposed yet — deferred until the package's verify step
-  needs them. Shim artifact: `dist/opencv/ghcv.dll` (built artifact, not
-  tracked).
+  needs them. Shim artifact:
+  `dist/package/com.greyhound.vision/Runtime/Plugins/shim/<arch>/ghcv.dll`
+  (built artifact, not tracked).
 - **`tools/ArucoIdentify` — landed.** The C# checker harness (net10.0,
   plain console — not Unity code): enumerates image files, ground truth
   from the filename (`marker_NNNN.(png|jpg)`), compares against the

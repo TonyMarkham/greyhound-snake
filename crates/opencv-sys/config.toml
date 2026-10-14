@@ -20,6 +20,15 @@
 # compiled into the same archives), so the link step may need the
 # dev tree's lib dir on the loader path too (LD_LIBRARY_PATH/rpath) —
 # unexercised; adjust from what the first build there reports.
+#
+# shim_dir/shim_filename — the compiled shim's destination, mirroring
+# occt-sys: the vision package's staged layout
+# (dist/package/com.greyhound.vision), where the shim gets its own
+# Plugins/shim/<arch> directory — the architecture in the directory
+# name, the same rule Unity's plugin resolution applies — separate
+# from the third-party OpenCV payload (Runtime/Plugins/opencv/<arch>/lib),
+# which the package's C# provisioner owns and which is never a build
+# output.
 
 [windows]
 toolchain      = "msvc"
@@ -28,7 +37,7 @@ include_dir    = "include"
 lib_dir        = "x64/vc17/lib"
 import_pattern = "opencv_{module}500.lib"
 modules        = ["core", "imgproc", "imgcodecs", "objdetect"]
-shim_dir       = "dist/opencv"
+shim_dir       = "dist/package/com.greyhound.vision/Runtime/Plugins/shim/x86_64"
 shim_filename  = "ghcv.dll"
 
 [linux]
@@ -43,7 +52,7 @@ include_dir    = "include"
 lib_dir        = "lib"
 import_pattern = "libopencv_{module}.so"
 modules        = ["core", "imgproc", "imgcodecs", "objdetect"]
-shim_dir       = "dist/opencv"
+shim_dir       = "dist/package/com.greyhound.vision/Runtime/Plugins/shim/x86_64"
 shim_filename  = "libghcv.so"
 
 [macos]
@@ -57,5 +66,5 @@ include_dir    = "include"
 lib_dir        = "lib"
 import_pattern = "libopencv_{module}.dylib"
 modules        = ["core", "imgproc", "imgcodecs", "objdetect"]
-shim_dir       = "dist/opencv"
+shim_dir       = "dist/package/com.greyhound.vision/Runtime/Plugins/shim/arm64"
 shim_filename  = "libghcv.dylib"

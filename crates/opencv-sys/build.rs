@@ -8,8 +8,9 @@ use std::{
 // shim is a plain C++ shared library compiled by the section's
 // toolchain (msvc: cl.exe driving link.exe; gnu: the cc crate's
 // compiler driving the linker), and the artifact lands in the
-// repo-local shim directory, separate from the third-party OpenCV
-// tree it bridges. The windows section is exercised (bite V1); the
+// vision package's shim plugins directory inside the staged package
+// layout, separate from the third-party OpenCV tree it bridges. The
+// windows section is exercised (bite V1); the
 // linux/macos sections and their gnu arm are pre-populated and wait
 // for their first run on a target machine.
 

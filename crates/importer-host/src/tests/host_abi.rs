@@ -3,6 +3,7 @@ use crate::{HostMeshCounts, HostSceneCounts, guard::guard, last_error};
 use unity_projection::{ProjectionSettings, UnitySubMesh, UnityVertex, project_scene};
 
 use libloading::{Library, Symbol};
+use serial_test::serial;
 use std::{
     ffi::{CStr, CString, c_char, c_void},
     path::{Path, PathBuf},
@@ -93,6 +94,10 @@ fn given_cleared_error_when_queried_then_pointer_is_null() {
 }
 
 #[test]
+// Serial: the cdylib's state is process-global (last_error buffer, the
+// dlopen'd shim, the OCCT runtime behind it) — the harness's parallel
+// threads must not run the two cdylib tests concurrently.
+#[serial]
 fn given_real_occt_when_importing_an_assembly_then_the_scene_matches_the_direct_pipeline() {
     // given
     let root = workspace_root();
@@ -281,6 +286,9 @@ fn given_real_occt_when_importing_an_assembly_then_the_scene_matches_the_direct_
     }
 }
 #[test]
+// Serial: see given_real_occt — the two cdylib tests share one
+// process-global module and must not interleave.
+#[serial]
 fn given_host_abi_when_calls_fail_then_status_and_error_report_the_cause() {
     // given
     let root = workspace_root();

@@ -1,0 +1,10 @@
+{
+    "name": "com.greyhound.vision.runtime",
+    "rootNamespace": "Greyhound.Vision",
+    "references": [
+        "com.greyhound.step.runtime"
+    ],
+    "internalsVisibleTo": [
+        "com.greyhound.vision.editor"
+    ]
+}

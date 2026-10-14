@@ -7,12 +7,13 @@
 # cdylib filename differs, branching on `uname`.
 set windows-shell := ["powershell.exe", "-NoLogo", "-Command"]
 
-# Assemble the production package into dist: stage the authored skeleton
-# sources plus the fetch config the package's C# provisioner reads, then
-# add the host cdylib; build.rs rebuilds the shim into the package. The
-# OCCT payload (Runtime/Plugins/occt) is NONE of this recipe's business
-# on any platform — not asserted, not read, not written; the package's
-# C# provisioner owns it exclusively.
+# Assemble the production packages into dist: stage the authored skeleton
+# sources plus the fetch config each package's C# provisioner reads, then
+# add the host cdylib (step package only — the vision package has none
+# yet); build.rs rebuilds the shims into the packages. The third-party
+# payloads (Runtime/Plugins/occt, Runtime/Plugins/opencv) are NONE of
+# this recipe's business on any platform — not asserted, not read, not
+# written; the packages' C# provisioners own them exclusively.
 [linux]
 [macos]
 assemble-package:
@@ -34,13 +35,15 @@ assemble-package:
     esac
     host="$package/Runtime/Plugins/$archdir"
     shim="$package/Runtime/Plugins/shim/$archdir"
+    vision="dist/package/com.greyhound.vision"
+    vision_shim="$vision/Runtime/Plugins/shim/$archdir"
 
     # Stage the authored skeleton sources wholesale; the provisioned
     # payload and the shim (cargo build output) survive untouched. The
     # steps below the shim check are non-destructive, and the host copy
     # overwrites in place — a failed run must leave the previously
     # assembled package intact (the Windows body's rule).
-    mkdir -p "$shim" "$host"
+    mkdir -p "$shim" "$host" "$vision_shim"
 
     cp -r package/com.greyhound.step/. "$package/"
     cp crates/extern-fetch/config.toml "$package/Editor/occt-fetch.toml"
@@ -59,14 +62,34 @@ assemble-package:
 
     cp "target/release/libimporter_host.$extension" "$host/libimporter_host.$extension"
 
-    # The listing prunes Plugins/occt entirely (-prune: no descent, no
-    # read inside it) — the recipe's own products are what it names.
-    echo "dist/package assembled:"
-    find dist/package -path '*Runtime/Plugins/occt*' -prune -o -type f -print | sort
+    # The vision package: the same staging model as the step package —
+    # authored skeleton wholesale (the built ghcv shim survives), the
+    # fetch config under the opencv-fetch.toml name its provisioner
+    # reads, then a forced opencv-sys rebuild so the fresh shim lands in
+    # the package. The OpenCV payload (Runtime/Plugins/opencv) is none
+    # of this recipe's business — the vision package's C# provisioner
+    # owns it exclusively. No host cdylib copy: the vision package has
+    # none yet.
+    cp -r package/com.greyhound.vision/. "$vision/"
+    cp crates/extern-fetch/config.toml "$vision/Editor/opencv-fetch.toml"
 
-# Windows counterpart of assemble-package: stages the authored skeleton,
-# the fetch config, and the host cdylib; build.rs rebuilds the shim into
-# the package. The body is a script launcher because just runs Windows
+    touch crates/opencv-sys/build.rs
+    cargo build --release -p opencv-sys
+
+    if [ ! -e "$vision_shim/libghcv.$extension" ]; then
+        echo "missing prerequisite: $vision_shim/libghcv.$extension (cargo build produced no shim)" >&2
+        exit 1
+    fi
+
+    # The listing prunes the provisioned payload dirs entirely (-prune:
+    # no descent, no read inside them) — the recipe's own products are
+    # what it names.
+    echo "dist/package assembled:"
+    find dist/package \( -path '*Runtime/Plugins/occt*' -o -path '*Runtime/Plugins/opencv*' \) -prune -o -type f -print | sort
+
+# Windows counterpart of assemble-package: stages the authored skeletons,
+# the fetch configs, and the host cdylib (step package); build.rs
+# rebuilds the shims into the packages. The body is a script launcher because just runs Windows
 # recipe lines one process per line: cross-line variables and multi-line
 # blocks do not survive in a recipe body; the logic lives in
 # tools/assemble-package.ps1.
@@ -141,6 +164,7 @@ fetch-occt:
 validate:
     cargo build -p occt-sys
     cargo build -p opencv-sys
+    cargo build -p importer-host
     cargo fmt
     cargo check
     cargo clippy --workspace --all-targets

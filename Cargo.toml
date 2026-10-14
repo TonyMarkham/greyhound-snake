@@ -25,6 +25,7 @@ goblin           = { version = "0.10.7" }
 libloading       = { version = "0.9.0" }
 png              = { version = "0.18.1" }
 serde            = { version = "1.0.229", features = ["derive"] }
+serial_test      = { version = "4.0.1" }
 sha2             = { version = "0.11.1" }
 tempfile         = { version = "3.27.0" }
 thiserror        = { version = "2.0.21" }

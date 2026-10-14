@@ -1,0 +1,11 @@
+{
+    "name": "com.greyhound.vision.editor",
+    "rootNamespace": "Greyhound.Vision",
+    "references": [
+        "com.greyhound.vision.runtime",
+        "com.greyhound.step.runtime"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ]
+}
