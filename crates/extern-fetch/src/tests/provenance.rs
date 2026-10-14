@@ -51,6 +51,27 @@ fn matches_requires_equal_coordinates() {
 }
 
 #[test]
+fn matches_ignores_the_tool_field() {
+    // The Unity package's C# provisioner leaves its own marker on the
+    // shared payload destination (refactor-repo.md D8), recording its
+    // tool name; ownership is the coordinates plus hash, so its marker
+    // is honored here and this tool's markers are honored in Unity.
+    let temp = TempDir::new().unwrap();
+    let path = temp.path().join("payload.provenance.toml");
+    fs::write(
+        &path,
+        format!(
+            "tool = \"com.greyhound.step\"\ngroup = \"occt\"\nrole = \"payload\"\n\
+             repo = \"example/occt-dev\"\ntag = \"v9\"\nurl = \"{URL}\"\nsha256 = \"{SHA}\"\n"
+        ),
+    )
+    .unwrap();
+    let marker = Provenance::read(&path).unwrap();
+    assert!(marker.matches("occt", "payload", "example/occt-dev", "v9", URL, Some(SHA)));
+    assert_eq!(marker.sha256(), SHA);
+}
+
+#[test]
 fn read_reports_an_invalid_marker() {
     let temp = TempDir::new().unwrap();
     let path = temp.path().join("dev.provenance.toml");

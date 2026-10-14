@@ -6,8 +6,12 @@
 # in tools/*.ps1); Linux bodies are shebang scripts.
 set windows-shell := ["powershell.exe", "-NoLogo", "-Command"]
 
-# Assemble the production package into dist: skeleton sources plus the
-# native payload (host cdylib; shim and OCCT install compile in place).
+# Assemble the production package into dist: skeleton sources, the fetch
+# config the package's C# provisioner reads, and the native payload (host
+# cdylib; shim and OCCT install compile in place). The payload's lib/ is
+# NOT a build output — on Windows it is provisioned by `just fetch-occt`
+# (extern-fetch, [occt.windows.payload]); on Linux the OCCT install IS
+# the payload (occt-linux.md).
 [linux]
 assemble-package:
     #!/usr/bin/env bash
@@ -32,6 +36,7 @@ assemble-package:
     mkdir -p "$shim" "$host"
 
     cp -r package/com.greyhound.step/. "$package/"
+    cp crates/extern-fetch/config.toml "$package/Editor/occt-fetch.toml"
 
     touch crates/occt-sys/build.rs
     cargo build --release -p importer-host
@@ -41,14 +46,14 @@ assemble-package:
     echo "dist/package assembled:"
     find dist/package -type f | sort
 
-# Windows counterpart of assemble-package: build.rs stages the runtime
-# payload (the shim's DLL closure + licenses) and the shim itself straight
-# into the Plugins tree from the neutral install (occt-win.md step 2), so
-# the prerequisites assert that staging ran, not that an install tree
-# exists. The body is a script launcher because just runs Windows recipe
-# lines one process per line: cross-line variables and multi-line blocks
-# do not survive in a recipe body; the logic lives in
-# tools/assemble-package.ps1.
+# Windows counterpart of assemble-package: stages the authored skeleton,
+# the fetch config, and the host cdylib; build.rs rebuilds the shim into
+# the package. The OCCT payload lib/ is not built here — the prerequisite
+# asserts it was provisioned by `just fetch-occt` (extern-fetch,
+# [occt.windows.payload]). The body is a script launcher because just
+# runs Windows recipe lines one process per line: cross-line variables
+# and multi-line blocks do not survive in a recipe body; the logic lives
+# in tools/assemble-package.ps1.
 [windows]
 assemble-package:
     powershell -NoProfile -ExecutionPolicy Bypass -File tools/assemble-package.ps1

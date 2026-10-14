@@ -45,6 +45,11 @@ namespace Greyhound.Step
 
         private static void Import(AssetImportContext ctx)
         {
+            // A STEP import that arrives before the payload is usable
+            // fails with the provisioning message, never with a cryptic
+            // native loader error (refactor-repo.md D5).
+            StepPayloadProvisioner.EnsureReady();
+
             string assetName = Path.GetFileNameWithoutExtension(ctx.assetPath);
             StepHost host = StepHost.GetShared();
             using (StepDocument doc = host.OpenStep(ctx.assetPath))

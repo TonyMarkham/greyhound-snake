@@ -1,5 +1,4 @@
 use std::{
-    collections::HashSet,
     env,
     ffi::{OsStr, OsString},
     fs, io,
@@ -18,16 +17,6 @@ struct PlatformConfig {
     lib: PathBuf,
     // The shim's own plugins directory inside the package layout.
     shim_dir: PathBuf,
-    // The runtime payload destination: the package's OCCT directory the
-    // root config.toml's consumers point at. On Linux it equals the
-    // [linux] occt_prefix (the install IS the payload); on Windows the
-    // staging step fills its lib/.
-    payload_dir: PathBuf,
-    // The LGPL license and exception texts that travel with the binaries.
-    license_dir: PathBuf,
-    // Windows-only: the runtime DLL directory the staging step derives
-    // the shim's DLL closure from.
-    runtime_dir: Option<PathBuf>,
     // Filename patterns; {tk} is replaced by the toolkit name.
     toolkit_pattern: String,
     runtime_pattern: String,
@@ -53,9 +42,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let config = platform_config(&manifest)?;
     build_native_shim(&manifest, &config)?;
-    if config.runtime_dir.is_some() {
-        stage_runtime_payload(&config)?;
-    }
     build_loader_fixtures(&manifest, &config)?;
     Ok(())
 }
@@ -138,26 +124,6 @@ fn platform_config(manifest: &Path) -> Result<PlatformConfig, Box<dyn std::error
                     io::Error::other("occt-sys config.toml is missing the string key shim_dir")
                 })?,
         ),
-        payload_dir: repo_root.join(
-            table
-                .get("payload_dir")
-                .and_then(toml::Value::as_str)
-                .ok_or_else(|| {
-                    io::Error::other("occt-sys config.toml is missing the string key payload_dir")
-                })?,
-        ),
-        license_dir: repo_root.join(
-            table
-                .get("license_dir")
-                .and_then(toml::Value::as_str)
-                .ok_or_else(|| {
-                    io::Error::other("occt-sys config.toml is missing the string key license_dir")
-                })?,
-        ),
-        runtime_dir: section
-            .get("runtime_dir")
-            .and_then(toml::Value::as_str)
-            .map(|value| repo_root.join(&prefix_value).join(value)),
         toolkit_pattern: string("toolkit_pattern")?,
         runtime_pattern: string("runtime_pattern")?,
         shim_filename: string("shim_filename")?,
@@ -519,106 +485,6 @@ fn msvc_link_libs(config: &PlatformConfig) -> Result<Vec<String>, Box<dyn std::e
     }
     libs.sort();
     Ok(libs)
-}
-
-// The runtime payload's DLL closure, derived from the freshly built shim's
-// PE import table: every imported DLL is copied from the dev prefix's bin
-// directory, children first, so a version bump that changes the import
-// closure re-derives the payload automatically. Anything the system DLL
-// directory carries is skipped; anything else is a broken closure and
-// fails loudly.
-fn stage_runtime_payload(config: &PlatformConfig) -> Result<(), Box<dyn std::error::Error>> {
-    let runtime_dir = config
-        .runtime_dir
-        .as_ref()
-        .ok_or_else(|| io::Error::other("staging requires the runtime_dir key"))?;
-    let lib = config.payload_dir.join("lib");
-    // The payload carries exactly this closure: start from an empty lib/
-    // so a source or version bump that shrinks the closure cannot leave
-    // stale DLLs from the previous tree behind. Windows-only — on Linux
-    // the payload lib/ is the OCCT install and staging never runs.
-    if lib.exists() {
-        fs::remove_dir_all(&lib)?;
-    }
-    fs::create_dir_all(&lib)?;
-
-    // The LGPL license and exception travel with the binaries.
-    for license in ["LICENSE_LGPL_21.txt", "OCCT_LGPL_EXCEPTION.txt"] {
-        let source = config.license_dir.join(license);
-        if !source.is_file() {
-            return Err(
-                io::Error::other(format!("missing license text: {}", source.display())).into(),
-            );
-        }
-        fs::copy(&source, lib.join(license))?;
-    }
-
-    let system = env::var_os("SystemRoot")
-        .map(|root| PathBuf::from(root).join("System32"))
-        .ok_or_else(|| io::Error::other("missing SystemRoot"))?;
-    let shim = config.shim_dir.join(&config.shim_filename);
-    let shim_canonical = shim.canonicalize()?;
-
-    let mut queue: Vec<PathBuf> = vec![shim_canonical.clone()];
-    let mut seen: HashSet<PathBuf> = HashSet::new();
-    let mut sources: Vec<PathBuf> = Vec::new();
-    while let Some(source) = queue.pop() {
-        if !seen.insert(source.clone()) {
-            continue;
-        }
-        let bytes = fs::read(&source).map_err(|error| {
-            io::Error::other(format!("cannot read {}: {error}", source.display()))
-        })?;
-        for name in pe_imports(&bytes)? {
-            // The api-ms-* / ext-ms-* names are Windows API sets: never
-            // physical files, always resolved by the OS loader.
-            if name.starts_with("api-ms-") || name.starts_with("ext-ms-") {
-                continue;
-            }
-            let candidate = runtime_dir.join(&name);
-            if candidate.is_file() {
-                queue.push(candidate.canonicalize()?);
-            } else if system.join(&name).is_file() {
-                // System DLLs are resolved by the OS search path.
-                continue;
-            } else {
-                return Err(io::Error::other(format!(
-                    "{} requires {name}; not found in the OCCT bin directory \
-                     or the system DLL directory",
-                    source.display()
-                ))
-                .into());
-            }
-        }
-        sources.push(source);
-    }
-
-    // The shim itself is not part of the OCCT payload: it lives in its own
-    // first-party plugins directory.
-    sources.retain(|source| source != &shim_canonical);
-    let mut staged = 0usize;
-    for source in &sources {
-        let name = source
-            .file_name()
-            .ok_or_else(|| io::Error::other(format!("{} has no filename", source.display())))?;
-        fs::copy(source, lib.join(name))?;
-        staged += 1;
-    }
-    println!(
-        "cargo:warning=Runtime payload staged: {staged} DLLs + 2 licenses into {}",
-        lib.display()
-    );
-    Ok(())
-}
-
-fn pe_imports(bytes: &[u8]) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    let pe = goblin::pe::PE::parse(bytes)
-        .map_err(|error| io::Error::other(format!("invalid PE image: {error}")))?;
-    Ok(pe
-        .imports
-        .iter()
-        .map(|import| import.dll.to_owned())
-        .collect())
 }
 
 fn build_loader_fixtures(

@@ -24,15 +24,13 @@
 #                     adds no DLL dependency — so the closed import set
 #                     is whatever the shim actually uses.
 
-# The runtime payload destination — the directory the runtime consumers
-# (root config.toml's library_dir/shim_dir) point at. On Linux the install
-# IS this directory ([linux].occt_prefix equals it; occt-linux.md installs
-# straight into it); on Windows the staging step fills its lib/ with the
-# freshly built shim's DLL closure.
-payload_dir = "dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64"
-
-# The LGPL license and exception texts that travel with the binaries.
-license_dir = "third_party/occt"
+# The shim's output directory. The runtime payload beside it
+# (Runtime/Plugins/occt/x86_64) is NOT a build output: its lib/ is
+# provisioned — `just fetch-occt` extracts the [occt.windows.payload]
+# release archive there (crates/extern-fetch/config.toml), and the Unity
+# package's C# provisioner fetches the same archive from the copy of that
+# config staged into the package (refactor-repo.md D5/D8). On Linux the
+# payload is the OCCT install itself (occt-linux.md); no provisioning.
 
 shim_dir = "dist/package/com.greyhound.step/Runtime/Plugins/shim/x86_64"
 
@@ -51,8 +49,9 @@ shim_filename = "libgreyhound_occt.so"
 # Build-time inputs come from the pinned occt-dev release extraction
 # (crates/extern-fetch/config.toml; `just fetch-occt`): a unified CMake
 # install tree — headers under include/opencascade, import libraries
-# under lib, runtime DLLs under bin. The payload still carries runtime
-# DLLs only, so headers and import libraries are never staged into it.
+# under lib. The shim links against the dev import libraries at build
+# time; at run time it loads the payload DLLs, which come from the
+# provisioned [occt.windows.payload] extraction, not from this tree.
 occt_prefix = "extern/occt/8.0.1/win64-dev"
 toolchain = "msvc"
 include_dir = "include/opencascade"
@@ -61,12 +60,6 @@ toolkit_pattern = "{tk}.lib"
 runtime_pattern = "{tk}.dll"
 shim_filename = "greyhound_occt.dll"
 link_all_toolkits = true
-# Runtime DLLs for the payload: bin/ carries the full TK*.dll set and the
-# release builds no bundled third-party libraries (no FreeType, no IPP),
-# so the closure resolves from bin/ plus the system directory — there is
-# no third-party tree. The staging step derives the shim's DLL closure
-# from this directory. Relative to occt_prefix.
-runtime_dir = "bin"
 
 [macos]
 # Unexercised (AGENTS.md: the macOS integration is not yet exercised).

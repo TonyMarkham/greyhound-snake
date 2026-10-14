@@ -3,11 +3,19 @@ use crate::{ExternFetchError, ExternFetchResult};
 use serde::{Deserialize, Serialize};
 use std::{fs, path::Path};
 
-/// The sibling `<dest>.provenance.toml` file: the tool's ownership claim
-/// on a destination directory. A directory is trusted (and left
+/// The sibling `<dest>.provenance.toml` file: the provisioner's ownership
+/// claim on a destination directory. A directory is trusted (and left
 /// untouched) only when this marker exists and matches the config entry;
 /// anything else fails loudly and must be deleted by hand — the tool
 /// never deletes content it cannot prove it created.
+///
+/// Ownership is the coordinates plus hash, not the writing tool: the
+/// `tool` field is informational. Two provisioners share the package
+/// payload destination (refactor-repo.md D8) — this tool via `just
+/// fetch-occt`, and the Unity package's C# provisioner (tool
+/// `com.greyhound.step`) via the staged fetch config — and because both
+/// verify the same pinned sha256, a marker either wrote certifies the
+/// same bytes.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub(crate) struct Provenance {
     tool: String,
@@ -49,7 +57,10 @@ impl Provenance {
 
     /// True when this marker certifies exactly the config entry: same
     /// coordinates and — once the entry pins a hash — the same hash
-    /// (case-insensitive; release pages print lowercase).
+    /// (case-insensitive; release pages print lowercase). The `tool`
+    /// field is deliberately not compared: the package payload
+    /// destination is shared with the Unity C# provisioner, which records
+    /// its own tool name (see the type's doc comment).
     pub(crate) fn matches(
         &self,
         group: &str,
@@ -59,8 +70,7 @@ impl Provenance {
         url: &str,
         pinned_sha256: Option<&str>,
     ) -> bool {
-        if self.tool != "extern-fetch"
-            || self.group != group
+        if self.group != group
             || self.role != role
             || self.repo != repo
             || self.tag != tag

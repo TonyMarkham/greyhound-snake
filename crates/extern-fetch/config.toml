@@ -1,13 +1,16 @@
 # extern-fetch configuration — what to fetch, from where, and where it
 # extracts. One table per dependency group; per-OS sub-tables keyed
 # windows/linux/macos (a missing OS section is the platform gate); per-role
-# entries (`dev` = build-time headers + link libraries for the shim, `libs`
-# = runtime shared libraries for the payload pool). Consumers differ per
-# role: the `dev` entries feed the shim build (consumed from the
-# occt-sys-config-flip bite on); the `libs` entries have no consumer in
-# this repo yet — they are pinned ahead for the provisioning bite
-# (refactor-repo.md D7/D8) that wires extern-fetch and the C# provisioner
-# to the shared package payload path.
+# entries (`dev` = build-time headers + link libraries for the shim,
+# `payload` = runtime shared libraries provisioned into the package
+# payload dir). Consumers per role: the `dev` entries feed the shim build
+# via crates/occt-sys/config.toml; the `payload` entry is fetched by both
+# provisioners that share one destination — `just fetch-occt` here, and
+# the Unity package's C# provisioner, which reads the copy of this file
+# that `just assemble-package` stages into the package as
+# Editor/occt-fetch.toml (refactor-repo.md D5/D8). Linux has no payload
+# entry because occt-linux.md builds OCCT straight into the payload dir
+# (the install IS the payload) — there is nothing to fetch.
 #
 # Rules, all enforced by the tool and checkable by hand:
 #   - Every url must be a GitHub release asset of the group's own repo and
@@ -38,10 +41,10 @@ url    = "https://github.com/TonyMarkham/occt-dev/releases/download/v0.1.0/occt-
 sha256 = "8ceafbaad923b9bc724123b3d676a53f153fdbaecab714be3dd2cb2143b0dd11"
 dest   = "extern/occt/8.0.1/win64-dev"
 
-[occt.windows.libs]
+[occt.windows.payload]
 url    = "https://github.com/TonyMarkham/occt-dev/releases/download/v0.1.0/occt-8.0.1-x86_64-windows-dlls-only.zip"
 sha256 = "7a336357b8c87a97737a54acb48ece86df3a437730dc3a5d16dde5e853691203"
-dest   = "extern/occt/8.0.1/win64-libs"
+dest   = "dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64/lib"
 
 # sha256 for the Linux and macOS archives is pinned from the corresponding
 # build machine (or by running this tool there): the tool prints the hash,
@@ -52,17 +55,7 @@ url    = "https://github.com/TonyMarkham/occt-dev/releases/download/v0.1.0/occt-
 sha256 = ""
 dest   = "extern/occt/8.0.1/linux-x86_64-dev"
 
-[occt.linux.libs]
-url    = "https://github.com/TonyMarkham/occt-dev/releases/download/v0.1.0/occt-8.0.1-x86_64-linux-libs-only.zip"
-sha256 = ""
-dest   = "extern/occt/8.0.1/linux-x86_64-libs"
-
 [occt.macos.dev]
 url    = "https://github.com/TonyMarkham/occt-dev/releases/download/v0.1.0/occt-8.0.1-arm64-macos-dev.zip"
 sha256 = ""
 dest   = "extern/occt/8.0.1/macos-arm64-dev"
-
-[occt.macos.libs]
-url    = "https://github.com/TonyMarkham/occt-dev/releases/download/v0.1.0/occt-8.0.1-arm64-macos-libs-only.zip"
-sha256 = ""
-dest   = "extern/occt/8.0.1/macos-arm64-libs"

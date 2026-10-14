@@ -127,13 +127,18 @@ listed in Open items.
    idea: the provisioner's destination is the package tree's
    `Plugins/occt/`. Unity will import those files as assets (bounded
    `.meta` churn, all ignored).
-8. **`extern-fetch` and the C# provisioner share one payload path.** For
-   non-Unity validation, `extern-fetch` can extract the libs zip into the
-   same `Plugins/occt/` destination; manifest/hash checks keep the two
-   provisioners idempotent against one location. Pins parity: the C# pins
-   (embedded in the package, self-contained) must reference the same
-   release tag + hashes as `extern-fetch`'s config — two copies, one
-   contract, kept visible by a parity check (verify-package or a test).
+8. **`extern-fetch` and the C# provisioner share one payload path and
+   one config.** The C# provisioner does not embed pins: `just
+   assemble-package` stages `crates/extern-fetch/config.toml` into the
+   package as `Editor/occt-fetch.toml` and the provisioner reads its
+   `[occt.<platform>.payload]` entry from that copy — one source of pins,
+   refreshed on every assembly, no parity check needed. Ownership of the
+   shared destination is the provenance marker's coordinates + hash, not
+   the writing tool, so a marker either provisioner wrote certifies the
+   same bytes to both. (Amended 2026-10-14: originally "C# pins embedded
+   in the package + a parity check"; the staged copy replaces the
+   embedded copy.) The payload entry supersedes the old `libs` entries:
+   same archive, dest = the package payload's `lib/`.
 
 ## Repo layout after
 
@@ -210,6 +215,45 @@ Facts this landed run resolved:
   The libs-only zip is 50 DLLs + 3 legal texts, flat. The next bite
   rewrites `config.toml [windows]` to `include_dir = include/opencascade`,
   `lib_dir = lib`, `runtime_dir = bin`, and drops `thirdparty_dir`.
+
+- **2026-10-14 — provisioning bite** (D5/D6/D8, Unity side pending Unity
+  validation): the package provisions its OCCT payload at editor load.
+  `extern-fetch` gains `[occt.<os>.payload]` entries (the old `libs`
+  entries, retargeted at `dist/package/com.greyhound.step/Runtime/
+  Plugins/occt/x86_64/lib`) and the provenance marker's ownership drops
+  the `tool` field from `matches` so `just fetch-occt` and the C#
+  provisioner honor each other's markers (28 tests pass, including the
+  new cross-tool case). `build.rs` loses `stage_runtime_payload` /
+  `pe_imports` and the `payload_dir`/`license_dir`/`runtime_dir` config
+  keys — goblin stays only in `[dependencies]` for `dependencies.rs` —
+  so a cargo build no longer wipes the payload; `assemble-package`
+  (both recipes) stages the fetch config as the package's
+  `Editor/occt-fetch.toml` and its prerequisites assert the provisioned
+  payload. The C# provisioner (Editor/`StepToml`, `StepFetchConfig`,
+  `StepProvenance`, `StepProvisionState`, `StepPayloadProvisioner` in the
+  dist package) does marker check → `UnityWebRequest` download to a temp
+  file → streaming SHA-256 → zip-slip-guarded extract to a staging dir →
+  atomic move → marker write → `AssetDatabase.Refresh()`;
+  `StepImporter` calls `EnsureReady()` first so an early import fails
+  with a clear provisioning message. **Consequence, superseding D1's
+  payload note:** the provisioned payload is the full libs-zip content
+  (50 toolkits + 3 legal texts), not the shim-derived 23-DLL closure —
+  the closure derivation needs the built shim's PE import table, which
+  Unity does not have. **Validated in Unity 6000.7.0b4 (Windows),
+  2026-10-14; synced to the tracked `package/` tree (hash parity on all
+  six files).** The cold loop ran twice — payload dir deleted, Unity
+  restarted, the provisioner downloaded the ~50 MB zip, verified the
+  pin, extracted, wrote the marker, and the cart-pole STEP import
+  built — and the marker it wrote (`tool = "com.greyhound.step"`)
+  carries exactly the extern-fetch config's pin. Two Unity compile
+  fixes are part of this bite: `PackageInfo` is ambiguous between
+  `UnityEditor.PackageInfo` and `UnityEditor.PackageManager.PackageInfo`
+  (CS0104) — the provisioner qualifies the PackageManager one — and
+  Unity's statics lifecycle analyzer rejects unattributed static state
+  (UAL0010) — the provisioner carries `[NoAutoStaticsCleanup]` +
+  `partial`, mirroring `StepHost`. The warm path (marker present →
+  silent no-op on domain reload) is designed but not yet observed in an
+  editor session.
 
 - **2026-10-14 — `occt-sys` build-input flip** (D1): `[windows]` in
   `crates/occt-sys/config.toml` points at `extern/occt/8.0.1/win64-dev`
