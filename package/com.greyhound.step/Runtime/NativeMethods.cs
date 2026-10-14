@@ -5,16 +5,29 @@ using System.Runtime.InteropServices;
 namespace Greyhound.Step
 {
     // P/Invoke surface of the importer-host cdylib. Unity resolves
-    // "importer_host" against the package's Runtime/Plugins/x86_64 plugin.
+    // "importer_host" against the package's Runtime/Plugins/<arch>
+    // plugin, <arch> being the platform's plugin architecture (arm64 on
+    // macOS, x86_64 elsewhere) — the same rule that names the payload
+    // and shim directories below.
     public static class NativeMethods
     {
         private const string Library = "importer_host";
 
         public const int AbiVersion = 4;
 
+        // The plugin architecture of the platform the editor runs on:
+        // macOS ships arm64 bits only; every other platform stages
+        // x86_64. Names the host plugin folder Unity resolves through,
+        // and the payload and shim directories the host dlopen's by
+        // explicit path.
+        public static string PluginArch()
+        {
+            return RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? "arm64" : "x86_64";
+        }
+
         public static string OcctLibraryDirectory()
         {
-            return Path.Combine(PluginsDirectory(), "occt", "x86_64", "lib");
+            return Path.Combine(PluginsDirectory(), "occt", PluginArch(), "lib");
         }
 
         // The shim is passed as a directory: the native loader appends the
@@ -22,7 +35,7 @@ namespace Greyhound.Step
         // config.toml), so this side must never name the file.
         public static string ShimDirectory()
         {
-            return Path.Combine(PluginsDirectory(), "shim", "x86_64");
+            return Path.Combine(PluginsDirectory(), "shim", PluginArch());
         }
 
         private static string PluginsDirectory()

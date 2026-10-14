@@ -115,12 +115,16 @@ listed in Open items.
    neutral install under `dist/`, no assembled copy under `dist/package/`.
    The built and provisioned payload lives inside the tracked package tree
    and is ignored there:
-   - `package/com.greyhound.step/Runtime/Plugins/x86_64/` — host cdylib
+   - `package/com.greyhound.step/Runtime/Plugins/<arch>/` — host cdylib
      (cargo build output);
-   - `package/com.greyhound.step/Runtime/Plugins/shim/x86_64/` — shim
+   - `package/com.greyhound.step/Runtime/Plugins/shim/<arch>/` — shim
      (cargo build output);
-   - `package/com.greyhound.step/Runtime/Plugins/occt/x86_64/` —
+   - `package/com.greyhound.step/Runtime/Plugins/occt/<arch>/` —
      provisioned libs zip contents (OCCT libs + legal texts).
+   `<arch>` is the platform's plugin architecture: `arm64` on macOS,
+   `x86_64` on Linux/Windows (amended 2026-10-14, first macOS Unity
+   exercise: Unity resolves native plugins per architecture folder and
+   the arm64 editor never loads from `x86_64/`).
    All of `Runtime/Plugins/` is ignored (binaries plus Unity's minted
    `.meta` for them); authored sources keep tracked `.meta`.
    This supersedes the earlier "extract into a project-local hidden dir"
@@ -150,9 +154,10 @@ listed in Open items.
 
 ```
 package/com.greyhound.step/            # tracked — authored sources + committed .meta
-  Runtime/Plugins/x86_64/              # ignored — host cdylib (cargo build output)
-  Runtime/Plugins/shim/x86_64/         # ignored — shim (cargo build output)
-  Runtime/Plugins/occt/x86_64/         # ignored — provisioned libs zip (libs + legal texts)
+  Runtime/Plugins/<arch>/              # ignored — host cdylib (cargo build output)
+  Runtime/Plugins/shim/<arch>/         # ignored — shim (cargo build output)
+  Runtime/Plugins/occt/<arch>/         # ignored — provisioned libs zip (libs + legal texts)
+                                       # <arch>: arm64 on macOS, x86_64 elsewhere
 extern/                                # ignored — fetched dev/libs zip extractions
   occt/8.0.1/
     win64-dev/  win64-libs/  linux-x86_64-dev/  linux-x86_64-libs/
@@ -359,6 +364,26 @@ Facts this landed run resolved:
   passes (43 nodes, 20 meshes, mass properties). The payload
   (`Runtime/Plugins/occt`) is now written and read by the C# provisioner
   alone, on every platform.
+- **2026-10-14 — macOS plugin-architecture directories** (first macOS
+  Unity exercise, arm64): Unity resolves native plugins per
+  architecture folder, and the arm64 editor never loads from `x86_64/`
+  — the staged host cdylib there failed with
+  `DllNotFoundException: importer_host` while everything dlopen'd by
+  explicit path (shim, payload) kept working. `<arch>` is now per-OS
+  everywhere the layout names it: the host plugin folder
+  (`assemble-package` branches on `uname`; verify-package follows), the
+  shim dir (`shim_dir` moved from the top level into the per-OS
+  sections of `crates/occt-sys/config.toml` and the root `config.toml`,
+  `build.rs` reads it from the section, the Rust consumers' `OcctConfig`
+  select it per target), the payload dir (the C# provisioner and
+  `NativeMethods` derive it at runtime via `NativeMethods.PluginArch()`),
+  and the `[occt.macos.payload]` dest. The arm64 macOS tessellation of
+  cart-asy differs from the Linux pin by one ring band on a curved face
+  (64 verts / 128 tris, deterministic run to run) — the verify script's
+  exact totals now assert on Linux only, per user decision, printing
+  the measured totals everywhere. Verified on the arm64 Mac: cargo
+  build/test green across the workspace, `just verify-package` passes,
+  and the STEP imports in Unity 6000.7.0b4.
 
 ## Open items
 

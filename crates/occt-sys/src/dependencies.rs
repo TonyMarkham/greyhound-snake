@@ -2,6 +2,8 @@ use crate::{OcctError, OcctResult, native_library::Library};
 
 #[cfg(target_os = "linux")]
 use goblin::elf::Elf;
+#[cfg(target_os = "macos")]
+use goblin::mach::MachO;
 #[cfg(target_os = "windows")]
 use goblin::pe::PE;
 use std::{
@@ -122,6 +124,40 @@ fn dependency_names(
     Ok(elf.libraries.into_iter().map(String::from).collect())
 }
 
+// Mach-O dependency install names (LC_LOAD_DYLIB and its load/reexport/
+// weak/lazy relatives). Install names are path-based by convention —
+// @rpath/libTKernel.dylib for the OCCT toolkits, /usr/lib/libSystem.B.dylib
+// for system libraries — while the walk resolves bare filenames against
+// `directory`, so keep only the final path component. libs[0] carries the
+// file's own install name (LC_ID_DYLIB), or goblin's "self" placeholder
+// when absent: identification, not a dependency. The rest deduplicate
+// through `seen`.
+#[cfg(target_os = "macos")]
+fn dependency_names(
+    bytes: &[u8],
+    file: &Path,
+    directory: &Path,
+    shim: &Path,
+) -> OcctResult<Vec<String>> {
+    let macho = MachO::parse(bytes, 0).map_err(|error| {
+        OcctError::load(
+            directory,
+            shim,
+            format!("invalid Mach-O file {}: {error}", file.display()),
+        )
+    })?;
+    Ok(macho
+        .libs
+        .into_iter()
+        .skip(1)
+        .map(|name| match name.rsplit_once('/') {
+            Some((_, base)) => base,
+            None => name,
+        })
+        .map(String::from)
+        .collect())
+}
+
 #[cfg(target_os = "windows")]
 fn dependency_names(
     bytes: &[u8],
@@ -146,8 +182,15 @@ fn dependency_names(
 }
 
 // The filename prefix every OCCT toolkit library carries on this platform
-// (libTKernel.so on Linux, TKernel.dll on Windows).
+// (libTKernel.so on Linux, libTKernel.dylib on macOS, TKernel.dll on
+// Windows). On macOS the install names were reduced to bare filenames
+// upstream, so the prefix check sees the same shape as Linux's sonames.
 #[cfg(target_os = "linux")]
+fn toolkit_prefix() -> &'static str {
+    "libTK"
+}
+
+#[cfg(target_os = "macos")]
 fn toolkit_prefix() -> &'static str {
     "libTK"
 }

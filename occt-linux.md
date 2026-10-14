@@ -205,7 +205,7 @@ Unity importer or its UPM package.
 > assets/rod-clamp-16mm.stp        # validation asset
 > ```
 
-> `crates/occt-sys/config.toml` — the sole input source for `build.rs` — must point the `[linux]` section's `occt_prefix` at the repo-relative `dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64` — the install prefix from step 2 — and the top-level `shim_dir` at `dist/package/com.greyhound.step/Runtime/Plugins/shim/x86_64` (update the values if they differ). `build.rs` uses `include/opencascade` and `lib` under `occt_prefix`, compiles the three C++ shims as C++17, and links these eleven toolkits (the XCAF pair carry the color/assembly document layer):
+> `crates/occt-sys/config.toml` — the sole input source for `build.rs` — must point the `[linux]` section's `occt_prefix` at the repo-relative `dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64` — the install prefix from step 2 — and the `[linux]` section's `shim_dir` at `dist/package/com.greyhound.step/Runtime/Plugins/shim/x86_64` (update the values if they differ). `build.rs` uses `include/opencascade` and `lib` under `occt_prefix`, compiles the three C++ shims as C++17, and links these eleven toolkits (the XCAF pair carry the color/assembly document layer):
 >
 > ```
 > TKernel TKMath TKGeomBase TKBRep TKPrim TKTopAlgo TKMesh TKXSBase TKDESTEP TKLCAF TKXCAF

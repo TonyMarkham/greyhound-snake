@@ -15,8 +15,9 @@ namespace Greyhound.Step
 {
     // Provisions the OCCT payload — the native shared libraries the
     // importer dlopen's — into the package's
-    // Runtime/Plugins/occt/x86_64/lib at editor load (refactor-repo.md
-    // D5/D6): the UPM package ships light and downloads the pinned
+    // Runtime/Plugins/occt/<arch>/lib at editor load (refactor-repo.md
+    // D5/D6), <arch> from NativeMethods.PluginArch(): the UPM package
+    // ships light and downloads the pinned
     // release archive instead. UPM has no install-time hook, so the
     // handshake point is editor assembly load; a STEP import that
     // arrives before provisioning is done fails with a clear message
@@ -36,7 +37,6 @@ namespace Greyhound.Step
     internal static partial class StepPayloadProvisioner
     {
         private const string PackageAssetPath = "Packages/com.greyhound.step";
-        private const string PayloadRelPath = "Runtime/Plugins/occt/x86_64/lib";
 
         private static StepProvisionState state = StepProvisionState.NotStarted;
         private static string status = string.Empty;
@@ -87,7 +87,7 @@ namespace Greyhound.Step
             {
                 string packageRoot = PackageRoot();
                 string payloadDir = Path.Combine(
-                    packageRoot, "Runtime", "Plugins", "occt", "x86_64", "lib");
+                    packageRoot, "Runtime", "Plugins", "occt", NativeMethods.PluginArch(), "lib");
                 string markerPath = payloadDir + ".provenance.toml";
                 StepFetchConfig config = StepFetchConfig.Load(packageRoot);
 

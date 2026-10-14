@@ -1,10 +1,11 @@
 # Runtime inputs for the Rust-side OCCT consumers (greyhound-export-mjc,
-# step-stats). library_dir is per-OS because the dev trees' runtime
-# libraries sit in different subdirectories (bin/ on Windows, lib/
-# elsewhere); the section matching the build target supplies it — a
-# missing section is the platform gate, the same rule
-# crates/occt-sys/config.toml applies. The shim directory is
-# host-neutral: cargo writes the shim there in every profile.
+# step-stats). Both keys are per-OS: library_dir because the dev trees'
+# runtime libraries sit in different subdirectories (bin/ on Windows,
+# lib/ elsewhere), and shim_dir because the package plugin directories
+# carry the platform's plugin architecture in their name (arm64 on
+# macOS, x86_64 elsewhere). The section matching the build target
+# supplies both — a missing section is the platform gate, the same rule
+# crates/occt-sys/config.toml applies.
 #
 # NOTHING on the Rust side reads or writes the package's provisioned
 # payload (Runtime/Plugins/occt): that directory belongs exclusively to
@@ -12,14 +13,14 @@
 # 2026-10-14). The dev trees under extern/ are the Rust side's runtime
 # sandbox; paths resolve against the config's parent (the repo root).
 
-[occt]
-shim_dir = "dist/package/com.greyhound.step/Runtime/Plugins/shim/x86_64"
-
 [occt.linux]
+shim_dir = "dist/package/com.greyhound.step/Runtime/Plugins/shim/x86_64"
 library_dir = "extern/occt/8.0.1/linux-x86_64-dev/lib"
 
 [occt.windows]
+shim_dir = "dist/package/com.greyhound.step/Runtime/Plugins/shim/x86_64"
 library_dir = "extern/occt/8.0.1/win64-dev/bin"
 
 [occt.macos]
+shim_dir = "dist/package/com.greyhound.step/Runtime/Plugins/shim/arm64"
 library_dir = "extern/occt/8.0.1/macos-arm64-dev/lib"

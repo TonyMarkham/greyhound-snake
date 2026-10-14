@@ -37,6 +37,8 @@ fn host_artifact() -> PathBuf {
     // platform-specific.
     let name = if cfg!(target_os = "windows") {
         "importer_host.dll"
+    } else if cfg!(target_os = "macos") {
+        "libimporter_host.dylib"
     } else {
         "libimporter_host.so"
     };

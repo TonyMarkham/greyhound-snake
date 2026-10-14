@@ -18,21 +18,25 @@
 #   runtime_pattern   Runtime library filename per toolkit, {tk} replaced;
 #                     the loader-test fixture stubs carry this name.
 #   shim_filename     The shim artifact build.rs writes into shim_dir.
+#   shim_dir          The shim's output directory inside the package
+#                     layout. Per-OS because the directory carries the
+#                     platform's plugin architecture in its name (arm64
+#                     on macOS, x86_64 elsewhere) — the same rule the
+#                     host cdylib's Plugins/<arch> folder follows for
+#                     Unity's plugin resolution. The runtime payload
+#                     beside it (Runtime/Plugins/occt/<arch>) is NOT a
+#                     build output on any platform: its lib/ is
+#                     provisioned from the [occt.<os>.payload] entry of
+#                     crates/extern-fetch/config.toml — by the Unity
+#                     package's C# provisioner from the copy of that
+#                     config staged into the package (refactor-repo.md
+#                     D5/D8). Build-time inputs come from the
+#                     [occt.<os>.dev] extractions under extern/.
 #   link_all_toolkits MSVC only: link every TK*.lib in lib_dir. link.exe
 #                     has no ELF-style transitive search through a DLL's
 #                     own dependencies, while an unused import library
 #                     adds no DLL dependency — so the closed import set
 #                     is whatever the shim actually uses.
-
-# The shim's output directory. The runtime payload beside it
-# (Runtime/Plugins/occt/x86_64) is NOT a build output on any platform:
-# its lib/ is provisioned from the [occt.<os>.payload] entry of
-# crates/extern-fetch/config.toml — by `just fetch-occt` here, or the
-# Unity package's C# provisioner from the copy of that config staged
-# into the package (refactor-repo.md D5/D8). Build-time inputs come from
-# the [occt.<os>.dev] extractions under extern/.
-
-shim_dir = "dist/package/com.greyhound.step/Runtime/Plugins/shim/x86_64"
 
 [linux]
 # Build-time inputs come from the pinned occt-dev release extraction
@@ -49,6 +53,7 @@ lib_dir = "lib"
 toolkit_pattern = "lib{tk}.so"
 runtime_pattern = "lib{tk}.so"
 shim_filename = "libgreyhound_occt.so"
+shim_dir = "dist/package/com.greyhound.step/Runtime/Plugins/shim/x86_64"
 
 [windows]
 # Build-time inputs come from the pinned occt-dev release extraction
@@ -64,13 +69,16 @@ lib_dir = "lib"
 toolkit_pattern = "{tk}.lib"
 runtime_pattern = "{tk}.dll"
 shim_filename = "greyhound_occt.dll"
+shim_dir = "dist/package/com.greyhound.step/Runtime/Plugins/shim/x86_64"
 link_all_toolkits = true
 
 [macos]
-# Unexercised (AGENTS.md: the macOS integration is not yet exercised).
+# Exercised on the arm64 Mac (2026-10-14): the pinned dev extraction
+# fetched and hash-verified, the shim compiled with the gnu macos flag
+# arm, the Mach-O dependency walk and loader tests green, and the real
+# cart-asy STEP import passing end to end through the package.
 # Follows the Windows/Linux model — build inputs from the dev
-# extraction, runtime payload provisioned; nothing here has run on a
-# Mac, so the hashes are unpinned and the first run there records them.
+# extraction, runtime payload provisioned.
 occt_prefix = "extern/occt/8.0.1/macos-arm64-dev"
 toolchain = "gnu"
 include_dir = "include/opencascade"
@@ -78,3 +86,4 @@ lib_dir = "lib"
 toolkit_pattern = "lib{tk}.dylib"
 runtime_pattern = "lib{tk}.dylib"
 shim_filename = "libgreyhound_occt.dylib"
+shim_dir = "dist/package/com.greyhound.step/Runtime/Plugins/shim/arm64"

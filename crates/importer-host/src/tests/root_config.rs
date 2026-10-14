@@ -13,7 +13,6 @@ struct RootConfig {
 
 #[derive(Deserialize)]
 struct RootOcct {
-    shim_dir: PathBuf,
     #[serde(default)]
     linux: Option<PlatformSection>,
     #[serde(default)]
@@ -25,6 +24,7 @@ struct RootOcct {
 #[derive(Deserialize)]
 struct PlatformSection {
     library_dir: PathBuf,
+    shim_dir: PathBuf,
 }
 
 /// `(library_dir, shim_dir)` for this build target, resolved against
@@ -61,12 +61,12 @@ pub(crate) fn occt_dirs(repo_root: &Path) -> (PathBuf, PathBuf) {
             )
         });
     let shim_dir = repo_root
-        .join(&config.occt.shim_dir)
+        .join(&section.shim_dir)
         .canonicalize()
         .unwrap_or_else(|error| {
             panic!(
                 "occt.shim_dir {} is missing (package not assembled?): {error}",
-                config.occt.shim_dir.display()
+                section.shim_dir.display()
             )
         });
     (library_dir, shim_dir)

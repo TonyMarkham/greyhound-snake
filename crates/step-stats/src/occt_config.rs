@@ -1,14 +1,16 @@
 use serde::Deserialize;
 use std::path::PathBuf;
 
-/// The `[occt]` table: the host-neutral shim directory plus per-OS
-/// library directories. `library_dir` lives in a per-OS sub-table
-/// because the dev trees' runtime libraries sit in different
-/// subdirectories (`bin/` on Windows, `lib/` elsewhere) — the section
-/// matching the build target supplies it, and a missing section is the
-/// platform gate, the same rule crates/occt-sys/config.toml applies.
-/// The deserialized `library_dir` field is the selected and resolved
-/// one; the TOML never names it directly at the `[occt]` level.
+/// The `[occt]` table: per-OS shim and library directories. Both live
+/// in a per-OS sub-table: `library_dir` because the dev trees' runtime
+/// libraries sit in different subdirectories (`bin/` on Windows,
+/// `lib/` elsewhere), and `shim_dir` because the package plugin
+/// directories carry the platform's plugin architecture in their name
+/// (`arm64` on macOS, `x86_64` elsewhere) — the section matching the
+/// build target supplies both, and a missing section is the platform
+/// gate, the same rule crates/occt-sys/config.toml applies. The
+/// deserialized `library_dir` and `shim_dir` fields are the selected
+/// and resolved ones; the TOML never names them at the `[occt]` level.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct OcctConfig {
@@ -20,6 +22,7 @@ pub struct OcctConfig {
     macos: Option<PlatformOcct>,
     #[serde(skip)]
     pub library_dir: PathBuf,
+    #[serde(skip)]
     pub shim_dir: PathBuf,
 }
 
@@ -27,6 +30,7 @@ pub struct OcctConfig {
 #[serde(deny_unknown_fields)]
 struct PlatformOcct {
     library_dir: PathBuf,
+    shim_dir: PathBuf,
 }
 
 impl OcctConfig {
@@ -50,6 +54,18 @@ impl OcctConfig {
             self.macos.as_ref().map(|platform| &platform.library_dir)
         } else {
             self.linux.as_ref().map(|platform| &platform.library_dir)
+        }
+    }
+
+    /// The build target's `shim_dir`, before resolution; the same
+    /// platform gate as `library_dir`.
+    pub(crate) fn selected_shim_dir(&self) -> Option<&PathBuf> {
+        if cfg!(target_os = "windows") {
+            self.windows.as_ref().map(|platform| &platform.shim_dir)
+        } else if cfg!(target_os = "macos") {
+            self.macos.as_ref().map(|platform| &platform.shim_dir)
+        } else {
+            self.linux.as_ref().map(|platform| &platform.shim_dir)
         }
     }
 }

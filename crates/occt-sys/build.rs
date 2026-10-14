@@ -116,14 +116,7 @@ fn platform_config(manifest: &Path) -> Result<PlatformConfig, Box<dyn std::error
         toolchain,
         include: repo_root.join(&prefix_value).join(string("include_dir")?),
         lib: repo_root.join(&prefix_value).join(string("lib_dir")?),
-        shim_dir: repo_root.join(
-            table
-                .get("shim_dir")
-                .and_then(toml::Value::as_str)
-                .ok_or_else(|| {
-                    io::Error::other("occt-sys config.toml is missing the string key shim_dir")
-                })?,
-        ),
+        shim_dir: repo_root.join(string("shim_dir")?),
         toolkit_pattern: string("toolkit_pattern")?,
         runtime_pattern: string("runtime_pattern")?,
         shim_filename: string("shim_filename")?,

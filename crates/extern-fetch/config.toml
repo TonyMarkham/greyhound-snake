@@ -80,4 +80,4 @@ dest   = "extern/occt/8.0.1/macos-arm64-dev"
 [occt.macos.payload]
 url    = "https://github.com/TonyMarkham/occt-dev/releases/download/v0.1.0/occt-8.0.1-arm64-macos-libs-only.zip"
 sha256 = "55e79bf9fc01cbdc7bc1886b6bb04e22c06b87842d8373f474931b70ab9925ad"
-dest   = "dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64/lib"
+dest   = "dist/package/com.greyhound.step/Runtime/Plugins/occt/arm64/lib"

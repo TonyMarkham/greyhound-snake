@@ -13,9 +13,11 @@ fn library_path_is_relative_to_config() -> Result<(), Box<dyn std::error::Error>
         ("windows", "native/windows"),
         ("macos", "native/macos"),
     ];
-    let mut config_text = String::from("[occt]\nshim_dir = 'shim'\n\n");
+    let mut config_text = String::new();
     for (os, dir) in native_dirs {
-        config_text.push_str(&format!("[occt.{os}]\nlibrary_dir = '{dir}'\n\n"));
+        config_text.push_str(&format!(
+            "[occt.{os}]\nshim_dir = 'shim'\nlibrary_dir = '{dir}'\n\n"
+        ));
         fs::create_dir_all(root.path().join(dir))?;
     }
     let config = root.path().join("config.toml");
@@ -33,13 +35,11 @@ fn library_path_is_relative_to_config() -> Result<(), Box<dyn std::error::Error>
 
 #[test]
 fn missing_os_section_is_the_platform_gate() -> Result<(), Box<dyn std::error::Error>> {
-    // The shim dir exists; the section for THIS build target does not,
-    // so the load fails naming the section instead of resolving paths.
+    // The section for THIS build target does not exist, so the load
+    // fails naming the section instead of resolving paths.
     let root = tempfile::tempdir()?;
-    let shim = root.path().join("shim");
-    fs::create_dir(&shim)?;
     let config = root.path().join("config.toml");
-    fs::write(&config, "[occt]\nshim_dir = 'shim'\n")?;
+    fs::write(&config, "[occt]\n")?;
     let error = match AppConfig::load(&config) {
         Err(error) => error,
         Ok(_) => panic!("config without a section for this OS must not load"),
