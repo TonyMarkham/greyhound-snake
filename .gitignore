@@ -4,6 +4,9 @@ tmp/
 # dist
 dist/
 
+# extern cache (fetched release archives; refactor-repo.md D3)
+extern/
+
 # Build
 target/
 

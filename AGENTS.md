@@ -152,6 +152,10 @@ needs the user's Unity editor, use the dist-first loop.
   — OpenCV-compatible dictionary tables, selection mode
   (`--count`/`--seed`/`--min-distance`), SVG rendering; the CLI
   crate's `README.md` is its user manual (`aruco-svg.md`).
+- `crates/extern-fetch/` + its `config.toml`: fetches the pinned
+  `occt-dev` release archives into the gitignored `extern/` cache
+  (download → SHA-256 verify → extract → sibling provenance marker);
+  `just fetch-occt` runs it. Design record: `refactor-repo.md`.
 
 Design reference docs (source of truth for their facts; consult before
 mesh, projection, or export work instead of re-deriving):

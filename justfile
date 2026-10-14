@@ -63,3 +63,12 @@ verify-package: assemble-package
 [windows]
 verify-package: assemble-package
     python tools/verify-package.py
+
+# Fetch the pinned occt-dev release archives into the extern/ cache
+# (refactor-repo.md D3/D4): download -> sha256 verify -> extract ->
+# provenance marker. Unpinned entries extract + report the hash and fail
+# the run; pin the reported hash into crates/extern-fetch/config.toml.
+[windows]
+[linux]
+fetch-occt:
+    cargo run -p extern-fetch -- --group occt
