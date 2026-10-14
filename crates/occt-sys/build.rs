@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     env,
     ffi::{OsStr, OsString},
     fs, io,
@@ -25,10 +25,9 @@ struct PlatformConfig {
     payload_dir: PathBuf,
     // The LGPL license and exception texts that travel with the binaries.
     license_dir: PathBuf,
-    // Windows-only: the runtime DLL directories the staging step derives
+    // Windows-only: the runtime DLL directory the staging step derives
     // the shim's DLL closure from.
     runtime_dir: Option<PathBuf>,
-    thirdparty_dir: Option<PathBuf>,
     // Filename patterns; {tk} is replaced by the toolkit name.
     toolkit_pattern: String,
     runtime_pattern: String,
@@ -157,10 +156,6 @@ fn platform_config(manifest: &Path) -> Result<PlatformConfig, Box<dyn std::error
         ),
         runtime_dir: section
             .get("runtime_dir")
-            .and_then(toml::Value::as_str)
-            .map(|value| repo_root.join(&prefix_value).join(value)),
-        thirdparty_dir: section
-            .get("thirdparty_dir")
             .and_then(toml::Value::as_str)
             .map(|value| repo_root.join(&prefix_value).join(value)),
         toolkit_pattern: string("toolkit_pattern")?,
@@ -527,22 +522,24 @@ fn msvc_link_libs(config: &PlatformConfig) -> Result<Vec<String>, Box<dyn std::e
 }
 
 // The runtime payload's DLL closure, derived from the freshly built shim's
-// PE import table: every imported DLL is copied from the neutral install,
-// children first, so a version bump that changes the import closure
-// re-derives the payload automatically. TK-prefixed DLLs must resolve in
-// the OCCT bin directory; other DLLs may come from the third-party tree;
-// anything the system DLL directory carries is skipped; anything else is
-// a broken closure and fails loudly.
+// PE import table: every imported DLL is copied from the dev prefix's bin
+// directory, children first, so a version bump that changes the import
+// closure re-derives the payload automatically. Anything the system DLL
+// directory carries is skipped; anything else is a broken closure and
+// fails loudly.
 fn stage_runtime_payload(config: &PlatformConfig) -> Result<(), Box<dyn std::error::Error>> {
     let runtime_dir = config
         .runtime_dir
         .as_ref()
         .ok_or_else(|| io::Error::other("staging requires the runtime_dir key"))?;
-    let thirdparty_dir = config
-        .thirdparty_dir
-        .as_ref()
-        .ok_or_else(|| io::Error::other("staging requires the thirdparty_dir key"))?;
     let lib = config.payload_dir.join("lib");
+    // The payload carries exactly this closure: start from an empty lib/
+    // so a source or version bump that shrinks the closure cannot leave
+    // stale DLLs from the previous tree behind. Windows-only — on Linux
+    // the payload lib/ is the OCCT install and staging never runs.
+    if lib.exists() {
+        fs::remove_dir_all(&lib)?;
+    }
     fs::create_dir_all(&lib)?;
 
     // The LGPL license and exception travel with the binaries.
@@ -556,27 +553,6 @@ fn stage_runtime_payload(config: &PlatformConfig) -> Result<(), Box<dyn std::err
         fs::copy(&source, lib.join(license))?;
     }
 
-    // The third-party tree's layout varies per package (some ship DLLs in
-    // <package>/bin, some in <package>/bin/win64): index every DLL in the
-    // tree once and look up by filename, first package wins.
-    let mut thirdparty: HashMap<OsString, PathBuf> = HashMap::new();
-    let mut stack: Vec<PathBuf> = vec![thirdparty_dir.clone()];
-    while let Some(dir) = stack.pop() {
-        let mut entries: Vec<PathBuf> = fs::read_dir(&dir)?
-            .filter_map(|entry| entry.ok())
-            .map(|entry| entry.path())
-            .collect();
-        entries.sort();
-        for entry in entries {
-            if entry.is_dir() {
-                stack.push(entry);
-            } else if entry.extension().and_then(|extension| extension.to_str()) == Some("dll")
-                && let Some(name) = entry.file_name()
-            {
-                thirdparty.entry(name.to_owned()).or_insert(entry);
-            }
-        }
-    }
     let system = env::var_os("SystemRoot")
         .map(|root| PathBuf::from(root).join("System32"))
         .ok_or_else(|| io::Error::other("missing SystemRoot"))?;
@@ -600,25 +576,19 @@ fn stage_runtime_payload(config: &PlatformConfig) -> Result<(), Box<dyn std::err
                 continue;
             }
             let candidate = runtime_dir.join(&name);
-            let found = if candidate.is_file() {
-                Some(candidate)
-            } else {
-                thirdparty.get(OsStr::new(&name)).cloned()
-            };
-            let found = match found {
-                Some(found) => found,
+            if candidate.is_file() {
+                queue.push(candidate.canonicalize()?);
+            } else if system.join(&name).is_file() {
                 // System DLLs are resolved by the OS search path.
-                None if system.join(&name).is_file() => continue,
-                None => {
-                    return Err(io::Error::other(format!(
-                        "{} requires {name}; not found in the OCCT bin directory, \
-                         the third-party tree, or the system DLL directory",
-                        source.display()
-                    ))
-                    .into());
-                }
-            };
-            queue.push(found.canonicalize()?);
+                continue;
+            } else {
+                return Err(io::Error::other(format!(
+                    "{} requires {name}; not found in the OCCT bin directory \
+                     or the system DLL directory",
+                    source.display()
+                ))
+                .into());
+            }
         }
         sources.push(source);
     }

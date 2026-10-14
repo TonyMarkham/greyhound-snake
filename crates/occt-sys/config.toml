@@ -48,24 +48,25 @@ runtime_pattern = "lib{tk}.so"
 shim_filename = "libgreyhound_occt.so"
 
 [windows]
-# Build-time inputs come from the neutral install (occt-win.md step 2) —
-# the payload carries runtime DLLs only, so headers and import libraries
-# are never staged into it.
-occt_prefix = "dist/occt/win64/opencascade-8.0.1-vc14-64"
+# Build-time inputs come from the pinned occt-dev release extraction
+# (crates/extern-fetch/config.toml; `just fetch-occt`): a unified CMake
+# install tree — headers under include/opencascade, import libraries
+# under lib, runtime DLLs under bin. The payload still carries runtime
+# DLLs only, so headers and import libraries are never staged into it.
+occt_prefix = "extern/occt/8.0.1/win64-dev"
 toolchain = "msvc"
-include_dir = "inc"
-lib_dir = "win64/vc14/lib"
+include_dir = "include/opencascade"
+lib_dir = "lib"
 toolkit_pattern = "{tk}.lib"
 runtime_pattern = "{tk}.dll"
 shim_filename = "greyhound_occt.dll"
 link_all_toolkits = true
-# Runtime DLLs for the payload: the OCCT bin directory carries all
-# TK*.dll; the third-party tree is searched one level deep for
-# <package>/bin. The staging step derives the shim's DLL closure from
-# these. Both paths are relative to occt_prefix; the third-party tree is
-# the OCCT root's sibling (env.bat's own convention).
-runtime_dir = "win64/vc14/bin"
-thirdparty_dir = "../3rdparty-vc14-64"
+# Runtime DLLs for the payload: bin/ carries the full TK*.dll set and the
+# release builds no bundled third-party libraries (no FreeType, no IPP),
+# so the closure resolves from bin/ plus the system directory — there is
+# no third-party tree. The staging step derives the shim's DLL closure
+# from this directory. Relative to occt_prefix.
+runtime_dir = "bin"
 
 [macos]
 # Unexercised (AGENTS.md: the macOS integration is not yet exercised).

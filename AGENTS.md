@@ -128,9 +128,10 @@ needs the user's Unity editor, use the dist-first loop.
   projected Unity buffers.
 - `crates/occt-sys/config.toml`: the sole input source for `build.rs` —
   per-OS OCCT prefix (Linux/macOS: the package payload; Windows: the
-  neutral `dist/occt` install for build-time headers and import libs), the
-  shim's own plugins directory, and the `[linux]`/`[windows]`/`[macos]`
-  deltas (toolchain, include/lib dirs, library naming).
+  pinned `extern/…-dev` extraction that `just fetch-occt` populates, for
+  build-time headers and import libs), the shim's own plugins directory,
+  and the `[linux]`/`[windows]`/`[macos]` deltas (toolchain, include/lib
+  dirs, library naming).
 - `dist/`: repo-local native distributions, including the fully assembled
   UPM package in `dist/package/`; currently gitignored.
 - `package/com.greyhound.step/`: tracked UPM package — authored

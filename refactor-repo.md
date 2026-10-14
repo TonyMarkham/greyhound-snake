@@ -176,8 +176,8 @@ extern/                                # ignored — fetched dev/libs zip extrac
   extract) lands in `Runtime/`; `NativeMethods.cs` path resolution points
   at the package tree's `Plugins/occt/`.
 - **`better-occt-bins.md`**: superseded in its `dist/` aspects (neutral
-  install → `extern/`, `stage-occt` → provisioning). Update or retire it
-  with the bite that lands this — until then it is a plan, not state.
+  install → `extern/`, `stage-occt` → provisioning). Left untouched —
+  the platform-docs flip bite retires it; do not edit it before then.
 - **dist-first Unity tweak workflow**: deleted. Unity's `file:` manifest
   points at the tracked tree; C#/UXML/USS is authored in place, Unity
   mints `.meta` there, and those `.meta` files are committed. The
@@ -210,6 +210,36 @@ Facts this landed run resolved:
   The libs-only zip is 50 DLLs + 3 legal texts, flat. The next bite
   rewrites `config.toml [windows]` to `include_dir = include/opencascade`,
   `lib_dir = lib`, `runtime_dir = bin`, and drops `thirdparty_dir`.
+
+- **2026-10-14 — `occt-sys` build-input flip** (D1): `[windows]` in
+  `crates/occt-sys/config.toml` points at `extern/occt/8.0.1/win64-dev`
+  (`include_dir = include/opencascade`, `lib_dir = lib`,
+  `runtime_dir = bin`); `thirdparty_dir` is gone from the config and from
+  `build.rs` — the release builds no bundled third-party libraries, so
+  the shim's DLL closure resolves from `bin/` plus the system directory
+  alone. The staging step wipes the payload `lib/` first, making the
+  payload exactly the closure derived from the built shim (23 TK DLLs +
+  2 licenses for the cart assembly); a build killed mid-wipe leaves a
+  damaged payload until the next staging. Verified on Windows: the shim
+  compiles against the dev headers, links the dev import libraries, and
+  `cargo test -p importer-host` (the real-OCCT assembly import) passes
+  end to end on the dev runtime. The neutral install `dist/occt` is no
+  longer a build input. `[linux]`/`[macos]` stay unchanged until their
+  hashes are pinned there.
+
+- **2026-10-14 — serial tessellation** (found by the flip's
+  verification): `step_mesh.cpp` passed `isInParallel = true` to
+  `BRepMesh_IncrementalMesh`; parallel meshing instantiates
+  `OSD_ThreadPool::DefaultPool()` in TKernel, and its static destructor
+  deadlocks `FreeLibrary(TKernel.dll)` under the loader lock on the
+  occt-dev binaries — the full host pipeline hung at teardown, while the
+  same sequence passed with the official release binaries. The shim now
+  tessellates serially (`false`, with the invariant in a comment): no
+  pool is ever instantiated, and the payload unloads cleanly. Cost on the
+  cart assembly: `scene_counts` ~300 ms (parallel) → ~600 ms (serial).
+  Revisit parallel meshing only together with the unload story and
+  `perf.md`'s trigger; feedback for the occt-dev recipe is recorded in
+  `occt-dev-feedback.md`.
 
 ## Open items
 

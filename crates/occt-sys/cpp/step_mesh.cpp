@@ -531,8 +531,13 @@ extern "C" int32_t greyhound_mesh_counts(
     }
     GreyMesh& mesh = doc->meshes[mesh_index];
     build_face_plan(mesh, *doc);
+    // isInParallel stays false: parallel meshing instantiates
+    // OSD_ThreadPool::DefaultPool() in TKernel, whose static destructor
+    // deadlocks FreeLibrary(TKernel) under the loader lock when the
+    // payload unloads. Serial meshing keeps the pool out of the process
+    // entirely; revisit only together with the unload story.
     BRepMesh_IncrementalMesh tessellator(mesh.shape, deflection, false,
-                                         angle_rad, true);
+                                         angle_rad, false);
     uint64_t nv = 0, ni = 0;
     for (const FacePlanEntry& entry : mesh.plan) {
       TopLoc_Location loc;
