@@ -25,19 +25,23 @@
 #                     is whatever the shim actually uses.
 
 # The shim's output directory. The runtime payload beside it
-# (Runtime/Plugins/occt/x86_64) is NOT a build output: its lib/ is
-# provisioned — `just fetch-occt` extracts the [occt.windows.payload]
-# release archive there (crates/extern-fetch/config.toml), and the Unity
-# package's C# provisioner fetches the same archive from the copy of that
-# config staged into the package (refactor-repo.md D5/D8). On Linux the
-# payload is the OCCT install itself (occt-linux.md); no provisioning.
+# (Runtime/Plugins/occt/x86_64) is NOT a build output on any platform:
+# its lib/ is provisioned from the [occt.<os>.payload] entry of
+# crates/extern-fetch/config.toml — by `just fetch-occt` here, or the
+# Unity package's C# provisioner from the copy of that config staged
+# into the package (refactor-repo.md D5/D8). Build-time inputs come from
+# the [occt.<os>.dev] extractions under extern/.
 
 shim_dir = "dist/package/com.greyhound.step/Runtime/Plugins/shim/x86_64"
 
 [linux]
-# The install IS the package payload (occt-linux.md step 2): build-time
-# inputs and the runtime payload live in one tree.
-occt_prefix = "dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64"
+# Build-time inputs come from the pinned occt-dev release extraction
+# (`just fetch-occt`), the same model as [windows]: headers under
+# include/opencascade, the unversioned libTK*.so both the link step and
+# the loader consume. UNVERIFIED LAYOUT: confirm from the extracted dev
+# zip that it is the unified CMake tree before trusting these keys —
+# the release record leaves the Linux zip layout unchecked.
+occt_prefix = "extern/occt/8.0.1/linux-x86_64-dev"
 toolchain = "gnu"
 include_dir = "include/opencascade"
 lib_dir = "lib"
@@ -63,10 +67,10 @@ link_all_toolkits = true
 
 [macos]
 # Unexercised (AGENTS.md: the macOS integration is not yet exercised).
-# Follows the Linux model — the install is the package payload; the
-# current occt-mac.md example ($HOME/opt/occt-8.0.1) is machine-local and
-# gains the matching install target when the mac flow is exercised.
-occt_prefix = "dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64"
+# Follows the Windows/Linux model — build inputs from the dev
+# extraction, runtime payload provisioned; nothing here has run on a
+# Mac, so the hashes are unpinned and the first run there records them.
+occt_prefix = "extern/occt/8.0.1/macos-arm64-dev"
 toolchain = "gnu"
 include_dir = "include/opencascade"
 lib_dir = "lib"

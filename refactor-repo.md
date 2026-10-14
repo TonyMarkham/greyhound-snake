@@ -200,7 +200,10 @@ extern/                                # ignored — fetched dev/libs zip extrac
   populated `extern/occt/8.0.1/` (dev + libs), hashes pinned, second run
   skips with exit 0. `.gitignore` gains `extern/`. Windows pins: dev
   `8ceafbaa…3b0dd11`, libs `7a336357…691203` (full values in the
-  config). Linux/macOS entries exist but are unpinned until run there.
+  config). Linux/macOS entries are pinned too (2026-10-14, from their
+  release pages); the downloaded bytes there are verified against the
+  pins by the first `just fetch-occt` run on such a machine, which also
+  answers the Linux dev-zip layout question the record left unverified.
   The libs fetch was ahead of any consumer — nothing reads
   `win64-libs` until the provisioning bite wires D7/D8; it validated the
   tool against the second archive shape (flattened 50 DLLs + 3 legal

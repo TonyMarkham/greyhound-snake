@@ -8,9 +8,10 @@
 # provisioners that share one destination — `just fetch-occt` here, and
 # the Unity package's C# provisioner, which reads the copy of this file
 # that `just assemble-package` stages into the package as
-# Editor/occt-fetch.toml (refactor-repo.md D5/D8). Linux has no payload
-# entry because occt-linux.md builds OCCT straight into the payload dir
-# (the install IS the payload) — there is nothing to fetch.
+# Editor/occt-fetch.toml (refactor-repo.md D5/D8). Every platform
+# carries dev + payload entries, all pinned (Linux/macOS pins from their
+# release pages / build machines; a run on such a machine verifies the
+# downloaded bytes against the pin).
 #
 # Rules, all enforced by the tool and checkable by hand:
 #   - Every url must be a GitHub release asset of the group's own repo and
@@ -60,16 +61,22 @@ url    = "https://github.com/TonyMarkham/occt-dev/releases/download/v0.1.0/occt-
 sha256 = "7a336357b8c87a97737a54acb48ece86df3a437730dc3a5d16dde5e853691203"
 dest   = "dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64/lib"
 
-# sha256 for the Linux and macOS archives is pinned from the corresponding
-# build machine (or by running this tool there): the tool prints the hash,
-# it goes into the matching entry, and the next run verifies against it.
-
 [occt.linux.dev]
 url    = "https://github.com/TonyMarkham/occt-dev/releases/download/v0.1.0/occt-8.0.1-x86_64-linux-dev.zip"
-sha256 = ""
+sha256 = "e1a283f40d46bd2dfed77fff6a8602b2015ad958cc521a4fd70b788d1aef27e7"
 dest   = "extern/occt/8.0.1/linux-x86_64-dev"
+
+[occt.linux.payload]
+url    = "https://github.com/TonyMarkham/occt-dev/releases/download/v0.1.0/occt-8.0.1-x86_64-linux-libs-only.zip"
+sha256 = "042255bd8bbb7609b5d3d3efcc830e0e1ff4da8e7522ecd7599a9c2fb393f2e4"
+dest   = "dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64/lib"
 
 [occt.macos.dev]
 url    = "https://github.com/TonyMarkham/occt-dev/releases/download/v0.1.0/occt-8.0.1-arm64-macos-dev.zip"
-sha256 = ""
+sha256 = "0ce1a587995feb50a93b2db29fc19dff65262b9e5cd5033d979f1abe2f69fb67"
 dest   = "extern/occt/8.0.1/macos-arm64-dev"
+
+[occt.macos.payload]
+url    = "https://github.com/TonyMarkham/occt-dev/releases/download/v0.1.0/occt-8.0.1-arm64-macos-libs-only.zip"
+sha256 = "55e79bf9fc01cbdc7bc1886b6bb04e22c06b87842d8373f474931b70ab9925ad"
+dest   = "dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64/lib"
