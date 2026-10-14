@@ -76,6 +76,16 @@ fn run(cli: &Cli) -> ExternFetchResult<bool> {
             continue;
         };
         for (role, artifact) in platform.artifacts() {
+            // The package payload is written exclusively by the package's
+            // C# provisioner (refactor-repo.md D8, amended 2026-10-14:
+            // only the C# fetcher puts anything in the dist package). The
+            // `payload` entries exist in this config as the pins source
+            // that assemble-package stages into the package
+            // (Editor/occt-fetch.toml); the CLI fetches only the extern/
+            // dev trees and must never write into the package.
+            if role == "payload" {
+                continue;
+            }
             match ensure(
                 name,
                 role,

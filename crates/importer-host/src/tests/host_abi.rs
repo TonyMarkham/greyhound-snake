@@ -45,11 +45,11 @@ fn host_artifact() -> PathBuf {
 
 fn occt_dirs(root: &Path) -> (PathBuf, PathBuf) {
     // The loader derives the platform's shim filename from the crate
-    // config; callers hand over the shim directory only.
-    (
-        root.join("dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64/lib"),
-        root.join("dist/package/com.greyhound.step/Runtime/Plugins/shim/x86_64"),
-    )
+    // config; callers hand over the shim directory only. Both
+    // directories come from the root config.toml (the same table the
+    // CLI crates parse) — no paths are hardcoded in source; see
+    // root_config.rs.
+    super::root_config::occt_dirs(root)
 }
 
 fn c_string(path: &Path) -> CString {

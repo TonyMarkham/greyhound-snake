@@ -138,7 +138,13 @@ listed in Open items.
    same bytes to both. (Amended 2026-10-14: originally "C# pins embedded
    in the package + a parity check"; the staged copy replaces the
    embedded copy.) The payload entry supersedes the old `libs` entries:
-   same archive, dest = the package payload's `lib/`.
+   same archive, dest = the package payload's `lib/`. (Amended
+   2026-10-14, later: **only the C# provisioner writes the package
+   payload.** The CLI fetch skips `payload` entries — they remain in the
+   config solely as the pins source for the staged copy; the CLI's job
+   is the `extern/` dev trees, and it must never write into the dist
+   package. The marker cross-recognition stays, but the CLI no longer
+   provisions the payload, even on explicit request.)
 
 ## Repo layout after
 
@@ -292,6 +298,67 @@ Facts this landed run resolved:
   Revisit parallel meshing only together with the unload story and
   `perf.md`'s trigger; feedback for the occt-dev recipe is recorded in
   `occt-dev-feedback.md`.
+
+- **2026-10-14 — Linux flip verified on the Linux box**: `just fetch-occt`
+  ran on Linux for the first time, verifying both Linux pins against their
+  release-page hashes. Facts this resolved: the Linux dev zip is the
+  unified CMake install tree — `include/opencascade` (7,266 headers),
+  `lib/` (50 unversioned `libTK*.so` + `cmake/`), `bin/`, `share/`, the 3
+  legal texts at the zip root — so the `[linux]` keys in
+  `crates/occt-sys/config.toml` stand as written and the UNVERIFIED-LAYOUT
+  note is replaced by the confirmation. The stale old-model OCCT install
+  inside `dist/package/…/Plugins/occt/x86_64` (bin/include/lib/share from
+  the install-into-payload workflow, no provenance marker) was deleted by
+  hand per the tool's rule, and the payload provisioned cleanly into
+  `lib/` (50 libs + 3 legal texts). The shim compiled against the dev
+  headers, `cargo test -p importer-host` passed end to end (the
+  real-OCCT assembly import), and `just verify-package` passes — the
+  `[linux] assemble-package` recipe now mirrors the Windows body,
+  asserting the provisioned payload lib + built shim instead of an
+  in-package OCCT install. (Fix mid-bite: the first cut carried the old
+  model's `rm -f` of the host cdylib ahead of the prerequisite check, so
+  a failed run damaged the assembled package; removed — every step
+  before the check is non-destructive and the host copy overwrites in
+  place, matching the Windows body.) Two `extern-fetch` tests assumed
+  Windows-hosted path shapes and failed on Linux: the `C:/extern` dest
+  rejection (which check fires is host-dependent) and the `D:/no-such-dir`
+  download_location existence check (not absolute on Linux); both now
+  branch on `HostOs::current()` — 38 pass on Linux, the Windows
+  expectations unchanged.
+
+- **2026-10-14 — CLI fetch no longer writes the package payload** (D8
+  amendment, user decision: only the C# fetcher puts anything in the
+  dist package): `main.rs` skips `payload`-role entries when fetching —
+  they stay in the config as the staged-copy pins source. The assemble
+  prerequisite messages (both platforms) no longer point at
+  `just fetch-occt` for the payload; they name the C# provisioner. This
+  resolves the day's provisioning fight: the CLI had been re-extracting
+  the payload into the package on every fetch, stepping on the C#
+  provisioner's exclusive ownership.
+- **2026-10-14 — Rust side never touches the package payload, reads
+  included** (rule as stated: NOTHING on the Rust side should EVER
+  touch `dist/package/…/Plugins/occt`): the real-OCCT tests
+  (`importer-host` `host_abi.rs`) and the root `config.toml` consumers
+  (`greyhound-export-mjc`, `step-stats`) now read their runtime
+  libraries from the `extern/` dev trees — the Rust side's sandbox —
+  instead of the provisioned payload. The root config's `library_dir`
+  moved into per-OS `[occt.<os>]` sections (the dev-tree runtime dir is
+  `bin/` on Windows, `lib/` elsewhere; missing section = platform gate,
+  mirroring `crates/occt-sys/config.toml`); both crates' `OcctConfig`
+  select and resolve the build target's section at load. `build.rs` was
+  already clean (shim-only writer; the payload staging was removed with
+  the provisioning bite). Verified with the payload directory removed:
+  `cargo test --workspace` passes fully without it (0 failures across
+  all crates, clippy clean), and the whole just workflow was then
+  decoupled from the payload at the user's ruling: `assemble-package`
+  (both platforms) asserts only the shim it just built; `verify-package`
+  loads the dev-tree runtime (repo root anchored on the script path)
+  and the Linux copied-layout check excludes `Plugins/occt` from the
+  copy; the recipe's file listing prunes the subtree. Verified end to
+  end with the payload directory physically absent: `just verify-package`
+  passes (43 nodes, 20 meshes, mass properties). The payload
+  (`Runtime/Plugins/occt`) is now written and read by the C# provisioner
+  alone, on every platform.
 
 ## Open items
 

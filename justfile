@@ -6,33 +6,27 @@
 # in tools/*.ps1); Linux bodies are shebang scripts.
 set windows-shell := ["powershell.exe", "-NoLogo", "-Command"]
 
-# Assemble the production package into dist: skeleton sources, the fetch
-# config the package's C# provisioner reads, and the native payload (host
-# cdylib; shim and OCCT install compile in place). The payload's lib/ is
-# NOT a build output — on Windows it is provisioned by `just fetch-occt`
-# (extern-fetch, [occt.windows.payload]); on Linux the OCCT install IS
-# the payload (occt-linux.md).
+# Assemble the production package into dist: stage the authored skeleton
+# sources plus the fetch config the package's C# provisioner reads, then
+# add the host cdylib; build.rs rebuilds the shim into the package. The
+# OCCT payload (Runtime/Plugins/occt) is NONE of this recipe's business
+# on any platform — not asserted, not read, not written; the package's
+# C# provisioner owns it exclusively (refactor-repo.md D8, amended
+# 2026-10-14).
 [linux]
 assemble-package:
     #!/usr/bin/env bash
     set -euo pipefail
 
     package="dist/package/com.greyhound.step"
-    occt="$package/Runtime/Plugins/occt/x86_64"
-    shim="$package/Runtime/Plugins/shim/x86_64"
     host="$package/Runtime/Plugins/x86_64"
+    shim="$package/Runtime/Plugins/shim/x86_64"
 
-    for required in "$occt/lib/libTKernel.so" "$occt/include/opencascade/Standard_Version.hxx"; do
-        if [ ! -e "$required" ]; then
-            echo "missing prerequisite: $required" >&2
-            echo "install OCCT per occt-linux.md (INSTALL_DIR is the package occt directory)" >&2
-            exit 1
-        fi
-    done
-
-    # Stage the authored skeleton sources wholesale; the OCCT install tree
-    # (cmake) and the shim (cargo build output) survive untouched.
-    rm -f "$host/libimporter_host.so"
+    # Stage the authored skeleton sources wholesale; the provisioned
+    # payload and the shim (cargo build output) survive untouched. The
+    # steps below the shim check are non-destructive, and the host copy
+    # overwrites in place — a failed run must leave the previously
+    # assembled package intact (the Windows body's rule).
     mkdir -p "$shim" "$host"
 
     cp -r package/com.greyhound.step/. "$package/"
@@ -41,19 +35,29 @@ assemble-package:
     touch crates/occt-sys/build.rs
     cargo build --release -p importer-host
 
-    cp -L "target/release/libimporter_host.so" "$host/libimporter_host.so"
+    # The package payload (Runtime/Plugins/occt) is none of this
+    # recipe's business — not asserted, not read, not written; the
+    # package's C# provisioner owns it exclusively (refactor-repo.md
+    # D8, amended 2026-10-14). Only the shim is asserted, because this
+    # recipe just built it.
+    if [ ! -e "$shim/libgreyhound_occt.so" ]; then
+        echo "missing prerequisite: $shim/libgreyhound_occt.so (cargo build produced no shim)" >&2
+        exit 1
+    fi
 
+    cp "target/release/libimporter_host.so" "$host/libimporter_host.so"
+
+    # The listing prunes Plugins/occt entirely (-prune: no descent, no
+    # read inside it) — the recipe's own products are what it names.
     echo "dist/package assembled:"
-    find dist/package -type f | sort
+    find dist/package -path '*Runtime/Plugins/occt*' -prune -o -type f -print | sort
 
 # Windows counterpart of assemble-package: stages the authored skeleton,
 # the fetch config, and the host cdylib; build.rs rebuilds the shim into
-# the package. The OCCT payload lib/ is not built here — the prerequisite
-# asserts it was provisioned by `just fetch-occt` (extern-fetch,
-# [occt.windows.payload]). The body is a script launcher because just
-# runs Windows recipe lines one process per line: cross-line variables
-# and multi-line blocks do not survive in a recipe body; the logic lives
-# in tools/assemble-package.ps1.
+# the package. The body is a script launcher because just runs Windows
+# recipe lines one process per line: cross-line variables and multi-line
+# blocks do not survive in a recipe body; the logic lives in
+# tools/assemble-package.ps1.
 [windows]
 assemble-package:
     powershell -NoProfile -ExecutionPolicy Bypass -File tools/assemble-package.ps1
@@ -71,8 +75,10 @@ verify-package: assemble-package
 
 # Fetch the pinned occt-dev release archives into the extern/ cache
 # (refactor-repo.md D3/D4): download -> sha256 verify -> extract ->
-# provenance marker. Unpinned entries extract + report the hash and fail
-# the run; pin the reported hash into crates/extern-fetch/config.toml.
+# provenance marker. Dev trees only: the package payload is provisioned
+# exclusively by the package's C# provisioner, never by this recipe.
+# Unpinned entries extract + report the hash and fail the run; pin the
+# reported hash into crates/extern-fetch/config.toml.
 [windows]
 [linux]
 fetch-occt:

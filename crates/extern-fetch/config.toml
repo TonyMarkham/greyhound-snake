@@ -4,11 +4,12 @@
 # entries (`dev` = build-time headers + link libraries for the shim,
 # `payload` = runtime shared libraries provisioned into the package
 # payload dir). Consumers per role: the `dev` entries feed the shim build
-# via crates/occt-sys/config.toml; the `payload` entry is fetched by both
-# provisioners that share one destination — `just fetch-occt` here, and
-# the Unity package's C# provisioner, which reads the copy of this file
-# that `just assemble-package` stages into the package as
-# Editor/occt-fetch.toml (refactor-repo.md D5/D8). Every platform
+# via crates/occt-sys/config.toml; the `payload` entries exist as the
+# single pins source that assemble-package stages into the package as
+# Editor/occt-fetch.toml — the C# provisioner reads its pins from that
+# copy and is the ONLY writer of the package payload (refactor-repo.md
+# D8, amended 2026-10-14: only the C# fetcher puts anything in the dist
+# package; the CLI fetch skips payload entries). Every platform
 # carries dev + payload entries, all pinned (Linux/macOS pins from their
 # release pages / build machines; a run on such a machine verifies the
 # downloaded bytes against the pin).

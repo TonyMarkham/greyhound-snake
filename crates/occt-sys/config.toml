@@ -36,11 +36,12 @@ shim_dir = "dist/package/com.greyhound.step/Runtime/Plugins/shim/x86_64"
 
 [linux]
 # Build-time inputs come from the pinned occt-dev release extraction
-# (`just fetch-occt`), the same model as [windows]: headers under
-# include/opencascade, the unversioned libTK*.so both the link step and
-# the loader consume. UNVERIFIED LAYOUT: confirm from the extracted dev
-# zip that it is the unified CMake tree before trusting these keys —
-# the release record leaves the Linux zip layout unchecked.
+# (`just fetch-occt`), the same model as [windows]: a unified CMake
+# install tree — headers under include/opencascade, the unversioned
+# libTK*.so both the link step and the loader consume (confirmed from
+# the extracted v0.1.0 zip; layout matches [windows] exactly). At run
+# time the shim loads the payload libs, which come from the provisioned
+# [occt.linux.payload] extraction, not from this tree.
 occt_prefix = "extern/occt/8.0.1/linux-x86_64-dev"
 toolchain = "gnu"
 include_dir = "include/opencascade"

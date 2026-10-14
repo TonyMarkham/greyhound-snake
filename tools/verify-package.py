@@ -42,6 +42,27 @@ NO_INDEX = 0xFFFFFFFF
 HOST_LIBRARY = "importer_host.dll" if os.name == "nt" else "libimporter_host.so"
 
 
+# Repo root, anchored on this script's location (tools/ sits one level
+# below it) — the dev-tree runtime lookup below must not depend on the
+# package argument, which is a temp copy on Linux.
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+
+def dev_occt_runtime(repo_root):
+    # The verify replay's OCCT runtime libraries come from the extern/
+    # dev tree, NOT from the package's provisioned payload
+    # (Runtime/Plugins/occt) — the payload belongs exclusively to the
+    # package's C# provisioner and nothing in this chain opens it
+    # (refactor-repo.md D8, amended 2026-10-14). The dev trees' runtime
+    # directory is per-OS (bin/ on Windows, lib/ elsewhere), mirroring
+    # the root config.toml.
+    if os.name == "nt":
+        return repo_root / "extern" / "occt" / "8.0.1" / "win64-dev" / "bin"
+    if sys.platform == "darwin":
+        return repo_root / "extern" / "occt" / "8.0.1" / "macos-arm64-dev" / "lib"
+    return repo_root / "extern" / "occt" / "8.0.1" / "linux-x86_64-dev" / "lib"
+
+
 class UnityBounds(ctypes.Structure):
     _fields_ = [("min", ctypes.c_float * 3), ("max", ctypes.c_float * 3)]
 
@@ -96,7 +117,17 @@ def fail(message):
 def verify_from_copy(source, asset):
     with tempfile.TemporaryDirectory(prefix="greyhound-package-") as copy:
         package = Path(copy) / "package"
-        shutil.copytree(source, package, symlinks=False)
+        # The copy excludes the package payload (Runtime/Plugins/occt)
+        # — nothing in this verify chain reads it; it belongs
+        # exclusively to the package's C# provisioner (refactor-repo.md
+        # D8, amended 2026-10-14). The shim and host are copied and
+        # loaded from the copy, so path independence is still exercised.
+        shutil.copytree(
+            source,
+            package,
+            symlinks=False,
+            ignore=shutil.ignore_patterns("occt"),
+        )
         verify(package, asset)
 
 
@@ -135,7 +166,7 @@ def verify(package, asset):
     if not (root / "Third Party Notices.md").is_file():
         fail("Third Party Notices.md is missing from the package root")
 
-    library_dir = root / "Runtime" / "Plugins" / "occt" / "x86_64" / "lib"
+    library_dir = dev_occt_runtime(REPO_ROOT)
     lib = ctypes.CDLL(str(root / "Runtime" / "Plugins" / "x86_64" / HOST_LIBRARY))
 
     lib.greyhound_host_version.restype = ctypes.c_uint32

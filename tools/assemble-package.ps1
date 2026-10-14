@@ -2,12 +2,13 @@
 # skeleton plus the fetch config (the package's C# provisioner reads its
 # pins from this copy, so the package is self-contained), force an
 # occt-sys rebuild so the freshly built shim lands in the package, then
-# add the host cdylib. The OCCT payload lib/ is not built or staged here:
-# it is provisioned by `just fetch-occt` (extern-fetch,
-# [occt.windows.payload]); the prerequisite asserts it. Windows
-# counterpart of the [linux] assemble-package recipe body; it lives in a
-# script because just runs Windows recipe lines one process per line, so
-# cross-line variables and multi-line blocks never survive in a recipe.
+# add the host cdylib. The OCCT payload (Runtime/Plugins/occt) is NONE
+# of this script's business — not asserted, not read, not written; the
+# package's C# provisioner owns it exclusively (refactor-repo.md D8,
+# amended 2026-10-14). Windows counterpart of the [linux]
+# assemble-package recipe body; it lives in a script because just runs
+# Windows recipe lines one process per line, so cross-line variables and
+# multi-line blocks never survive in a recipe.
 $ErrorActionPreference = "Stop"
 
 $package = "dist/package/com.greyhound.step"
@@ -27,12 +28,14 @@ Copy-Item crates/extern-fetch/config.toml $package/Editor/occt-fetch.toml -Force
 cargo build --release -p importer-host
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-$payload_lib = "$package/Runtime/Plugins/occt/x86_64/lib"
 $shim = "$package/Runtime/Plugins/shim/x86_64"
-foreach ($required in @("$payload_lib/TKernel.dll", "$shim/greyhound_occt.dll")) {
-    if (-not (Test-Path $required)) {
-        throw "missing prerequisite: $required; provision the payload with 'just fetch-occt'"
-    }
+# The package payload (Runtime/Plugins/occt) is none of this script's
+# business — not asserted, not read, not written; the package's C#
+# provisioner owns it exclusively (refactor-repo.md D8, amended
+# 2026-10-14). Only the shim is asserted, because this script just
+# built it.
+if (-not (Test-Path "$shim/greyhound_occt.dll")) {
+    throw "missing prerequisite: $shim/greyhound_occt.dll (cargo build produced no shim)"
 }
 
 # Create the host directory before copying: Copy-Item with a destination

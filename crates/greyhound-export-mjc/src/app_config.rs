@@ -23,6 +23,19 @@ impl AppConfig {
             path: config_path.clone(),
             source,
         })?;
+        // The build target's section supplies library_dir; a missing
+        // section is the platform gate (occt_config.rs).
+        config.occt.library_dir = config
+            .occt
+            .selected_library_dir()
+            .ok_or_else(|| ConfigError::Invalid {
+                path: config_path.clone(),
+                message: format!(
+                    "config.toml has no [occt.{}] section for this OS",
+                    OcctConfig::section_key()
+                ),
+            })?
+            .clone();
         if config.occt.library_dir.as_os_str().is_empty() {
             return Err(ConfigError::Invalid {
                 path: config_path,

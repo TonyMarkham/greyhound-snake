@@ -99,8 +99,11 @@ fn dest_rejects_backslashes() {
 #[test]
 fn dest_rejects_colon_components() {
     // Rejected on every platform so the committed config means the same
-    // thing everywhere — via the absolute-path check on Windows (a drive
-    // prefix) and via the colon-component check elsewhere.
+    // thing everywhere. Which check fires is host-dependent — on Windows
+    // "C:/extern" parses as an absolute path (drive prefix), elsewhere
+    // it is a relative path whose first component carries the colon —
+    // so only the rejection itself is host-independent; assert the
+    // message of the check that fires on this host.
     let error = Config::parse(&config_text(
         "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
         "C:/extern",
@@ -108,7 +111,11 @@ fn dest_rejects_colon_components() {
     .unwrap()
     .validate()
     .unwrap_err();
-    assert!(error.to_string().contains("dest must"), "{error}");
+    let expected = match HostOs::current().unwrap() {
+        HostOs::Windows => "dest must",
+        HostOs::Linux | HostOs::MacOs => "contains ':'",
+    };
+    assert!(error.to_string().contains(expected), "{error}");
 }
 
 #[test]
@@ -171,10 +178,17 @@ fn download_location_relative_is_rejected() {
 
 #[test]
 fn download_location_missing_directory_is_rejected() {
-    // On Windows a relative path is not rooted, so an absolute fake
-    // drive path that does not exist exercises the existence check.
+    // The path must be absolute on this host (a relative path is
+    // rejected earlier, with a different message) yet not exist, so the
+    // existence check — not the absolute check — produces the failure.
+    // Windows needs a drive prefix to be absolute; elsewhere a leading
+    // slash does it.
+    let missing = match HostOs::current().unwrap() {
+        HostOs::Windows => "D:/no-such-dir-7f3d",
+        HostOs::Linux | HostOs::MacOs => "/no-such-dir-7f3d",
+    };
     let text = format!(
-        "download_location = \"D:/no-such-dir-7f3d\"\n{}",
+        "download_location = \"{missing}\"\n{}",
         config_text("", "extern/x")
     );
     let error = Config::parse(&text).unwrap().download_dir().unwrap_err();
