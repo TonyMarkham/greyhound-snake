@@ -1,0 +1,138 @@
+# extern-fetch configuration — what to fetch, from where, and where it
+# extracts. One table per dependency group; per-OS sub-tables keyed
+# windows/linux/macos (a missing OS section is the platform gate); per-role
+# entries (`dev` = build-time headers + link libraries for the shim,
+# `payload` = runtime shared libraries provisioned into the package
+# payload dir). Consumers per role: the `dev` entries feed the shim
+# builds via the `*-sys` crates' config.toml (crates/occt-sys,
+# crates/opencv-sys); the `payload` entries exist as the
+# single pins source that assemble-package stages into the package as
+# Editor/occt-fetch.toml — the C# provisioner reads its pins from that
+# copy and is the ONLY writer of the package payload (only the C#
+# fetcher puts anything in the dist package; the CLI fetch skips
+# payload entries). Every platform
+# carries dev + payload entries, all pinned (Linux/macOS pins from their
+# release pages / build machines; a run on such a machine verifies the
+# downloaded bytes against the pin).
+#
+# Rules, all enforced by the tool and checkable by hand:
+#   - Every url must be a GitHub release asset of the group's own repo and
+#     tag (`https://github.com/<repo>/releases/download/<tag>/<asset>`) —
+#     the same-tag invariant, enforced mechanically:
+#     the dev zip and the libs zip can never drift onto different releases.
+#   - dest is repo-root-relative with forward slashes, no `..`. The repo
+#     root is two levels above this file's directory, the same rule
+#     crates/occt-sys/config.toml states for its own paths.
+#   - sha256 empty (or omitted) = unpinned: the tool downloads, extracts,
+#     records the computed hash in the sibling provenance marker, prints
+#     the hash, and exits non-zero. Once the hash is pinned here, the next
+#     run verifies against it — the already-extracted tree is accepted
+#     because the marker records exactly that hash.
+#   - A dest directory is owned by this tool only when its sibling
+#     `<dest>.provenance.toml` matches the config entry. A directory with
+#     a matching marker is never touched again; anything else (no marker,
+#     marker/entry mismatch) fails loudly and must be deleted by hand.
+
+# Where a downloader stages the archive bytes on disk before
+# extraction. Empty (the tracked default): the archive is held in
+# memory only — also the right default for machines whose IT policy
+# locks down temp directories. Set: an absolute path, forward slashes
+# (TOML basic strings treat `\` as an escape), to an EXISTING writable
+# directory on the machine running the consumer — a per-machine
+# override of a tracked-default-empty key, never committed with a real
+# path. Both consumers honor it, staging their zip inside the directory
+# and deleting it after extraction: this tool (`just fetch-occt`) and
+# the Unity package's C# provisioner via the staged copy of this file
+# (Editor/occt-fetch.toml). Neither creates the
+# directory — a missing one fails loudly.
+download_location = ""
+
+[occt]
+repo = "TonyMarkham/occt-dev"
+tag  = "v0.1.0"
+
+[occt.windows.dev]
+url    = "https://github.com/TonyMarkham/occt-dev/releases/download/v0.1.0/occt-8.0.1-x86_64-windows-dev.zip"
+sha256 = "8ceafbaad923b9bc724123b3d676a53f153fdbaecab714be3dd2cb2143b0dd11"
+dest   = "extern/occt/8.0.1/win64-dev"
+
+[occt.windows.payload]
+url    = "https://github.com/TonyMarkham/occt-dev/releases/download/v0.1.0/occt-8.0.1-x86_64-windows-dlls-only.zip"
+sha256 = "7a336357b8c87a97737a54acb48ece86df3a437730dc3a5d16dde5e853691203"
+dest   = "dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64/lib"
+
+[occt.linux.dev]
+url    = "https://github.com/TonyMarkham/occt-dev/releases/download/v0.1.0/occt-8.0.1-x86_64-linux-dev.zip"
+sha256 = "e1a283f40d46bd2dfed77fff6a8602b2015ad958cc521a4fd70b788d1aef27e7"
+dest   = "extern/occt/8.0.1/linux-x86_64-dev"
+
+[occt.linux.payload]
+url    = "https://github.com/TonyMarkham/occt-dev/releases/download/v0.1.0/occt-8.0.1-x86_64-linux-libs-only.zip"
+sha256 = "042255bd8bbb7609b5d3d3efcc830e0e1ff4da8e7522ecd7599a9c2fb393f2e4"
+dest   = "dist/package/com.greyhound.step/Runtime/Plugins/occt/x86_64/lib"
+
+[occt.macos.dev]
+url    = "https://github.com/TonyMarkham/occt-dev/releases/download/v0.1.0/occt-8.0.1-arm64-macos-dev.zip"
+sha256 = "0ce1a587995feb50a93b2db29fc19dff65262b9e5cd5033d979f1abe2f69fb67"
+dest   = "extern/occt/8.0.1/macos-arm64-dev"
+
+[occt.macos.payload]
+url    = "https://github.com/TonyMarkham/occt-dev/releases/download/v0.1.0/occt-8.0.1-arm64-macos-libs-only.zip"
+sha256 = "55e79bf9fc01cbdc7bc1886b6bb04e22c06b87842d8373f474931b70ab9925ad"
+dest   = "dist/package/com.greyhound.step/Runtime/Plugins/occt/arm64/lib"
+
+# Dev entries only (bite V1 landed state): the windows hash was verified
+# against downloaded bytes on this machine; linux/macos are pinned from
+# the release page per this file's rule (a run on such a machine verifies
+# them). The windows dev dest is what crates/opencv-sys/config.toml
+# consumes; the linux/macos dests are named for their future -sys builds.
+#
+# Dest naming follows the [occt] convention (linux-x86_64, macos-arm64),
+# not the release assets' reversed forms (x86_64-linux, arm64-macos).
+#
+# NOTE: an extern/opencv tree extracted by hand (no fetch run) carries no
+# provenance marker; the tool fails loudly on it by design — delete it
+# and fetch through the tool to mint the marker.
+#
+# Payload entries (libs-only archives): the pins source staged into the
+# vision package as Editor/opencv-fetch.toml — the package's C#
+# provisioner is the ONLY writer of Runtime/Plugins/opencv (this CLI
+# fetch skips payload entries), so these entries are inert until the
+# package skeleton exists (V2 in vision.md). Dest = the vision package's
+# plugin architecture directories, mirroring the [occt] payload layout;
+# the archives are flattened at the zip root (16 libraries + 3 legal
+# texts), which is the layout the provisioner expects to copy.
+
+[opencv]
+repo = "TonyMarkham/opencv-dev"
+tag  = "v0.1.0"
+
+[opencv.windows.dev]
+url    = "https://github.com/TonyMarkham/opencv-dev/releases/download/v0.1.0/opencv-5.0.0-x86_64-windows-dev.zip"
+sha256 = "bdc47489a883b19e4604dcb0d235276f2374959dcb9c5cae81f6eca1859b3788"
+dest   = "extern/opencv/5.0.0/win64-dev"
+
+[opencv.linux.dev]
+url    = "https://github.com/TonyMarkham/opencv-dev/releases/download/v0.1.0/opencv-5.0.0-x86_64-linux-dev.zip"
+sha256 = "f2b8625777407f8e3e4430fa2927eaa2980a2baef5903ad4b0dee014fc50419a"
+dest   = "extern/opencv/5.0.0/linux-x86_64-dev"
+
+[opencv.macos.dev]
+url    = "https://github.com/TonyMarkham/opencv-dev/releases/download/v0.1.0/opencv-5.0.0-arm64-macos-dev.zip"
+sha256 = "b8a27164e731bd052e67bd299ede45b2cdfa3290e93c481b06f930c603e34eaa"
+dest   = "extern/opencv/5.0.0/macos-arm64-dev"
+
+[opencv.windows.payload]
+url    = "https://github.com/TonyMarkham/opencv-dev/releases/download/v0.1.0/opencv-5.0.0-x86_64-windows-libs-only.zip"
+sha256 = "cc56bbe42ae93bfe0cd08a0a4633168ad7eb3e76be5b40f022c8a146bc7912fa"
+dest   = "dist/package/com.greyhound.vision/Runtime/Plugins/opencv/x86_64/lib"
+
+[opencv.linux.payload]
+url    = "https://github.com/TonyMarkham/opencv-dev/releases/download/v0.1.0/opencv-5.0.0-x86_64-linux-libs-only.zip"
+sha256 = "6ba60dfbea1638874fc123d3e518166fb19a0be6008b095bece638b061db1dc4"
+dest   = "dist/package/com.greyhound.vision/Runtime/Plugins/opencv/x86_64/lib"
+
+[opencv.macos.payload]
+url    = "https://github.com/TonyMarkham/opencv-dev/releases/download/v0.1.0/opencv-5.0.0-arm64-macos-libs-only.zip"
+sha256 = "e231d5dffae44526d31312778aa9fa03d9313d13808cc916c0c3cebf09f2db20"
+dest   = "dist/package/com.greyhound.vision/Runtime/Plugins/opencv/arm64/lib"
