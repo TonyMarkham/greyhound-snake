@@ -1,0 +1,20 @@
+[package]
+name = "yolo-labeler"
+version        = { workspace = true }
+edition        = { workspace = true }
+description    = "YOLO-compatible image labeling tool built with GPUI"
+publish        = false
+
+[dependencies]
+gpui  = { workspace = true }
+image = { workspace = true }
+rfd   = { workspace = true }
+serde = { workspace = true }
+serde_yaml = { workspace = true }
+smol  = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+[lints]
+workspace      = true

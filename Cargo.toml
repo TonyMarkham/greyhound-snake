@@ -9,7 +9,8 @@ members          = [
     "crates/occt-sys",
     "crates/opencv-sys",
     "crates/step-stats",
-    "crates/unity-projection"
+    "crates/unity-projection",
+    "crates/yolo-labeler"
 ]
 resolver         = "3"
 
@@ -22,16 +23,21 @@ cc               = { version = "1.8.0" }
 clap             = { version = "4.6.7", features = ["derive"] }
 error-location   = { version = "0.1.0" }
 goblin           = { version = "0.10.7" }
+gpui             = { version = "0.2.2" }
+image            = { version = "0.25.10", default-features = false, features = ["bmp", "gif", "jpeg", "png", "tiff", "webp"] }
 libloading       = { version = "0.9.0" }
 png              = { version = "0.18.1" }
+rfd              = { version = "0.17.2" }
+smol             = { version = "2.0.2" }
 serde            = { version = "1.0.229", features = ["derive"] }
+serde_yaml       = { version = "0.9.34" }
 serial_test      = { version = "4.0.1" }
 sha2             = { version = "0.11.1" }
 tempfile         = { version = "3.27.0" }
 thiserror        = { version = "2.0.21" }
 toml             = { version = "1.1.8" }
 ureq             = { version = "3.4.2" }
-zip              = { version = "9.0.3" }
+zip              = { version = "9.0.4" }
 
 aruco            = { path = "./crates/aruco" }
 importer-host    = { path = "./crates/importer-host" }
