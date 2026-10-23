@@ -154,6 +154,11 @@ namespace Greyhound.Step
                     problems.Add($"actuator '{actuator.name}' targets joint '{actuator.target.name}' which is not in the set");
                     continue;
                 }
+                if (ActuatorElement(actuator.mj.type) == null)
+                {
+                    problems.Add($"actuator '{actuator.name}' has type {(int)actuator.mj.type}, which is not a StepActuatorType");
+                    continue;
+                }
                 actuators.Add(actuator);
             }
 
@@ -308,9 +313,14 @@ namespace Greyhound.Step
                     foreach (StepActuator actuator in actuators)
                     {
                         string name = Dedupe(Sanitize(actuator.name), usedActuatorNames, () => "actuator");
-                        writer.WriteStartElement("position");
+                        writer.WriteStartElement(ActuatorElement(actuator.mj.type));
                         writer.WriteAttributeString("name", name);
-                        // Every attribute of the spec element, verbatim.
+                        // Every attribute of the selected spec element,
+                        // verbatim: the common ones first, then the
+                        // element's own (<position>: kp, kv/dampratio,
+                        // timeconst, inheritrange; <velocity>: kv only —
+                        // MuJoCo rejects the position-only attributes on
+                        // <velocity> as a schema violation).
                         // The limit switches emit as "true"/"false" —
                         // explicit false disables clamping even with a
                         // range present, so the mirror is valid under
@@ -347,21 +357,32 @@ namespace Greyhound.Step
                             writer.WriteAttributeString("cranklength", Format(actuator.mj.cranklength));
                         }
                         writer.WriteAttributeString("joint", jointNames[actuator.target]);
-                        writer.WriteAttributeString("kp", Format(actuator.mj.kp));
-                        // kv and dampratio are presence-exclusive — the
-                        // compiler rejects both being defined even at
-                        // their defaults; emit the authored one only
-                        // (the form warns when both are authored).
-                        if (actuator.mj.dampratio != 0f)
+                        switch (actuator.mj.type)
                         {
-                            writer.WriteAttributeString("dampratio", Format(actuator.mj.dampratio));
+                            case StepActuatorType.Position:
+                                writer.WriteAttributeString("kp", Format(actuator.mj.kp));
+                                // kv and dampratio are presence-exclusive — the
+                                // compiler rejects both being defined even at
+                                // their defaults; emit the authored one only
+                                // (the form warns when both are authored).
+                                if (actuator.mj.dampratio != 0f)
+                                {
+                                    writer.WriteAttributeString("dampratio", Format(actuator.mj.dampratio));
+                                }
+                                else if (actuator.mj.kv != 0f)
+                                {
+                                    writer.WriteAttributeString("kv", Format(actuator.mj.kv));
+                                }
+                                writer.WriteAttributeString("timeconst", Format(actuator.mj.timeconst));
+                                writer.WriteAttributeString("inheritrange", Format(actuator.mj.inheritrange));
+                                break;
+                            case StepActuatorType.Velocity:
+                                // Always written: the field's default (0) is
+                                // not the spec's (1), so omitting it would
+                                // export a gain the asset does not show.
+                                writer.WriteAttributeString("kv", Format(actuator.mj.kv));
+                                break;
                         }
-                        else if (actuator.mj.kv != 0f)
-                        {
-                            writer.WriteAttributeString("kv", Format(actuator.mj.kv));
-                        }
-                        writer.WriteAttributeString("timeconst", Format(actuator.mj.timeconst));
-                        writer.WriteAttributeString("inheritrange", Format(actuator.mj.inheritrange));
                         writer.WriteAttributeString("damping", Format(actuator.mj.damping));
                         writer.WriteAttributeString("armature", Format(actuator.mj.armature));
                         writer.WriteEndElement();
@@ -802,6 +823,22 @@ namespace Greyhound.Step
                     return "hinge";
                 default:
                     return type.ToString().ToLowerInvariant();
+            }
+        }
+
+        // The MJCF element an actuator type emits as; null for a value the
+        // enum does not define (a hand-edited or newer asset), which the
+        // validation pass reports instead of guessing an element.
+        private static string ActuatorElement(StepActuatorType type)
+        {
+            switch (type)
+            {
+                case StepActuatorType.Position:
+                    return "position";
+                case StepActuatorType.Velocity:
+                    return "velocity";
+                default:
+                    return null;
             }
         }
 

@@ -3,7 +3,9 @@
 Facts doc (not a bite doc) covering the MJCF schema
 surface the repo needs next: the cart's **horizontal slide joint**, the
 pole's **horizontal hinge joint**, and the **stepper-motor drive** of the
-cart (position servo on the slide; `potpori.md` *Sim control model*).
+cart (originally a position servo on the slide, `potpori.md` *Sim control
+model*; a velocity servo by the user's decision of 2026-10-22 — see
+*`<velocity>`* below).
 Checked 2026-10-09 against the MuJoCo **stable** docs — XML reference and
 modeling guide — which track release **3.15.0** (verified via the GitHub
 releases API). Sources: `XMLreference.rst` and `modeling.rst` from
@@ -32,7 +34,7 @@ convention (gravity default `(0, 0, −9.81)` sets the length scale),
     </body>
   </worldbody>
   <actuator>
-    <position name="cart_drive" joint="cart_slide" .../>  ← stepper/belt fake
+    <velocity name="cart_drive" joint="cart_slide" .../>  ← stepper/belt drive (was <position>)
   </actuator>
 </mujoco>
 ```
@@ -142,7 +144,7 @@ rewrites body poses, which would scramble our CAD-exact frames — keep
   cadence" pins these — emit `<option>` once actuation lands, so cadence
   is explicit rather than defaulted.
 
-## Actuation — the model and the `<position>` shortcut
+## Actuation — the model, the `<position>` and `<velocity>` shortcuts
 
 MJCF has exactly **one** actuator element internally (`general`); `<motor>`,
 `<position>`, `<velocity>`, `<intvelocity>`, `<damper>`, `<pid>`, … are
@@ -195,11 +197,52 @@ With a one-actuator-per-joint model the three collapse to the same clamp
 at full saturation; the safety gap (ctrlrange ⊂ joint range) lives in the
 XML visibly, per `potpori.md`.
 
-`<motor>` (direct torque/force = gainprm[0]·ctrl) and `<intvelocity>`
-(velocity setpoint, integrated) exist as alternatives; the settled choice
-(`<position>` on the slide) stands — no need to re-litigate.
+### `<velocity>` (the cart drive, decided 2026-10-22)
+
+The user decided on 2026-10-22 that the cart is driven by a velocity
+servo: the policy's command is a signed speed (sign = direction), the way
+the NEMA-23's driver is commanded (direction + step rate). This replaces
+the earlier settled `<position>` choice. The exporter emits either
+element from one `StepActuator` asset, selected by `mj.type`.
+
+Checked against `doc/XMLreference.rst` at tag **3.15.0** (GitHub raw,
+2026-10-22), `#actuator-velocity`. Sets: `dyntype none`, `gaintype fixed,
+gainprm = (kv, 0, 0)`, `biastype affine, biasprm = (0, 0, −kv)`. Net
+servo law, before clamping:
+
+```
+force = kv · (ctrl − qvel)        [slide: N, ctrl and qvel in m/s]
+```
+
+Attributes: the common list — `name`, `class`, `group`, `delay`,
+`ctrllimited`, `forcelimited`, `ctrlrange`, `forcerange`, `lengthrange`,
+`gear`, `cranklength`, the transmission attributes (`joint`, …), `user`,
+`damping`, `armature` — plus exactly one of its own:
+
+| Attribute | Default | Notes |
+|---|---|---|
+| `kv` | "1" | Velocity feedback gain — N per m/s on a slide transmission. Not damping, as it is on `<position>` |
+| `ctrlrange` | "0 0" | Clamp on `ctrl` — here a **speed** envelope in m/s, not a position envelope |
+
+- **`kp`, `dampratio`, `timeconst`, `inheritrange` are `<position>`-only.**
+  MuJoCo 3.15.0's `compile.exe` rejects them on `<velocity>`:
+  `XML Error: Schema violation: unrecognized attribute: 'kp'` (and the
+  same for `dampratio`), run 2026-10-22 on a one-slide test model. A
+  `<velocity>` with the common attributes plus `kv` compiles.
+- The docs recommend the `implicitfast` or `implicit` integrator with
+  this actuator. The exporter emits no `<option>` today, so MuJoCo's
+  default (Euler) applies.
+- **Position is no longer held by the actuator.** `ctrlrange` bounds
+  speed, so nothing in the actuator keeps the cart inside the joint
+  `range`; the slide's limit stops it.
+
+`<motor>` (direct force = gainprm[0]·ctrl) and `<intvelocity>`
+(velocity setpoint, integrated into a position target) also exist.
 
 ## Worked example — the 2-DOF target (`potpori.md` MJCF target)
+
+Written before the 2026-10-22 decision, in the `<position>` form; the
+cart drive is now `<velocity>` (above).
 
 Schematic (body placement is M3's conjugation work; axis letters assume
 the rail along x, pole swinging in the xz-plane — conjugated from the
