@@ -3,6 +3,8 @@
         <ui:Label text="Step Joint Set" class="section-title" />
         <ue:PropertyField binding-path="stepAssetPath" />
         <ue:PropertyField binding-path="rootMobility" />
+        <ue:PropertyField binding-path="timestep" />
+        <ue:PropertyField binding-path="integrator" />
         <ui:Button name="export-button" text="Export" />
         <ui:Label text="Joints" class="list-header" />
         <ui:ListView name="joints-list" class="list-view" />

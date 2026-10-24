@@ -22,7 +22,7 @@ convention (gravity default `(0, 0, −9.81)` sets the length scale),
 ```
 <mujoco>
   <compiler .../>          already emitted (M1)
-  <option .../>            NOT emitted today (defaults); timestep/integrator decisions come with actuation
+  <option timestep integrator/>   emitted from StepJointSet (2026-10-23, dist; awaiting Unity validation)
   <worldbody>
     <body name="cart" pos quat>
       <joint name="cart_slide" type="slide" .../>     ← cart on rail
@@ -142,7 +142,14 @@ rewrites body poses, which would scramble our CAD-exact frames — keep
   `option/gravity` `(0, 0, −9.81)` (`xmlref #option-timestep`,
   `#option-integrator`, `#option-gravity`). The `potpori.md` "fixed sim
   cadence" pins these — emit `<option>` once actuation lands, so cadence
-  is explicit rather than defaulted.
+  is explicit rather than defaulted. **Landed in dist (2026-10-23,
+  awaiting Unity validation):** `StepJointSet.timestep` (default 0.002)
+  and `StepJointSet.integrator` (`StepIntegrator`, a single-choice
+  dropdown, default `ImplicitFast`) are always written as `<option
+  timestep integrator/>`; gravity stays MuJoCo's default. The keywords
+  are case-sensitive: 3.15.0's `compile.exe` accepts `Euler`, `RK4`,
+  `implicit`, `implicitfast` and `discrete`, and rejects `euler`
+  ("invalid keyword", run 2026-10-23).
 
 ## Actuation — the model, the `<position>` and `<velocity>` shortcuts
 
@@ -230,8 +237,8 @@ Attributes: the common list — `name`, `class`, `group`, `delay`,
   same for `dampratio`), run 2026-10-22 on a one-slide test model. A
   `<velocity>` with the common attributes plus `kv` compiles.
 - The docs recommend the `implicitfast` or `implicit` integrator with
-  this actuator. The exporter emits no `<option>` today, so MuJoCo's
-  default (Euler) applies.
+  this actuator. The StepJointSet's integrator defaults to
+  `implicitfast` for that reason (see the compiler/option facts above).
 - **Position is no longer held by the actuator.** `ctrlrange` bounds
   speed, so nothing in the actuator keeps the cart inside the joint
   `range`; the slide's limit stops it.

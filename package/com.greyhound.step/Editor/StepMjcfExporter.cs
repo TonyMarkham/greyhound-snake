@@ -162,6 +162,18 @@ namespace Greyhound.Step
                 actuators.Add(actuator);
             }
 
+            // MuJoCo rejects a non-positive timestep; NaN fails every
+            // comparison, so it is caught by the same test.
+            if (!(set.timestep > 0f) || float.IsInfinity(set.timestep))
+            {
+                problems.Add($"timestep is {Format(set.timestep)} s; it must be a positive number of seconds");
+            }
+            string integrator = IntegratorValue(set.integrator);
+            if (integrator == null)
+            {
+                problems.Add($"integrator is {(int)set.integrator}, which is not a StepIntegrator");
+            }
+
             if (problems.Count > 0)
             {
                 foreach (string problem in problems)
@@ -209,7 +221,7 @@ namespace Greyhound.Step
 
             bool freeRoot = set.rootMobility == StepRootMobilityMode.Free;
             string xmlPath = Path.Combine(exportDirectory, stem + ".xml");
-            int bodyCount = WriteMjcf(xmlPath, stem, root.transform, freeRoot, jointsByKey, jointNames, geomsByKey, geomNames, meshIds, firstUsers, actuators);
+            int bodyCount = WriteMjcf(xmlPath, stem, root.transform, freeRoot, set.timestep, integrator, jointsByKey, jointNames, geomsByKey, geomNames, meshIds, firstUsers, actuators);
             Debug.Log($"Exported MuJoCo model with {bodyCount} bodies and {meshes.Count} mesh assets to {xmlPath}");
         }
 
@@ -253,6 +265,8 @@ namespace Greyhound.Step
             string stem,
             Transform root,
             bool freeRoot,
+            float timestep,
+            string integrator,
             Dictionary<string, List<StepJoint>> jointsByKey,
             Dictionary<StepJoint, string> jointNames,
             Dictionary<string, List<StepGeom>> geomsByKey,
@@ -279,6 +293,13 @@ namespace Greyhound.Step
                 writer.WriteAttributeString("autolimits", "true");
                 writer.WriteAttributeString("inertiafromgeom", "auto");
                 writer.WriteAttributeString("balanceinertia", "false");
+                writer.WriteEndElement();
+
+                // Always written, so the file states its cadence and
+                // integrator instead of inheriting MuJoCo's defaults.
+                writer.WriteStartElement("option");
+                writer.WriteAttributeString("timestep", Format(timestep));
+                writer.WriteAttributeString("integrator", integrator);
                 writer.WriteEndElement();
 
                 writer.WriteStartElement("asset");
@@ -823,6 +844,29 @@ namespace Greyhound.Step
                     return "hinge";
                 default:
                     return type.ToString().ToLowerInvariant();
+            }
+        }
+
+        // The option/integrator keyword, spelled as MuJoCo's parser expects
+        // it (case matters: "Euler" and "RK4", but "implicitfast"); null
+        // for a value the enum does not define, reported by the validation
+        // pass.
+        private static string IntegratorValue(StepIntegrator integrator)
+        {
+            switch (integrator)
+            {
+                case StepIntegrator.Euler:
+                    return "Euler";
+                case StepIntegrator.RK4:
+                    return "RK4";
+                case StepIntegrator.Implicit:
+                    return "implicit";
+                case StepIntegrator.ImplicitFast:
+                    return "implicitfast";
+                case StepIntegrator.Discrete:
+                    return "discrete";
+                default:
+                    return null;
             }
         }
 
