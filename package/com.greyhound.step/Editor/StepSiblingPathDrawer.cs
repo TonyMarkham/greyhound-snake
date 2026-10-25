@@ -22,8 +22,15 @@ namespace Greyhound.Step
             var container = new VisualElement();
             container.AddToClassList("sibling-path");
 
-            var joint = property.serializedObject.targetObject as StepJoint;
-            string stepPath = joint != null && joint.root != null ? joint.root.stepAssetPath : null;
+            // Every element that keys on a part carries its set in root.
+            StepJointSet set = property.serializedObject.targetObject switch
+            {
+                StepJoint joint => joint.root,
+                StepGeom geom => geom.root,
+                StepSite site => site.root,
+                _ => null,
+            };
+            string stepPath = set != null ? set.stepAssetPath : null;
 
             Rebuild(container, property, stepPath);
             return container;

@@ -12,5 +12,9 @@
         <ui:ListView name="actuators-list" class="list-view" />
         <ui:Label text="Geoms" class="list-header" />
         <ui:ListView name="geoms-list" class="list-view" />
+        <ui:Label text="Sites" class="list-header" />
+        <ui:ListView name="sites-list" class="list-view" />
+        <ui:Label text="Sensors" class="list-header" />
+        <ui:ListView name="sensors-list" class="list-view" />
     </ui:VisualElement>
 </ui:UXML>

@@ -1,0 +1,14 @@
+.measure-form {
+    padding: 4px;
+}
+
+.section-title {
+    -unity-font-style: bold;
+    font-size: 13px;
+    margin-bottom: 4px;
+}
+
+.list-header {
+    -unity-font-style: bold;
+    margin-top: 8px;
+}

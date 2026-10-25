@@ -1,0 +1,16 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:ue="UnityEditor.UIElements">
+    <ui:VisualElement class="sensor-form">
+        <ui:Label text="Step Sensor (framepos)" class="section-title" />
+        <ue:PropertyField binding-path="root" />
+        <ue:PropertyField binding-path="target" />
+        <ui:VisualElement name="target-drop" class="site-dropzone">
+            <ui:Label text="drop a part with a site to set the target" />
+        </ui:VisualElement>
+        <ui:Label name="target-warning" class="warning" text="a sensor needs a target site" />
+        <ue:PropertyField binding-path="reference" />
+        <ui:VisualElement name="reference-drop" class="site-dropzone">
+            <ui:Label text="drop a part with a site to set the reference" />
+        </ui:VisualElement>
+        <ui:Label name="set-warning" class="warning" text="target and reference must be sites of this sensor's set" />
+    </ui:VisualElement>
+</ui:UXML>

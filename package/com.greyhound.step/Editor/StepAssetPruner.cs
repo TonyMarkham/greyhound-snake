@@ -36,6 +36,22 @@ namespace Greyhound.Step
                 EditorUtility.SetDirty(actuator.root);
             }
 
+            var site = AssetDatabase.LoadAssetAtPath<StepSite>(assetPath);
+            if (site != null && site.root != null)
+            {
+                Undo.RecordObject(site.root, "Prune Deleted Site");
+                site.root.sites.Remove(site);
+                EditorUtility.SetDirty(site.root);
+            }
+
+            var sensor = AssetDatabase.LoadAssetAtPath<StepSensor>(assetPath);
+            if (sensor != null && sensor.root != null)
+            {
+                Undo.RecordObject(sensor.root, "Prune Deleted Sensor");
+                sensor.root.sensors.Remove(sensor);
+                EditorUtility.SetDirty(sensor.root);
+            }
+
             return AssetDeleteResult.DidNotDelete;
         }
     }

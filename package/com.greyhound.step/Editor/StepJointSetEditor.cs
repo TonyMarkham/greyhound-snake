@@ -62,13 +62,64 @@ namespace Greyhound.Step
             geoms.Rebuild();
             geoms.selectionChanged += items => SelectGeom(items.FirstOrDefault() as StepGeom);
 
+            ListView sites = root.Q<ListView>("sites-list");
+            sites.makeItem = MakeItem;
+            sites.bindItem = (element, index) => ((Label)element).text = SiteText(set.sites[index]);
+            sites.itemsSource = new List<StepSite>(set.sites);
+            sites.Rebuild();
+            sites.selectionChanged += items => SelectSite(items.FirstOrDefault() as StepSite);
+            // Site assets dropped on the list join the set (a site made
+            // from the Create menu starts in none): one with no Root is
+            // given this set; one already in this set, or owned by
+            // another set, is refused.
+            sites.RegisterCallback<DragUpdatedEvent>(drag =>
+            {
+                DragAndDrop.visualMode = DroppedSites(set).Count > 0
+                    ? DragAndDropVisualMode.Link
+                    : DragAndDropVisualMode.Rejected;
+                drag.StopPropagation();
+            });
+            sites.RegisterCallback<DragPerformEvent>(drag =>
+            {
+                List<StepSite> dropped = DroppedSites(set);
+                if (dropped.Count == 0)
+                {
+                    return;
+                }
+                Undo.RecordObject(set, "Add Step Site");
+                foreach (StepSite site in dropped)
+                {
+                    if (site.root == null)
+                    {
+                        Undo.RecordObject(site, "Add Step Site");
+                        site.root = set;
+                        EditorUtility.SetDirty(site);
+                    }
+                    set.sites.Add(site);
+                }
+                EditorUtility.SetDirty(set);
+                DragAndDrop.AcceptDrag();
+                drag.StopPropagation();
+                sites.itemsSource = new List<StepSite>(set.sites);
+                sites.Rebuild();
+            });
+
+            ListView sensors = root.Q<ListView>("sensors-list");
+            sensors.makeItem = MakeItem;
+            sensors.bindItem = (element, index) => ((Label)element).text = SensorText(set.sensors[index]);
+            sensors.itemsSource = new List<StepSensor>(set.sensors);
+            sensors.Rebuild();
+            sensors.selectionChanged += items => SelectSensor(items.FirstOrDefault() as StepSensor);
+
             root.Q<Button>("export-button").clicked += () => StepMjcfExporter.Export(set);
 
-            root.RegisterCallback<SerializedPropertyChangeEvent>(change => RebuildLists(joints, actuators, geoms));
+            root.RegisterCallback<SerializedPropertyChangeEvent>(change =>
+                RebuildLists(joints, actuators, geoms, sites, sensors));
             return root;
         }
 
-        private void RebuildLists(ListView joints, ListView actuators, ListView geoms)
+        private void RebuildLists(
+            ListView joints, ListView actuators, ListView geoms, ListView sites, ListView sensors)
         {
             var set = (StepJointSet)target;
             if (set == null)
@@ -78,9 +129,13 @@ namespace Greyhound.Step
             joints.itemsSource = new List<StepJoint>(set.joints);
             actuators.itemsSource = new List<StepActuator>(set.actuators);
             geoms.itemsSource = new List<StepGeom>(set.geoms);
+            sites.itemsSource = new List<StepSite>(set.sites);
+            sensors.itemsSource = new List<StepSensor>(set.sensors);
             joints.Rebuild();
             actuators.Rebuild();
             geoms.Rebuild();
+            sites.Rebuild();
+            sensors.Rebuild();
         }
 
         private static VisualElement MakeItem()
@@ -105,6 +160,64 @@ namespace Greyhound.Step
         private static string GeomText(StepGeom geom)
         {
             return geom != null ? $"{geom.name}  ({geom.mj.type})" : "(missing geom)";
+        }
+
+        private static string SiteText(StepSite site)
+        {
+            return site != null
+                ? $"{site.name}  ({(site.body != null ? site.body.name : "no part")})"
+                : "(missing site)";
+        }
+
+        private static string SensorText(StepSensor sensor)
+        {
+            if (sensor == null)
+            {
+                return "(missing sensor)";
+            }
+            string target = sensor.target != null ? sensor.target.name : "(no target)";
+            string reference = sensor.reference != null ? sensor.reference.name : "world";
+            return $"{sensor.name}  →  {target}  from {reference}";
+        }
+
+        private static List<StepSite> DroppedSites(StepJointSet set)
+        {
+            return DragAndDrop.objectReferences
+                .OfType<StepSite>()
+                .Where(site => !set.sites.Contains(site) && (site.root == null || site.root == set))
+                .Distinct()
+                .ToList();
+        }
+
+        private static void SelectSite(StepSite site)
+        {
+            if (site == null)
+            {
+                return;
+            }
+            SelectAsset(site);
+            GameObject part = StepJointSetFactory.FindPart(site.root, site.body);
+            if (part != null)
+            {
+                EditorGUIUtility.PingObject(part);
+            }
+        }
+
+        private static void SelectSensor(StepSensor sensor)
+        {
+            if (sensor == null)
+            {
+                return;
+            }
+            SelectAsset(sensor);
+            if (sensor.target != null)
+            {
+                GameObject part = StepJointSetFactory.FindPart(sensor.target.root, sensor.target.body);
+                if (part != null)
+                {
+                    EditorGUIUtility.PingObject(part);
+                }
+            }
         }
 
         private static void SelectGeom(StepGeom geom)

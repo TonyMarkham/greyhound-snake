@@ -34,5 +34,9 @@ namespace Greyhound.Step
         public List<StepActuator> actuators = new List<StepActuator>();
 
         public List<StepGeom> geoms = new List<StepGeom>();
+
+        public List<StepSite> sites = new List<StepSite>();
+
+        public List<StepSensor> sensors = new List<StepSensor>();
     }
 }

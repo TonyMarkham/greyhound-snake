@@ -118,6 +118,64 @@ namespace Greyhound.Step
                     $"{string.Join(", ", unmatchedGeoms)}");
             }
 
+            var unmatchedSites = new List<string>();
+            int siteTotal = 0;
+            var sitesByKey = new Dictionary<string, List<StepSite>>();
+            foreach (StepSite site in set.sites)
+            {
+                if (site == null)
+                {
+                    continue;
+                }
+                siteTotal++;
+                GameObject part = Resolve(root.transform, site.body);
+                if (part == null)
+                {
+                    unmatchedSites.Add(site.name);
+                    continue;
+                }
+                string siteKey = KeyOf(site.body.indices);
+                if (!sitesByKey.TryGetValue(siteKey, out List<StepSite> siteList))
+                {
+                    siteList = new List<StepSite>();
+                    sitesByKey.Add(siteKey, siteList);
+                }
+                siteList.Add(site);
+            }
+            if (unmatchedSites.Count > 0)
+            {
+                problems.Add(
+                    $"{unmatchedSites.Count} of {siteTotal} sites could not be placed for export: " +
+                    $"{string.Join(", ", unmatchedSites)}");
+            }
+
+            // A sensor names its sites in the file, so both must be
+            // written: a site outside the set never is.
+            var sensors = new List<StepSensor>();
+            foreach (StepSensor sensor in set.sensors)
+            {
+                if (sensor == null)
+                {
+                    continue;
+                }
+                if (sensor.target == null)
+                {
+                    problems.Add($"sensor '{sensor.name}' has no target site");
+                    continue;
+                }
+                if (!set.sites.Contains(sensor.target))
+                {
+                    problems.Add($"sensor '{sensor.name}' targets site '{sensor.target.name}' which is not in the set");
+                    continue;
+                }
+                if (sensor.reference != null && !set.sites.Contains(sensor.reference))
+                {
+                    problems.Add($"sensor '{sensor.name}' measures from site '{sensor.reference.name}' which is not in the set");
+                    continue;
+                }
+                sensors.Add(sensor);
+            }
+
             // MuJoCo's own validity rule for moving bodies (its compiler
             // checks the body's own mass, else accepts a static —
             // joint-free — descendant with mass): a massless assembly
@@ -203,6 +261,16 @@ namespace Greyhound.Step
                 }
             }
 
+            var siteNames = new Dictionary<StepSite, string>();
+            var usedSiteNames = new HashSet<string>();
+            foreach (StepSite site in set.sites)
+            {
+                if (site != null)
+                {
+                    siteNames.Add(site, Dedupe(Sanitize(site.name), usedSiteNames, () => "site"));
+                }
+            }
+
             string stepFileName = Path.GetFileName(set.stepAssetPath);
             string stem = Path.GetFileNameWithoutExtension(stepFileName);
             string exportDirectory = Path.Combine(
@@ -221,7 +289,7 @@ namespace Greyhound.Step
 
             bool freeRoot = set.rootMobility == StepRootMobilityMode.Free;
             string xmlPath = Path.Combine(exportDirectory, stem + ".xml");
-            int bodyCount = WriteMjcf(xmlPath, stem, root.transform, freeRoot, set.timestep, integrator, jointsByKey, jointNames, geomsByKey, geomNames, meshIds, firstUsers, actuators);
+            int bodyCount = WriteMjcf(xmlPath, stem, root.transform, freeRoot, set.timestep, integrator, jointsByKey, jointNames, geomsByKey, geomNames, sitesByKey, siteNames, meshIds, firstUsers, actuators, sensors);
             Debug.Log($"Exported MuJoCo model with {bodyCount} bodies and {meshes.Count} mesh assets to {xmlPath}");
         }
 
@@ -271,9 +339,12 @@ namespace Greyhound.Step
             Dictionary<StepJoint, string> jointNames,
             Dictionary<string, List<StepGeom>> geomsByKey,
             Dictionary<StepGeom, string> geomNames,
+            Dictionary<string, List<StepSite>> sitesByKey,
+            Dictionary<StepSite, string> siteNames,
             Dictionary<Mesh, int> meshIds,
             List<string> firstUsers,
-            List<StepActuator> actuators)
+            List<StepActuator> actuators,
+            List<StepSensor> sensors)
         {
             var settings = new XmlWriterSettings
             {
@@ -321,6 +392,8 @@ namespace Greyhound.Step
                     JointNames = jointNames,
                     GeomsByKey = geomsByKey,
                     GeomNames = geomNames,
+                    SitesByKey = sitesByKey,
+                    SiteNames = siteNames,
                     MeshIds = meshIds,
                     UsedBodyNames = new HashSet<string>(),
                 };
@@ -411,6 +484,30 @@ namespace Greyhound.Step
                     writer.WriteEndElement();
                 }
 
+                if (sensors.Count > 0)
+                {
+                    writer.WriteStartElement("sensor");
+                    var usedSensorNames = new HashSet<string>();
+                    foreach (StepSensor sensor in sensors)
+                    {
+                        // framepos: the target site's position, in the
+                        // world frame, or in the reference site's frame
+                        // when one is set (reftype/refname absent means
+                        // world).
+                        writer.WriteStartElement("framepos");
+                        writer.WriteAttributeString("name", Dedupe(Sanitize(sensor.name), usedSensorNames, () => "sensor"));
+                        writer.WriteAttributeString("objtype", "site");
+                        writer.WriteAttributeString("objname", siteNames[sensor.target]);
+                        if (sensor.reference != null)
+                        {
+                            writer.WriteAttributeString("reftype", "site");
+                            writer.WriteAttributeString("refname", siteNames[sensor.reference]);
+                        }
+                        writer.WriteEndElement();
+                    }
+                    writer.WriteEndElement();
+                }
+
                 writer.WriteEndElement();
                 writer.WriteEndDocument();
                 return bodyCount;
@@ -428,6 +525,10 @@ namespace Greyhound.Step
             public Dictionary<string, List<StepGeom>> GeomsByKey;
 
             public Dictionary<StepGeom, string> GeomNames;
+
+            public Dictionary<string, List<StepSite>> SitesByKey;
+
+            public Dictionary<StepSite, string> SiteNames;
 
             public Dictionary<Mesh, int> MeshIds;
 
@@ -539,6 +640,19 @@ namespace Greyhound.Step
                     writer.WriteAttributeString("damping", Format(joint.mj.damping));
                     writer.WriteAttributeString("frictionloss", Format(joint.mj.frictionloss));
                     writer.WriteAttributeString("armature", Format(joint.mj.armature));
+                    writer.WriteEndElement();
+                }
+            }
+
+            // A site's pos is a body-frame point, permuted into the MJCF
+            // frame like a joint's pos.
+            if (context.SitesByKey.TryGetValue(pathKey, out List<StepSite> sites))
+            {
+                foreach (StepSite site in sites)
+                {
+                    writer.WriteStartElement("site");
+                    writer.WriteAttributeString("name", context.SiteNames[site]);
+                    writer.WriteAttributeString("pos", FormatVector(Permute(site.mj.pos)));
                     writer.WriteEndElement();
                 }
             }

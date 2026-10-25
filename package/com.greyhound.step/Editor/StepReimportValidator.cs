@@ -78,6 +78,22 @@ namespace Greyhound.Step
                     pruned = true;
                 }
             }
+            for (int i = set.sites.Count - 1; i >= 0; i--)
+            {
+                if (set.sites[i] == null)
+                {
+                    set.sites.RemoveAt(i);
+                    pruned = true;
+                }
+            }
+            for (int i = set.sensors.Count - 1; i >= 0; i--)
+            {
+                if (set.sensors[i] == null)
+                {
+                    set.sensors.RemoveAt(i);
+                    pruned = true;
+                }
+            }
             if (pruned)
             {
                 EditorUtility.SetDirty(set);
@@ -123,6 +139,27 @@ namespace Greyhound.Step
                 Debug.LogError(
                     $"{stepPath}: {unmatchedGeoms.Count} of {geomTotal} geoms could not be placed " +
                     $"after reimport: {string.Join(", ", unmatchedGeoms)}");
+            }
+
+            var unmatchedSites = new List<string>();
+            int siteTotal = 0;
+            foreach (StepSite site in set.sites)
+            {
+                if (site == null)
+                {
+                    continue;
+                }
+                siteTotal++;
+                if (StepJointSetFactory.FindPart(set, site.body) == null)
+                {
+                    unmatchedSites.Add(site.name);
+                }
+            }
+            if (unmatchedSites.Count > 0)
+            {
+                Debug.LogError(
+                    $"{stepPath}: {unmatchedSites.Count} of {siteTotal} sites could not be placed " +
+                    $"after reimport: {string.Join(", ", unmatchedSites)}");
             }
         }
     }

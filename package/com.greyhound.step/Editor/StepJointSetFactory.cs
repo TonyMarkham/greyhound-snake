@@ -56,7 +56,8 @@ namespace Greyhound.Step
 
         public static StepJointSet FindSet(string stepPath)
         {
-            return AssetDatabase.LoadAssetAtPath<StepJointSet>(ContainerPath(stepPath));
+            return AssetDatabase.LoadAssetAtPath<StepJointSet>(ContainerPath(stepPath))
+                ?? FindMovedSet(stepPath);
         }
 
         public static StepJointSet FindOrCreateSet(string stepPath)
@@ -73,6 +74,11 @@ namespace Greyhound.Step
                     set.stepAssetPath = stepPath;
                     EditorUtility.SetDirty(set);
                 }
+                return set;
+            }
+            set = FindMovedSet(stepPath);
+            if (set != null)
+            {
                 return set;
             }
 
@@ -148,6 +154,55 @@ namespace Greyhound.Step
             return set.geoms
                 .Where(geom => geom != null && geom.body != null && SamePath(geom.body.indices, path))
                 .ToList();
+        }
+
+        public static StepSite CreateSiteAsset(
+            StepJointSet set, GameObject instanceRoot, GameObject part)
+        {
+            var site = ScriptableObject.CreateInstance<StepSite>();
+            site.name = part.name;
+            site.root = set;
+            site.body = PathOf(part, instanceRoot);
+
+            string folder = SetFolder(set);
+            string path = AssetDatabase.GenerateUniqueAssetPath(
+                $"{folder}/{Sanitize(part.name)}.site.asset");
+            AssetDatabase.CreateAsset(site, path);
+            Undo.RegisterCreatedObjectUndo(site, "Add Step Site");
+
+            Undo.RecordObject(set, "Add Step Site");
+            set.sites.Add(site);
+            EditorUtility.SetDirty(set);
+            return site;
+        }
+
+        // A part's sites are found the way its joints are: the live
+        // sibling-index path against the stored paths.
+        public static List<StepSite> FindSites(StepJointSet set, GameObject part, GameObject instanceRoot)
+        {
+            int[] path = PathIndices(part, instanceRoot);
+            return set.sites
+                .Where(site => site != null && site.body != null && SamePath(site.body.indices, path))
+                .ToList();
+        }
+
+        public static StepSensor CreateSensorAsset(StepJointSet set, StepSite site, GameObject part)
+        {
+            var sensor = ScriptableObject.CreateInstance<StepSensor>();
+            sensor.name = $"{part.name}_framepos";
+            sensor.root = set;
+            sensor.target = site;
+
+            string folder = SetFolder(set);
+            string path = AssetDatabase.GenerateUniqueAssetPath(
+                $"{folder}/{Sanitize(part.name)}.sensor.asset");
+            AssetDatabase.CreateAsset(sensor, path);
+            Undo.RegisterCreatedObjectUndo(sensor, "Add Step Sensor");
+
+            Undo.RecordObject(set, "Add Step Sensor");
+            set.sensors.Add(sensor);
+            EditorUtility.SetDirty(set);
+            return sensor;
         }
 
         // The joint's identity is the sibling-index path, so a part's
@@ -344,10 +399,30 @@ namespace Greyhound.Step
             return $"{directory}/{stem}.joints/{stem}.joints.asset";
         }
 
+        // A set moved or renamed away from its deterministic path is
+        // found by its stepAssetPath, the durable link (StepJointSet's
+        // own rule). Example: Assets/Simulation/MuJoCo/01-Cart-Pole.root
+        // annotates Assets/Simulation/Robot/asy-cart-pole.step. The first
+        // match wins; new elements then land in that set's folder.
+        private static StepJointSet FindMovedSet(string stepPath)
+        {
+            foreach (string guid in AssetDatabase.FindAssets($"t:{nameof(StepJointSet)}"))
+            {
+                var set = AssetDatabase.LoadAssetAtPath<StepJointSet>(AssetDatabase.GUIDToAssetPath(guid));
+                if (set != null && set.stepAssetPath == stepPath)
+                {
+                    return set;
+                }
+            }
+            return null;
+        }
+
         private static string SetFolder(StepJointSet set)
         {
+            // Asset paths use '/'; Path.GetDirectoryName returns '\' on
+            // Windows ("Assets\Simulation\MuJoCo"), so it is put back.
             string containerPath = AssetDatabase.GetAssetPath(set);
-            return Path.GetDirectoryName(containerPath);
+            return Path.GetDirectoryName(containerPath).Replace('\\', '/');
         }
 
         private static bool IsSelfOrDescendant(Transform root, Transform node)
