@@ -1,0 +1,32 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:ue="UnityEditor.UIElements">
+    <ui:VisualElement class="mujoco-card mujoco-card--sites">
+        <ui:Label text="Site" class="mujoco-card__title" />
+        <ue:PropertyField binding-path="site.name" label="name" />
+        <ue:PropertyField binding-path="body" label="body" />
+    </ui:VisualElement>
+
+    <ui:Foldout text="Placement" value="true" class="mujoco-section">
+        <ue:PropertyField binding-path="site.pos" label="pos (m)" class="frame-only" />
+        <ue:PropertyField binding-path="site.quat" label="quat" class="frame-only" />
+        <ue:PropertyField binding-path="site.useFromto" label="use fromto" />
+        <ue:PropertyField binding-path="site.fromtoFrom" label="fromto from (m)" class="fromto-only" />
+        <ue:PropertyField binding-path="site.fromtoTo" label="fromto to (m)" class="fromto-only" />
+    </ui:Foldout>
+
+    <ui:Foldout text="Shape" value="true" class="mujoco-section">
+        <ue:PropertyField binding-path="site.type" label="type" />
+        <ue:PropertyField binding-path="site.size" label="size (m)" />
+        <ue:PropertyField binding-path="site.mesh" label="mesh" class="mesh-only" />
+    </ui:Foldout>
+
+    <ui:Foldout text="Appearance" value="false" class="mujoco-section">
+        <ue:PropertyField binding-path="site.rgba" label="rgba" />
+        <ue:PropertyField binding-path="site.material" label="material" />
+        <ue:PropertyField binding-path="site.group" label="group" />
+    </ui:Foldout>
+
+    <ui:Foldout text="Other" value="false" class="mujoco-section">
+        <ue:PropertyField binding-path="site.class" label="class" />
+        <ue:PropertyField binding-path="site.user" label="user" />
+    </ui:Foldout>
+</ui:UXML>

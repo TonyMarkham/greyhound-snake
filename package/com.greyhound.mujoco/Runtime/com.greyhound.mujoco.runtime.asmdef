@@ -1,0 +1,17 @@
+{
+    "name": "com.greyhound.mujoco.runtime",
+    "rootNamespace": "Greyhound.MuJoCo",
+    "references": [
+        "com.greyhound.step.runtime"
+    ],
+    "internalsVisibleTo": [
+        "com.greyhound.mujoco.editor"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.greyhound.step",
+            "expression": "0.0.0",
+            "define": "GREYHOUND_STEP"
+        }
+    ]
+}

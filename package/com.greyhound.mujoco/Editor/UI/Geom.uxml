@@ -1,0 +1,63 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:ue="UnityEditor.UIElements">
+    <ui:VisualElement class="mujoco-card mujoco-card--geoms">
+        <ui:Label text="Geom" class="mujoco-card__title" />
+        <ue:PropertyField binding-path="geom.name" label="name" />
+        <ue:PropertyField binding-path="body" label="body" />
+        <ue:PropertyField binding-path="overrideDefault" label="override default" />
+        <ue:PropertyField binding-path="geom.type" label="type" />
+    </ui:VisualElement>
+
+    <ui:VisualElement name="geom-sections">
+        <ui:Foldout text="Placement" value="true" class="mujoco-section">
+            <ue:PropertyField binding-path="geom.pos" label="pos (m)" class="frame-only" />
+            <ue:PropertyField binding-path="geom.quat" label="quat" class="frame-only" />
+            <ue:PropertyField binding-path="geom.useFromto" label="use fromto" />
+            <ue:PropertyField binding-path="geom.fromtoFrom" label="fromto from (m)" class="fromto-only" />
+            <ue:PropertyField binding-path="geom.fromtoTo" label="fromto to (m)" class="fromto-only" />
+        </ui:Foldout>
+
+        <ui:Foldout text="Shape" value="true" class="mujoco-section">
+            <ue:PropertyField binding-path="geom.size" label="size (m)" />
+            <ue:PropertyField binding-path="geom.mesh" label="mesh" class="mesh-only" />
+            <ue:PropertyField binding-path="geom.hfield" label="hfield" class="hfield-only" />
+            <ue:PropertyField binding-path="geom.fitscale" label="fitscale" />
+        </ui:Foldout>
+
+        <ui:Foldout text="Contact" value="false" class="mujoco-section">
+            <ue:PropertyField binding-path="geom.contype" label="contype" />
+            <ue:PropertyField binding-path="geom.conaffinity" label="conaffinity" />
+            <ue:PropertyField binding-path="geom.condim" label="condim" />
+            <ue:PropertyField binding-path="geom.priority" label="priority" />
+            <ue:PropertyField binding-path="geom.friction" label="friction" />
+            <ue:PropertyField binding-path="geom.margin" label="margin (m)" />
+            <ue:PropertyField binding-path="geom.gap" label="gap (m)" />
+            <ue:PropertyField binding-path="geom.solmix" label="solmix" />
+            <ue:PropertyField binding-path="geom.solref" label="solref" />
+            <ue:PropertyField binding-path="geom.solimp" label="solimp" />
+            <ue:PropertyField binding-path="geom.adhesion" label="adhesion (N)" />
+        </ui:Foldout>
+
+        <ui:Foldout text="Mass" value="false" class="mujoco-section">
+            <ue:PropertyField binding-path="geom.mass" label="mass (kg)" />
+            <ue:PropertyField name="unit-density" binding-path="geom.density" label="density" />
+            <ue:PropertyField binding-path="geom.shellinertia" label="shellinertia" />
+        </ui:Foldout>
+
+        <ui:Foldout text="Appearance" value="false" class="mujoco-section">
+            <ue:PropertyField binding-path="geom.rgba" label="rgba" />
+            <ue:PropertyField binding-path="geom.material" label="material" />
+            <ue:PropertyField binding-path="geom.group" label="group" />
+        </ui:Foldout>
+
+        <ui:Foldout text="Fluid" value="false" class="mujoco-section">
+            <ue:PropertyField binding-path="geom.fluidshape" label="fluidshape" />
+            <ue:PropertyField binding-path="geom.fluidcoef" label="fluidcoef" />
+        </ui:Foldout>
+
+        <ui:Foldout text="Other" value="false" class="mujoco-section">
+            <ue:PropertyField binding-path="geom.class" label="class" />
+            <ue:PropertyField binding-path="geom.user" label="user" />
+            <ue:PropertyField binding-path="geom.surfacevel" label="surfacevel (m/s, rad/s)" />
+        </ui:Foldout>
+    </ui:VisualElement>
+</ui:UXML>

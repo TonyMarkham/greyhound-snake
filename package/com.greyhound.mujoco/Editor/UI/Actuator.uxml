@@ -1,0 +1,57 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:ue="UnityEditor.UIElements">
+    <ui:VisualElement class="mujoco-card mujoco-card--actuators">
+        <ui:Label text="Actuator" class="mujoco-card__title" />
+        <ue:PropertyField binding-path="actuator.name" label="name" />
+        <ue:PropertyField name="type-field" binding-path="actuator.type" label="type" />
+    </ui:VisualElement>
+
+    <ui:Foldout text="Transmission" value="true" class="mujoco-section">
+        <ue:PropertyField binding-path="target" label="joint (target)" />
+        <ue:PropertyField binding-path="jointinparent" label="jointinparent" />
+        <ue:PropertyField binding-path="site" label="site" />
+        <ue:PropertyField binding-path="refsite" label="refsite" />
+        <ue:PropertyField binding-path="cranksite" label="cranksite" />
+        <ue:PropertyField binding-path="slidersite" label="slidersite" />
+        <ue:PropertyField name="unit-cranklength" binding-path="actuator.cranklength" label="cranklength" />
+        <ue:PropertyField binding-path="actuator.gear" label="gear" />
+    </ui:Foldout>
+
+    <ui:Foldout text="Gains" value="true" class="mujoco-section">
+        <ue:PropertyField name="unit-kp" binding-path="actuator.kp" label="kp" class="position-only" />
+        <ue:PropertyField name="unit-kv" binding-path="actuator.kv" label="kv" />
+        <ue:PropertyField name="unit-dampratio" binding-path="actuator.dampratio" label="dampratio" class="position-only" />
+        <ue:PropertyField name="unit-timeconst" binding-path="actuator.timeconst" label="timeconst" class="position-only" />
+    </ui:Foldout>
+
+    <ui:Foldout text="Control" value="true" class="mujoco-section">
+        <ue:PropertyField binding-path="actuator.ctrllimited" label="ctrllimited" />
+        <ue:PropertyField name="unit-ctrlLo" binding-path="actuator.ctrlLo" label="ctrlrange lo" />
+        <ue:PropertyField name="unit-ctrlHi" binding-path="actuator.ctrlHi" label="ctrlrange hi" />
+        <ue:PropertyField name="unit-inheritrange" binding-path="actuator.inheritrange" label="inheritrange" class="position-only" />
+    </ui:Foldout>
+
+    <ui:Foldout text="Force" value="false" class="mujoco-section">
+        <ue:PropertyField binding-path="actuator.forcelimited" label="forcelimited" />
+        <ue:PropertyField name="unit-forceLo" binding-path="actuator.forceLo" label="forcerange lo" />
+        <ue:PropertyField name="unit-forceHi" binding-path="actuator.forceHi" label="forcerange hi" />
+        <ue:PropertyField name="unit-lengthrangeLo" binding-path="actuator.lengthrangeLo" label="lengthrange lo" />
+        <ue:PropertyField name="unit-lengthrangeHi" binding-path="actuator.lengthrangeHi" label="lengthrange hi" />
+    </ui:Foldout>
+
+    <ui:Foldout text="Dynamics" value="false" class="mujoco-section">
+        <ue:PropertyField name="unit-damping" binding-path="actuator.damping" label="damping" />
+        <ue:PropertyField name="unit-armature" binding-path="actuator.armature" label="armature" />
+    </ui:Foldout>
+
+    <ui:Foldout text="Delay" value="false" class="mujoco-section">
+        <ue:PropertyField name="unit-delay" binding-path="actuator.delay" label="delay" />
+        <ue:PropertyField binding-path="actuator.nsample" label="nsample" />
+        <ue:PropertyField binding-path="actuator.interp" label="interp" />
+    </ui:Foldout>
+
+    <ui:Foldout text="Other" value="false" class="mujoco-section">
+        <ue:PropertyField binding-path="actuator.class" label="class" />
+        <ue:PropertyField binding-path="actuator.group" label="group" />
+        <ue:PropertyField binding-path="actuator.user" label="user" />
+    </ui:Foldout>
+</ui:UXML>

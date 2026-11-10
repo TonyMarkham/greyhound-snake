@@ -1,0 +1,85 @@
+/* The bar colour is the path's state (SiblingPathDrawer.Refresh):
+   red = no root, yellow = root but no target (indices []), green = root
+   and a target (child indices, or [-1] = the root itself). The
+   state rules come after .sibling-path-card so their left colour
+   overrides the shorthand border-color. */
+.sibling-path-card {
+    border-width: 1px;
+    border-left-width: 6px;
+    border-color: rgb(90, 90, 90);
+    border-radius: 4px;
+    /* No padding, so the header band reaches the borders; the body
+       pads itself below. overflow: hidden clips the band to the
+       card's rounded corners. */
+    padding: 0;
+    margin: 2px 0;
+    overflow: hidden;
+}
+
+.sibling-path-card > .unity-foldout {
+    margin: 0;
+}
+
+/* The header band: edge to edge, darkened by a 25% black overlay
+   (works on both the light and dark editor skins). The inspector
+   gives foldout headers a negative left margin; it is zeroed so the
+   chevron sits inside the card instead of under the bar. */
+.sibling-path-card > .unity-foldout > .unity-foldout__toggle {
+    margin: 0;
+    padding: 3px 8px 3px 4px;
+    background-color: rgba(0, 0, 0, 0.25);
+}
+
+.sibling-path-card > .unity-foldout > .unity-foldout__content {
+    padding: 4px 8px 0 0;
+}
+
+.sibling-path-card--empty {
+    border-left-color: rgb(244, 67, 54);
+}
+
+.sibling-path-card--rooted {
+    border-left-color: rgb(255, 193, 7);
+}
+
+.sibling-path-card--set {
+    border-left-color: rgb(76, 175, 80);
+}
+
+.sibling-path-chain {
+    margin-left: 10px;
+}
+
+.sibling-path-chain__row {
+    padding: 1px 0;
+}
+
+.sibling-path-chain__row--target {
+    -unity-font-style: bold;
+}
+
+/* Separates the Name / Resolved Name rows from the chain above. */
+.sibling-path-names {
+    border-top-width: 1px;
+    border-top-color: rgb(90, 90, 90);
+    margin-top: 4px;
+    padding-top: 4px;
+}
+
+/* No USS border: USS has no dashed style, so SiblingPathDrawer draws
+   the dashed outline itself (DrawDashedBorder). */
+.sibling-path-dropzone {
+    padding: 6px;
+    margin: 4px 8px 6px 8px;
+    opacity: 0.75;
+    /* Twice the 30px it measured with content-sized height. UI Toolkit
+       heights include padding and border. */
+    height: 60px;
+    justify-content: center;
+    align-items: center;
+}
+
+.sibling-path-ping {
+    margin: 4px 8px 6px 8px;
+    align-self: stretch;
+}

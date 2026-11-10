@@ -1,0 +1,8 @@
+{
+  "name": "com.greyhound.mujoco",
+  "version": "0.1.0",
+  "displayName": "Greyhound MuJoCo",
+  "description": "MuJoCo annotation assets (root, joints, actuators, sites) keyed by sibling-index paths.",
+  "unity": "6000.0",
+  "dependencies": {}
+}

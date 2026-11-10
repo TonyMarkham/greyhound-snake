@@ -1,0 +1,35 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:ue="UnityEditor.UIElements">
+    <ui:VisualElement class="mujoco-card mujoco-card--sensors">
+        <ui:Label text="Sensor (framepos)" class="mujoco-card__title" />
+        <ue:PropertyField binding-path="sensor.name" label="name" />
+    </ui:VisualElement>
+
+    <ui:Foldout text="Measures" value="true" class="mujoco-section">
+        <ue:PropertyField name="objtype-field" binding-path="objtype" label="objtype" />
+        <ue:PropertyField binding-path="objnameSite" label="objname (site)" class="obj-site" />
+        <ue:PropertyField binding-path="objnameGeom" label="objname (geom)" class="obj-geom" />
+        <ue:PropertyField binding-path="objnameBody" label="objname (body)" class="obj-body" />
+        <ue:PropertyField name="reftype-field" binding-path="reftype" label="reftype" />
+        <ue:PropertyField binding-path="refnameSite" label="refname (site)" class="ref-site" />
+        <ue:PropertyField binding-path="refnameGeom" label="refname (geom)" class="ref-geom" />
+        <ue:PropertyField binding-path="refnameBody" label="refname (body)" class="ref-body" />
+        <ui:Label text="Leave refname empty to measure in world coordinates." class="mujoco-hint" />
+        <ui:Label name="camera-note" text="Camera is not supported: the package has no camera type, so the export is refused." class="mujoco-hint" />
+    </ui:Foldout>
+
+    <ui:Foldout text="Signal" value="true" class="mujoco-section">
+        <ue:PropertyField binding-path="sensor.noise" label="noise (m)" />
+        <ue:PropertyField binding-path="sensor.cutoff" label="cutoff (m)" />
+    </ui:Foldout>
+
+    <ui:Foldout text="Timing" value="false" class="mujoco-section">
+        <ue:PropertyField binding-path="sensor.delay" label="delay (s)" />
+        <ue:PropertyField binding-path="sensor.nsample" label="nsample" />
+        <ue:PropertyField binding-path="sensor.interp" label="interp" />
+        <ue:PropertyField binding-path="sensor.interval" label="interval (s)" />
+    </ui:Foldout>
+
+    <ui:Foldout text="Other" value="false" class="mujoco-section">
+        <ue:PropertyField binding-path="sensor.user" label="user" />
+    </ui:Foldout>
+</ui:UXML>

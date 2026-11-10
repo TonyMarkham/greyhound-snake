@@ -122,6 +122,42 @@ rewrites body poses, which would scramble our CAD-exact frames — keep
 `alignfree` at its false default (`xmlref #body-freejoint-align`,
 `#compiler-alignfree`).
 
+## body/site — full attribute surface
+
+Checked 2026-11-09 against the rendered stable XML reference
+(`XMLreference.html#body-site`) and the modeling guide's *Frame
+orientations*; the rendered pages state no version number. A site is a
+named frame on a body: sites "do not participate in collisions and
+computation of body masses and inertias", and serve where geoms cannot —
+sensor mounts, spatial-tendon via-points, slider-crank transmissions.
+
+| Attribute | Value | Notes |
+|---|---|---|
+| `name` | `string`, optional | How sensors reference the site (`objname`/`refname`). In this repo it is the asset's own `.name`, sanitized and deduplicated by the exporter — not a payload field |
+| `class` | `string`, optional | Defaults class for unspecified attributes |
+| `type` | `[sphere, capsule, ellipsoid, cylinder, box, mesh]` "sphere" | Shape for rendering; **also the active sensor zone of touch sensors** — the only site attribute the docs tie to simulation |
+| `group` | `int` "0" | Visualizer show/hide group, or a custom tag |
+| `material` | `string`, optional | Visual properties |
+| `mesh` | `string`, optional | Mesh asset name; required iff `type="mesh"` |
+| `rgba` | `real(4)` "0.5 0.5 0.5 1" | Colour; when it differs from the internal default it overrides the material |
+| `size` | `real(3)` "0.005 0.005 0.005" | Shape sizes. The site section gives **no per-type meaning**; the geom table (sphere radius, box half-sizes, …) is not stated to apply |
+| `fromto` | `real(6)`, optional | Capsule, cylinder, ellipsoid, box only: +Z runs from the first point to the second, frame at the midpoint. **When set, `pos` and every orientation attribute are ignored** |
+| `pos` | `real(3)` "0 0 0" | Site frame position in the body frame |
+| `quat` / `axisangle` / `xyaxes` / `zaxis` / `euler` | orientation forms | At most one. Only `quat` has a default, "1 0 0 0" (unrotated); stored internally as a unit quaternion. `axisangle` and `euler` angles follow `compiler angle`; `euler`'s axis order is `compiler eulerseq` (default "xyz") |
+| `user` | `real(nuser_site)` "0 0 …" | Custom parameters; count set by `size nuser_site` |
+
+- **Orientation reaches sensors that report in the site frame**, e.g. the
+  magnetometer ("expressed in the site frame", `xmlref #option-magnetic`).
+  `framepos` — the only sensor the step exporter writes — uses position
+  only.
+- **Repo payload today** (source, 2026-11-09): `MjSite` (step) and
+  `Site` (`com.greyhound.mujoco`) carry `pos` only; the step exporter
+  writes `<site name pos/>`. Every other attribute above is left at its
+  MJCF default.
+- **Not stated by the docs:** which form wins when more than one
+  orientation attribute is given, and whether `size`/`fromto` shape the
+  touch-sensor zone beyond `type`.
+
 ## compiler / option facts touching joints
 
 - `autolimits` `[false,true]` default **true**: infers `limited`,
@@ -354,7 +390,8 @@ retired by this decision.
   <https://mujoco.readthedocs.io/en/stable/XMLreference.html>
   (anchors used: `#body`, `#body-joint`, `#body-joint-*` (pos, axis,
   range, limited, damping, frictionloss, armature, ref, springdamper,
-  margin, actuatorfrcrange), `#body-freejoint`, `#compiler-autolimits`,
+  margin, actuatorfrcrange), `#body-freejoint`, `#body-site` (checked
+  2026-11-09), `#option-magnetic`, `#compiler-autolimits`,
   `#compiler-angle`, `#compiler-coordinate`, `#compiler-fusestatic`,
   `#compiler-inertiafromgeom`, `#compiler-alignfree`, `#option-timestep`,
   `#option-integrator`, `#option-gravity`, `#actuator`,
@@ -363,7 +400,7 @@ retired by this decision.
   `#actuator-position` + `#actuator-position-*` (kp, kv, dampratio,
   timeconst, inheritrange))
 - Modeling guide: <https://mujoco.readthedocs.io/en/stable/modeling.html>
-  (*Actuator shortcuts*, *Force limits*)
+  (*Actuator shortcuts*, *Force limits*, *Frame orientations*)
 - Release pin: google-deepmind/mujoco latest release **3.15.0** (GitHub
   releases API, 2026-10-09); readthedocs "stable" tracks it
 - Repo: `unity-mujoco.md` (facts, plan, and landed M1–M3 decisions),

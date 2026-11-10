@@ -1,0 +1,108 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:ue="UnityEditor.UIElements">
+    <ui:VisualElement name="model-card" class="mujoco-card">
+        <ui:Label text="Model" class="mujoco-card__title" />
+        <ue:PropertyField binding-path="root" label="model" />
+        <ue:PropertyField binding-path="rootMobility" label="root mobility" />
+    </ui:VisualElement>
+
+    <ui:Foldout text="Simulation" value="true" class="mujoco-section">
+        <ue:PropertyField binding-path="timestepSeconds" label="timestep (s)" />
+        <ue:PropertyField binding-path="integrator" label="integrator" />
+    </ui:Foldout>
+
+    <ui:Foldout text="Physics" value="false" class="mujoco-section">
+        <ue:PropertyField binding-path="gravity" label="gravity" />
+        <ue:PropertyField binding-path="wind" label="wind" />
+        <ue:PropertyField binding-path="magnetic" label="magnetic" />
+        <ue:PropertyField binding-path="density" label="density" />
+        <ue:PropertyField binding-path="viscosity" label="viscosity" />
+    </ui:Foldout>
+
+    <ui:Foldout text="Solver" value="false" class="mujoco-section">
+        <ue:PropertyField binding-path="solver" label="solver" />
+        <ue:PropertyField binding-path="cone" label="cone" />
+        <ue:PropertyField binding-path="jacobian" label="jacobian" />
+        <ue:PropertyField binding-path="impratio" label="impratio" />
+        <ui:Label text="Iterations" class="mujoco-subheader" />
+        <ue:PropertyField binding-path="iterations" label="iterations" />
+        <ue:PropertyField binding-path="ls_iterations" label="ls_iterations" />
+        <ue:PropertyField binding-path="noslip_iterations" label="noslip_iterations" />
+        <ue:PropertyField binding-path="ccd_iterations" label="ccd_iterations" />
+        <ue:PropertyField binding-path="sdf_iterations" label="sdf_iterations" />
+        <ue:PropertyField binding-path="sdf_initpoints" label="sdf_initpoints" />
+        <ui:Label text="Tolerances" class="mujoco-subheader" />
+        <ue:PropertyField binding-path="tolerance" label="tolerance" />
+        <ue:PropertyField binding-path="ls_tolerance" label="ls_tolerance" />
+        <ue:PropertyField binding-path="noslip_tolerance" label="noslip_tolerance" />
+        <ue:PropertyField binding-path="ccd_tolerance" label="ccd_tolerance" />
+        <ue:PropertyField binding-path="sleep_tolerance" label="sleep_tolerance" />
+    </ui:Foldout>
+
+    <ui:Foldout text="Contact override" value="false" class="mujoco-section">
+        <ue:PropertyField binding-path="o_margin" label="o_margin" />
+        <ue:PropertyField binding-path="o_solref" label="o_solref" />
+        <ue:PropertyField binding-path="o_solimp" label="o_solimp" />
+        <ue:PropertyField binding-path="o_friction" label="o_friction" />
+    </ui:Foldout>
+
+    <ui:Foldout text="Flags" value="false" class="mujoco-section">
+        <ui:Label text="On by default" class="mujoco-subheader" />
+        <ue:PropertyField binding-path="flag.constraint" label="constraint" />
+        <ue:PropertyField binding-path="flag.equality" label="equality" />
+        <ue:PropertyField binding-path="flag.frictionloss" label="frictionloss" />
+        <ue:PropertyField binding-path="flag.limit" label="limit" />
+        <ue:PropertyField binding-path="flag.contact" label="contact" />
+        <ue:PropertyField binding-path="flag.spring" label="spring" />
+        <ue:PropertyField binding-path="flag.damper" label="damper" />
+        <ue:PropertyField binding-path="flag.gravity" label="gravity" />
+        <ue:PropertyField binding-path="flag.clampctrl" label="clampctrl" />
+        <ue:PropertyField binding-path="flag.warmstart" label="warmstart" />
+        <ue:PropertyField binding-path="flag.filterparent" label="filterparent" />
+        <ue:PropertyField binding-path="flag.actuation" label="actuation" />
+        <ue:PropertyField binding-path="flag.refsafe" label="refsafe" />
+        <ue:PropertyField binding-path="flag.sensor" label="sensor" />
+        <ue:PropertyField binding-path="flag.midphase" label="midphase" />
+        <ue:PropertyField binding-path="flag.eulerdamp" label="eulerdamp" />
+        <ue:PropertyField binding-path="flag.autoreset" label="autoreset" />
+        <ue:PropertyField binding-path="flag.nativeccd" label="nativeccd" />
+        <ue:PropertyField binding-path="flag.island" label="island" />
+        <ue:PropertyField binding-path="flag.multiccd" label="multiccd" />
+        <ui:Label text="Off by default" class="mujoco-subheader" />
+        <ue:PropertyField binding-path="flag.override" label="override" />
+        <ue:PropertyField binding-path="flag.energy" label="energy" />
+        <ue:PropertyField binding-path="flag.fwdinv" label="fwdinv" />
+        <ue:PropertyField binding-path="flag.invdiscrete" label="invdiscrete" />
+        <ue:PropertyField binding-path="flag.sleep" label="sleep" />
+        <ue:PropertyField binding-path="flag.diagexact" label="diagexact" />
+        <ue:PropertyField binding-path="flag.ipc" label="ipc" />
+    </ui:Foldout>
+
+    <ui:Foldout text="Actuator groups" value="false" class="mujoco-section">
+        <ue:PropertyField binding-path="actuatorgroupdisable" label="actuatorgroupdisable" />
+    </ui:Foldout>
+
+    <ui:VisualElement class="mujoco-card mujoco-card--element mujoco-card--joints">
+        <ue:PropertyField name="joints-list" binding-path="joints" />
+        <ui:Button name="joints-add" text="Add Joint" class="mujoco-add" />
+    </ui:VisualElement>
+    <ui:VisualElement class="mujoco-card mujoco-card--element mujoco-card--actuators">
+        <ue:PropertyField name="actuators-list" binding-path="actuators" />
+        <ui:Button name="actuators-add" text="Add Actuator" class="mujoco-add" />
+    </ui:VisualElement>
+    <ui:VisualElement class="mujoco-card mujoco-card--element mujoco-card--sites">
+        <ue:PropertyField name="sites-list" binding-path="sites" />
+        <ui:Button name="sites-add" text="Add Site" class="mujoco-add" />
+    </ui:VisualElement>
+    <ui:VisualElement class="mujoco-card mujoco-card--element mujoco-card--geoms">
+        <ue:PropertyField name="geoms-list" binding-path="geoms" />
+        <ui:Button name="geoms-add" text="Add Geom" class="mujoco-add" />
+    </ui:VisualElement>
+    <ui:VisualElement class="mujoco-card mujoco-card--element mujoco-card--sensors">
+        <ue:PropertyField name="sensors-list" binding-path="sensors" />
+        <ui:Button name="sensors-add" text="Add Sensor" class="mujoco-add" />
+    </ui:VisualElement>
+
+    <ui:Button name="export-button" text="Export MJCF..." class="mujoco-export" />
+    <ui:VisualElement name="export-result" />
+    <ui:Button name="reveal-button" text="Show in Explorer" style="display: none;" />
+</ui:UXML>

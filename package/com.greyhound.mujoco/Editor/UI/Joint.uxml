@@ -1,0 +1,53 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:ue="UnityEditor.UIElements">
+    <ui:VisualElement class="mujoco-card mujoco-card--joints">
+        <ui:Label text="Joint" class="mujoco-card__title" />
+        <ue:PropertyField binding-path="joint.name" label="name" />
+        <ue:PropertyField binding-path="body" label="body" />
+    </ui:VisualElement>
+
+    <ui:Foldout text="Joint" value="true" class="mujoco-section">
+        <ue:PropertyField binding-path="joint.type" label="type" />
+        <ue:PropertyField binding-path="joint.pos" label="pos (m)" />
+        <ue:PropertyField binding-path="joint.axis" label="axis" />
+        <ui:Label name="axis-warning" class="warning" text="axis must be a non-zero vector" />
+        <ui:Button name="repick-axis" text="Re-pick Axis" />
+        <ue:PropertyField name="unit-ref" binding-path="joint.ref" label="ref" />
+    </ui:Foldout>
+
+    <ui:Foldout text="Range" value="true" class="mujoco-section">
+        <ue:PropertyField binding-path="joint.limited" label="limited" />
+        <ue:PropertyField name="unit-rangeLo" binding-path="joint.rangeLo" label="range lo" />
+        <ue:PropertyField name="unit-rangeHi" binding-path="joint.rangeHi" label="range hi" />
+        <ui:Label name="limits-warning" class="warning" text="limits require lo &lt; hi" />
+    </ui:Foldout>
+
+    <ui:Foldout text="Dynamics" value="false" class="mujoco-section">
+        <ue:PropertyField name="unit-damping" binding-path="joint.damping" label="damping" />
+        <ue:PropertyField name="unit-frictionloss" binding-path="joint.frictionloss" label="frictionloss" />
+        <ue:PropertyField name="unit-armature" binding-path="joint.armature" label="armature" />
+        <ue:PropertyField name="unit-stiffness" binding-path="joint.stiffness" label="stiffness" />
+        <ue:PropertyField name="unit-springref" binding-path="joint.springref" label="springref" />
+        <ue:PropertyField binding-path="joint.springdamper" label="springdamper (s, 1 = critical)" />
+    </ui:Foldout>
+
+    <ui:Foldout text="Solver" value="false" class="mujoco-section">
+        <ue:PropertyField name="unit-margin" binding-path="joint.margin" label="margin" />
+        <ue:PropertyField binding-path="joint.solreflimit" label="solreflimit" />
+        <ue:PropertyField binding-path="joint.solimplimit" label="solimplimit" />
+        <ue:PropertyField binding-path="joint.solreffriction" label="solreffriction" />
+        <ue:PropertyField binding-path="joint.solimpfriction" label="solimpfriction" />
+    </ui:Foldout>
+
+    <ui:Foldout text="Actuator force" value="false" class="mujoco-section">
+        <ue:PropertyField binding-path="joint.actuatorfrclimited" label="actuatorfrclimited" />
+        <ue:PropertyField name="unit-actuatorfrcrangeLo" binding-path="joint.actuatorfrcrangeLo" label="actuatorfrcrange lo" />
+        <ue:PropertyField name="unit-actuatorfrcrangeHi" binding-path="joint.actuatorfrcrangeHi" label="actuatorfrcrange hi" />
+        <ue:PropertyField binding-path="joint.actuatorgravcomp" label="actuatorgravcomp" />
+    </ui:Foldout>
+
+    <ui:Foldout text="Other" value="false" class="mujoco-section">
+        <ue:PropertyField binding-path="joint.class" label="class" />
+        <ue:PropertyField binding-path="joint.group" label="group" />
+        <ue:PropertyField binding-path="joint.user" label="user" />
+    </ui:Foldout>
+</ui:UXML>
