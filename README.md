@@ -37,15 +37,15 @@ x86_64 is exercised end to end.
 | `crates/aruco` | 4x4 ArUco dictionary model: OpenCV's embedded bit tables, rotations, standard Hamming error checks, marker selection, SVG rendering |
 | `crates/aruco-cli` | CLI generating 4x4 ArUco marker SVGs (manual: `crates/aruco-cli/README.md`) |
 | `package/com.greyhound.step` | Tracked UPM package sources: the C# `Runtime/` P/Invoke layer, mass-properties components, the joint/actuator/geom annotation asset family with its `Mj*` MJCF mirrors, and the `Editor/` ScriptedImporter, authoring editors, scene tools, reimport validator, and MJCF exporter |
-| `tools/verify-package.py` | End-to-end verification of the assembled package against measured constants |
-| `justfile` | `just assemble-package` stages package + native payload into `dist/`; `just verify-package` checks it from a copied layout |
+| `tools/verify-package.py` | End-to-end verification of the step package and its provisioned native libraries against measured constants |
+| `justfile` | `just sync-fetch-config` copies the fetch pins into both packages; `just verify-package` checks the step package from a copied layout |
 | `assets/` | Sample STEP files (single part `rod-clamp-16mm.stp`, assembly `cart-asy.step`) |
 | `config.toml` | Runtime config for `step-stats` and the MJCF exporter: OCCT `library_dir` and `shim_dir` |
 | `crates/occt-sys/config.toml` | Sole input source for `build.rs`: the per-OS OCCT prefix and shim destination plus the `[linux]`/`[windows]`/`[macos]` deltas (toolchain, include/lib dirs, library naming) |
 | `third_party/occt` | OCCT license and exception texts bundled with the binaries |
 | `third_party/opencv` | OpenCV Apache-2.0 license text (the embedded 4x4 dictionary bit tables are OpenCV source data — see `THIRD_PARTY_NOTICES.md`) |
 | `tools/extract_aruco_dict.py` | Regenerates `crates/aruco/src/data/dict_4x4_1000.rs` verbatim from OpenCV's pinned source |
-| `dist/` | Gitignored native output (see below) |
+| `dist/` | Gitignored local native build output: the shims' `shim_dir` (zipped by `RELEASE.md`) |
 | `tmp/` | Gitignored OCCT source/build scratch area |
 
 ### Design reference docs
@@ -63,10 +63,10 @@ x86_64 is exercised end to end.
 
 | Path | Contents |
 |---|---|
-| `dist/package/com.greyhound.step/` | the assembled UPM package: authored sources plus the native payload |
-| `…/Runtime/Plugins/occt/x86_64/` | the provisioned OCCT payload: the runtime `libTK*.so` libraries plus license texts and notices |
-| `…/Runtime/Plugins/shim/x86_64/` | `libgreyhound_occt.so` — the C++ shim built by `occt-sys/build.rs` |
-| `…/Runtime/Plugins/x86_64/` | `libimporter_host.so` — the Unity-facing host cdylib |
+| `package/com.greyhound.step/Runtime/Plugins/` | gitignored; filled by the package's provisioner at editor load from the pins in `Editor/occt-fetch.toml` |
+| `…/occt/x86_64/lib/` | the OCCT payload: the runtime `libTK*.so` libraries plus license texts and notices |
+| `…/shim/x86_64/` | `libgreyhound_occt.so` — the C++ shim (built by `occt-sys/build.rs`, released per `RELEASE.md`) |
+| `…/x86_64/` | `libimporter_host.so` — the Unity-facing host cdylib (released per `RELEASE.md`) |
 
 ## Getting started (Linux x86_64)
 
@@ -98,19 +98,21 @@ Prerequisites: a recent Rust toolchain (edition 2024) and a C++17 compiler.
    `--config` defaults to `config.toml` in the working directory; its
     `library_dir` and `shim_dir` values resolve relative to the config file's
    directory.
-4. Assemble and verify the UPM package:
+4. Use it in Unity: reference `package/com.greyhound.step/` from a
+   project (a `file:` entry in `Packages/manifest.json` works). On editor
+   load the package downloads its native libraries (OCCT, `importer_host`,
+   the shim) into its gitignored `Runtime/Plugins/`, pinned by
+   `Editor/occt-fetch.toml`. Then drop a `.stp`/`.step` file into
+   `Assets/`. Right-click
+   an imported part to author joints and actuators; the joint set's
+   inspector has the Export button that writes the MJCF model beside the
+   STEP file.
+5. Verify the package and its downloaded natives outside Unity (after
+   step 4 has provisioned them):
 
    ```
    just verify-package
    ```
-
-5. Use it in Unity: reference or copy
-   `dist/package/com.greyhound.step/` into a project (a `file:` entry in
-   `Packages/manifest.json` works), restart the editor so the native plugins
-   are scanned, and drop a `.stp`/`.step` file into `Assets/`. Right-click
-   an imported part to author joints and actuators; the joint set's
-   inspector has the Export button that writes the MJCF model beside the
-   STEP file.
 
 ## How native loading works
 

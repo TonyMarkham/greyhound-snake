@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the assembled native package from a copied layout.
+"""Verify the tracked step package (with its provisioned natives) from a copied layout.
 
 Replays the exact C# consumption flow of the importer-host ABI against a
 temporary copy of package/ so path independence is actually exercised:
@@ -145,12 +145,15 @@ def verify_from_copy(source, asset):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--package", type=Path, default=Path("dist/package"))
+    parser.add_argument("--package", type=Path, default=Path("package"))
     parser.add_argument("--asset", type=Path, default=Path("assets/cart-asy.step"))
     args = parser.parse_args()
 
     if not (args.package / PACKAGE_NAME / "Runtime" / "Plugins" / PLUGIN_ARCH / HOST_LIBRARY).is_file():
-        fail(f"{args.package} is not an assembled package; run 'just assemble-package'")
+        fail(
+            f"{args.package} has no provisioned host library; open a Unity "
+            "project that uses the package once so its provisioner downloads it"
+        )
 
     asset = args.asset.resolve()
     if os.name != "nt":
@@ -161,7 +164,7 @@ def main():
         return
 
     # Windows refuses to delete a loaded image, which is what made a copied
-    # layout need child-process gymnastics; so verify the assembled package
+    # layout need child-process gymnastics; so verify the package
     # directly instead. It is still independent of the build tree (nothing
     # loads from target/), and this process exits right after, releasing
     # every DLL lock itself.

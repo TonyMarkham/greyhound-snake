@@ -46,7 +46,9 @@ namespace Greyhound.MuJoCo
     // name renames the asset to match (ElementEditor). The exporter turns
     // [ , ] into _, so "j-[2,0]-Pole" exports as "j-_2_0_-Pole".
     [CustomEditor(typeof(SO.Joint))]
+#if UNITY_6000_5_OR_NEWER
     [NoAutoStaticsCleanup]
+#endif
     internal sealed class JointEditor : ElementEditor
     {
         [SerializeField] private VisualTreeAsset m_VisualTreeAsset;

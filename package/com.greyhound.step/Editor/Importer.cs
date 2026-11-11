@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Text;
 
@@ -10,8 +9,8 @@ using UnityEditor.AssetImporters;
 
 namespace Greyhound.Step
 {
-    [ScriptedImporter(version: 1, exts: new[] { "stp", "step" })]
-    internal sealed class StepImporter : ScriptedImporter
+    [ScriptedImporter(version: 1, exts: new[] { "stp", "step", "STP", "STEP" })]
+    internal sealed class Importer : ScriptedImporter
     {
         private const double Deflection = 0.01;
         private const double AngleRadians = 0.5;
@@ -52,7 +51,12 @@ namespace Greyhound.Step
 
             string assetName = Path.GetFileNameWithoutExtension(ctx.assetPath);
             StepHost host = StepHost.GetShared();
-            using (StepDocument doc = host.OpenStep(ctx.assetPath))
+            // The native reader opens a real file, but a STEP inside a
+            // package has a virtual "Packages/<name>/..." asset path with
+            // no file behind it under the project. Path.GetFullPath maps
+            // it to the package's physical folder (Unity's documented way
+            // to reach a package file); an Assets/ path maps unchanged.
+            using (StepDocument doc = host.OpenStep(Path.GetFullPath(ctx.assetPath)))
             {
                 HostSceneCounts sceneCounts = doc.SceneCounts(Deflection, AngleRadians, Scale);
 

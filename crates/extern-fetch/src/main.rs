@@ -76,13 +76,12 @@ fn run(cli: &Cli) -> ExternFetchResult<bool> {
             continue;
         };
         for (role, artifact) in platform.artifacts() {
-            // The package payload is written exclusively by the package's
-            // C# provisioner (only the C# fetcher puts anything in the
-            // dist package). The
-            // `payload` entries exist in this config as the pins source
-            // that assemble-package stages into the package
-            // (Editor/occt-fetch.toml); the CLI fetches only the extern/
-            // dev trees and must never write into the package.
+            // The package payload is written exclusively by the packages'
+            // C# provisioners. The `payload` entries exist in this config
+            // as the pins source that `just sync-fetch-config` copies into
+            // the packages (Editor/occt-fetch.toml,
+            // Editor/opencv-fetch.toml); the CLI fetches only the extern/
+            // dev trees and must never write into a package.
             if role == "payload" {
                 continue;
             }

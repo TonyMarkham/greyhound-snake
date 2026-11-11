@@ -142,8 +142,8 @@ needs the user's Unity editor, use the dist-first loop.
   build-time headers and import libs), the shim's own plugins directory,
   and the `[linux]`/`[windows]`/`[macos]` deltas (toolchain, include/lib
   dirs, library naming).
-- `dist/`: repo-local native distributions, including the fully assembled
-  UPM package in `dist/package/`; currently gitignored.
+- `dist/`: gitignored local native build output — the shims' `shim_dir`
+  (`crates/*-sys/config.toml`), zipped from there by `RELEASE.md`.
 - `package/com.greyhound.step/`: tracked UPM package — authored
   sources (`package.json`, `Third Party Notices.md`, and the C# code:
   the `Runtime/` P/Invoke layer with struct mirrors, the
@@ -153,10 +153,13 @@ needs the user's Unity editor, use the dist-first loop.
   MJCF payload mirrors), and the `Editor/` `ScriptedImporter`, authoring
   editors, scene tools, reimport validator/pruner, and the MJCF
   exporter).
-  `just assemble-package` stages it with the native
-  payload into `dist/package/com.greyhound.step/`; `just verify-package`
-  checks the staged package from a copied layout
-  (`tools/verify-package.py`).
+  Unity projects consume it directly (a `file:` manifest entry); its
+  C# provisioner downloads every native library (OCCT, the host, the
+  shim) into its gitignored `Runtime/Plugins/` at editor load, pinned by
+  the tracked `Editor/occt-fetch.toml` (`just sync-fetch-config` copies
+  `crates/extern-fetch/config.toml` there; `RELEASE.md` publishes our
+  own libraries). `just verify-package` checks the package and its
+  provisioned natives from a copied layout (`tools/verify-package.py`).
 - `tmp/`: disposable OCCT source and build scaffolding; currently gitignored.
 - `assets/`: sample assets, including a single part and an assembly STEP file.
 - `crates/aruco/`, `crates/aruco-cli/`: ArUco 4x4 marker SVG generator

@@ -43,12 +43,13 @@ shim_filename  = "ghcv.dll"
 [linux]
 # Pre-populated from the release page's linux layout (NOT exercised):
 # unversioned libopencv_*.so with plain SONAMEs (the local build patch
-# removing VERSION/SOVERSION, opencv-linux.md §2.1). Headers sit
-# directly under include/opencv2 — the archive's actual layout (the
-# release page's include/opencv5 text does not match the tree).
+# removing VERSION/SOVERSION, opencv-linux.md §2.1). Headers sit under
+# include/opencv5/opencv2 (checked in the fetched v0.1.0 linux-dev
+# tree: include/opencv5/opencv2/objdetect/aruco_detector.hpp), so
+# include_dir is include/opencv5 and `#include <opencv2/...>` resolves.
 opencv_prefix  = "extern/opencv/5.0.0/linux-x86_64-dev"
 toolchain      = "gnu"
-include_dir    = "include"
+include_dir    = "include/opencv5"
 lib_dir        = "lib"
 import_pattern = "libopencv_{module}.so"
 modules        = ["core", "imgproc", "imgcodecs", "objdetect"]
@@ -62,7 +63,7 @@ shim_filename  = "libghcv.so"
 # the shim's own loader-path story on darwin is unexercised.
 opencv_prefix  = "extern/opencv/5.0.0/macos-arm64-dev"
 toolchain      = "gnu"
-include_dir    = "include"
+include_dir    = "include/opencv5"
 lib_dir        = "lib"
 import_pattern = "libopencv_{module}.dylib"
 modules        = ["core", "imgproc", "imgcodecs", "objdetect"]

@@ -1,6 +1,9 @@
-using Unity.Scripting.LifecycleManagement;
 using UnityEditor;
 using UnityEngine;
+
+#if UNITY_6000_5_OR_NEWER
+using Unity.Scripting.LifecycleManagement;
+#endif
 
 namespace Greyhound.Step
 {
@@ -13,7 +16,9 @@ namespace Greyhound.Step
     // Tools > Step/Log Bounds prints each mesh's emitted bounds next to
     // Unity's renderer bounds and a fresh RecalculateBounds result.
     [InitializeOnLoad]
+#if UNITY_6000_5_OR_NEWER
     [NoAutoStaticsCleanup]
+#endif
     internal static class StepBoundsGizmo
     {
         private const string MenuPath = "Tools/Step Bounds Gizmo";

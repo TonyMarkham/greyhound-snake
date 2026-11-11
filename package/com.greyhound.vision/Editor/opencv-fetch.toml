@@ -6,11 +6,11 @@
 # payload dir). Consumers per role: the `dev` entries feed the shim
 # builds via the `*-sys` crates' config.toml (crates/occt-sys,
 # crates/opencv-sys); the `payload` entries exist as the
-# single pins source that assemble-package stages into the package as
-# Editor/occt-fetch.toml — the C# provisioner reads its pins from that
-# copy and is the ONLY writer of the package payload (only the C#
-# fetcher puts anything in the dist package; the CLI fetch skips
-# payload entries). Every platform
+# single pins source that `just sync-fetch-config` copies into the
+# packages as Editor/occt-fetch.toml and Editor/opencv-fetch.toml — the
+# C# provisioners read their pins from those copies and are the ONLY
+# writers of the package payload folders (the CLI fetch skips payload
+# entries, and their `dest` is never used by either side). Every platform
 # carries dev + payload entries, all pinned (Linux/macOS pins from their
 # release pages / build machines; a run on such a machine verifies the
 # downloaded bytes against the pin).
@@ -136,3 +136,67 @@ dest   = "dist/package/com.greyhound.vision/Runtime/Plugins/opencv/x86_64/lib"
 url    = "https://github.com/TonyMarkham/opencv-dev/releases/download/v0.1.0/opencv-5.0.0-arm64-macos-libs-only.zip"
 sha256 = "e231d5dffae44526d31312778aa9fa03d9313d13808cc916c0c3cebf09f2db20"
 dest   = "dist/package/com.greyhound.vision/Runtime/Plugins/opencv/arm64/lib"
+
+
+
+
+# Our own native libraries (RELEASE.md): one group per library, one
+# payload per platform. Only the packages' C# provisioners consume
+# these; the CLI skips payload entries.
+
+[greyhound_host]
+repo = "TonyMarkham/greyhound-snake"
+tag  = "v0.1.0"
+
+[greyhound_host.windows.payload]
+url    = "https://github.com/TonyMarkham/greyhound-snake/releases/download/v0.1.0/importer_host-0.1.0-x86_64-windows.zip"
+sha256 = "5aea131b59191b9f920ac187b3dda35984abc4e74d7440480ad00300271a04a9"
+dest   = "dist/package/com.greyhound.step/Runtime/Plugins/x86_64"
+
+[greyhound_host.linux.payload]
+url    = "https://github.com/TonyMarkham/greyhound-snake/releases/download/v0.1.0/importer_host-0.1.0-x86_64-linux.zip"
+sha256 = "08e6e718ed2386806cf510384c9e5e5118d4b39b4f908e8564a3bec36b401b6b"
+dest   = "dist/package/com.greyhound.step/Runtime/Plugins/x86_64"
+
+[greyhound_host.macos.payload]
+url    = "https://github.com/TonyMarkham/greyhound-snake/releases/download/v0.1.0/importer_host-0.1.0-arm64-macos.zip"
+sha256 = "8f846182567847771aa8f3af806cdb94e217085b444c496d0596c3bde0406461"
+dest   = "dist/package/com.greyhound.step/Runtime/Plugins/arm64"
+
+[greyhound_shim]
+repo = "TonyMarkham/greyhound-snake"
+tag  = "v0.1.0"
+
+[greyhound_shim.windows.payload]
+url    = "https://github.com/TonyMarkham/greyhound-snake/releases/download/v0.1.0/greyhound_occt-0.1.0-x86_64-windows.zip"
+sha256 = "220f1381704ea51bea3f6d5a2d2b8ecdb9d4e71f7d362db1ccb3f1557c2d64b0"
+dest   = "dist/package/com.greyhound.step/Runtime/Plugins/shim/x86_64"
+
+[greyhound_shim.linux.payload]
+url    = "https://github.com/TonyMarkham/greyhound-snake/releases/download/v0.1.0/greyhound_occt-0.1.0-x86_64-linux.zip"
+sha256 = "30f9eeaae46d383fc78eb16c45a136d645607d001afccef8f06e5b2bcf2e8116"
+dest   = "dist/package/com.greyhound.step/Runtime/Plugins/shim/x86_64"
+
+[greyhound_shim.macos.payload]
+url    = "https://github.com/TonyMarkham/greyhound-snake/releases/download/v0.1.0/greyhound_occt-0.1.0-arm64-macos.zip"
+sha256 = "edde214d1f28785ae5ea280fc98d4f1bf55565d50ee156bb2f4e8fe6b497240f"
+dest   = "dist/package/com.greyhound.step/Runtime/Plugins/shim/arm64"
+
+[greyhound_ghcv]
+repo = "TonyMarkham/greyhound-snake"
+tag  = "v0.1.0"
+
+[greyhound_ghcv.windows.payload]
+url    = "https://github.com/TonyMarkham/greyhound-snake/releases/download/v0.1.0/ghcv-0.1.0-x86_64-windows.zip"
+sha256 = "b20a07159bc591c293652a072303bc13cfab865fe4028ce18fed8e446808969e"
+dest   = "dist/package/com.greyhound.vision/Runtime/Plugins/shim/x86_64"
+
+[greyhound_ghcv.linux.payload]
+url    = "https://github.com/TonyMarkham/greyhound-snake/releases/download/v0.1.0/ghcv-0.1.0-x86_64-linux.zip"
+sha256 = "ddaae39b9b9f39fe8d0b25277da2824816a69c32672be4d8ade922fd03e94c19"
+dest   = "dist/package/com.greyhound.vision/Runtime/Plugins/shim/x86_64"
+
+[greyhound_ghcv.macos.payload]
+url    = "https://github.com/TonyMarkham/greyhound-snake/releases/download/v0.1.0/ghcv-0.1.0-arm64-macos.zip"
+sha256 = "046dc3886b0c78e861bae2e98088b2fa51d6738e51f38bb86863bc12e9782c02"
+dest   = "dist/package/com.greyhound.vision/Runtime/Plugins/shim/arm64"

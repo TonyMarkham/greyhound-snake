@@ -44,7 +44,7 @@ namespace Greyhound.Vision
         public static VisionProvenance ForConfig(VisionFetchConfig config)
         {
             return new VisionProvenance(
-                ToolName, VisionFetchConfig.Group, VisionFetchConfig.Role,
+                ToolName, config.Group, VisionFetchConfig.Role,
                 config.Repo, config.Tag, config.Url, config.Sha256);
         }
 
@@ -76,7 +76,7 @@ namespace Greyhound.Vision
 
         public bool Matches(VisionFetchConfig config)
         {
-            return Group == VisionFetchConfig.Group
+            return Group == config.Group
                 && Role == VisionFetchConfig.Role
                 && Repo == config.Repo
                 && Tag == config.Tag

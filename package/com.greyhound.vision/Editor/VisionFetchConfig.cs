@@ -6,20 +6,22 @@ using UnityEngine;
 
 namespace Greyhound.Vision
 {
-    // The pins the C# provisioner fetches with: the copy of
-    // crates/extern-fetch/config.toml that `just assemble-package` stages
-    // as Editor/opencv-fetch.toml. One source of
-    // pins — the staged copy is refreshed on every package assembly, so
-    // the package and the repository can never disagree about a release.
-    // The provisioner reads exactly one entry: [opencv.<platform>.payload];
-    // the dev entries (shim build inputs) are meaningless in Unity and
-    // are ignored.
+    // The pins the C# provisioner fetches with: the tracked copy of
+    // crates/extern-fetch/config.toml at Editor/opencv-fetch.toml. One
+    // source of pins — `just sync-fetch-config` re-copies it after every
+    // pin change; until it runs, the package keeps the old pins. The
+    // provisioner reads one <group>.<platform>.payload entry per folder it
+    // owns (opencv, greyhound_ghcv); the dev entries (shim build inputs)
+    // are meaningless in Unity and are ignored.
     internal sealed class VisionFetchConfig
     {
-        public const string Group = "opencv";
         public const string Role = "payload";
         public const string StagedFileName = "opencv-fetch.toml";
 
+        // The config group this entry was loaded from ("opencv",
+        // "greyhound_ghcv"): the staged config holds every group, and
+        // the provisioner loads one entry per payload directory it owns.
+        public string Group { get; }
         public string Repo { get; }
         public string Tag { get; }
         public string Url { get; }
@@ -33,8 +35,10 @@ namespace Greyhound.Vision
         public string DownloadLocation { get; }
 
         private VisionFetchConfig(
-            string repo, string tag, string url, string sha256, string downloadLocation)
+            string group, string repo, string tag, string url, string sha256,
+            string downloadLocation)
         {
+            Group = group;
             Repo = repo;
             Tag = tag;
             Url = url;
@@ -42,18 +46,24 @@ namespace Greyhound.Vision
             DownloadLocation = downloadLocation;
         }
 
-        // Loads the staged config for the platform the editor runs on.
-        // The platform key is the same "windows"/"linux"/"macos" the
-        // extern-fetch config sections use; the entry for the current
-        // platform selects the archive.
-        public static VisionFetchConfig Load(string packageRoot)
+        // Loads one group's entry from the staged config for the platform
+        // the editor runs on. The platform key is the same
+        // "windows"/"linux"/"macos" the extern-fetch config sections use;
+        // the entry for the current platform selects the archive.
+        //
+        // required = true (OpenCV): a missing group or platform section
+        // throws — detection cannot run without it. required = false
+        // (our own ghcv shim): a missing group or platform section
+        // returns null, meaning "no release for this platform; use what
+        // a local cargo build put in the folder".
+        public static VisionFetchConfig Load(string packageRoot, string groupName, bool required)
         {
             string path = Path.Combine(packageRoot, "Editor", StagedFileName);
             if (!File.Exists(path))
             {
                 throw new InvalidOperationException(
                     $"the package's fetch config is missing: {path}; "
-                    + "assemble the package with 'just assemble-package'");
+                    + "restore it with 'just sync-fetch-config'");
             }
             Dictionary<string, Dictionary<string, string>> tables =
                 VisionToml.Parse(File.ReadAllText(path));
@@ -74,16 +84,24 @@ namespace Greyhound.Vision
                     + $"slashes (got {downloadLocation}); empty string = in-memory download");
             }
 
-            if (!tables.TryGetValue(Group, out Dictionary<string, string> group))
+            if (!tables.TryGetValue(groupName, out Dictionary<string, string> group))
             {
-                throw new InvalidOperationException($"[{Group}] is missing from {path}");
+                if (!required)
+                {
+                    return null;
+                }
+                throw new InvalidOperationException($"[{groupName}] is missing from {path}");
             }
             string repo = Require(group, "repo", path);
             string tag = Require(group, "tag", path);
 
-            string section = $"{Group}.{PlatformKey()}.{Role}";
+            string section = $"{groupName}.{PlatformKey()}.{Role}";
             if (!tables.TryGetValue(section, out Dictionary<string, string> entry))
             {
+                if (!required)
+                {
+                    return null;
+                }
                 throw new InvalidOperationException(
                     $"[{section}] is missing from {path}; "
                     + "no payload is configured for this platform");
@@ -108,9 +126,9 @@ namespace Greyhound.Vision
                 throw new InvalidOperationException(
                     $"{section}: sha256 is not pinned in {path}; pin the archive's "
                     + "64-hex-digit sha256 in crates/extern-fetch/config.toml and "
-                    + "re-run 'just assemble-package'");
+                    + "run 'just sync-fetch-config'");
             }
-            return new VisionFetchConfig(repo, tag, url, sha256, downloadLocation);
+            return new VisionFetchConfig(groupName, repo, tag, url, sha256, downloadLocation);
         }
 
         // The editor platform as the extern-fetch config's OS section key.

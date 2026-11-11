@@ -1,6 +1,8 @@
 using System;
 
+#if UNITY_6000_5_OR_NEWER
 using Unity.Scripting.LifecycleManagement;
+#endif
 
 namespace Greyhound.Step
 {
@@ -9,7 +11,9 @@ namespace Greyhound.Step
     // dlopen handles for OCCT and the shim for the life of the process.
     // NoAutoStaticsCleanup keeps Unity's statics lifecycle analyzer happy;
     // the generator requires the partial declaration.
+#if UNITY_6000_5_OR_NEWER
     [NoAutoStaticsCleanup]
+#endif
     public sealed partial class StepHost
     {
         private static StepHost shared;

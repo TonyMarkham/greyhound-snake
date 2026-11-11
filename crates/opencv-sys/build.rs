@@ -234,8 +234,13 @@ fn gnu_flags(
                 std::ffi::OsString::from("-fPIC"),
                 std::ffi::OsString::from("-fexceptions"),
             ],
+            // The shim sits in Plugins/shim/x86_64; the provisioned
+            // OpenCV libs in Plugins/opencv/x86_64/lib. $ORIGIN/../.. is
+            // Plugins, so the second entry finds them wherever the
+            // package is installed. DT_RPATH (--disable-new-dtags) also
+            // covers the OpenCV libs' own dependencies on each other.
             vec![std::ffi::OsString::from(
-                "-Wl,--disable-new-dtags,-rpath,$ORIGIN",
+                "-Wl,--disable-new-dtags,-rpath,$ORIGIN:$ORIGIN/../../opencv/x86_64/lib",
             )],
             vec![
                 std::ffi::OsString::from("-Xlinker"),

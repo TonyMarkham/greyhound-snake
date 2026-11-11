@@ -1,13 +1,13 @@
 using System.Collections.Generic;
 using System.Linq;
-
 using UnityEditor;
-
-using Unity.Scripting.LifecycleManagement;
-
 using UnityEngine;
 
 using SO = Greyhound.MuJoCo.ScriptableObjects;
+
+#if UNITY_6000_5_OR_NEWER
+using Unity.Scripting.LifecycleManagement;
+#endif
 
 namespace Greyhound.MuJoCo
 {
@@ -26,7 +26,9 @@ namespace Greyhound.MuJoCo
     // whenever the project changes (an asset added, removed or edited),
     // so a new Root or joint shows on the next repaint.
     [InitializeOnLoad]
+#if UNITY_6000_5_OR_NEWER
     [NoAutoStaticsCleanup]
+#endif
     internal static class JointHierarchyMarker
     {
         private static readonly Color RowTint = new(1.0f, 0.55f, 0.2f, 0.08f);
@@ -36,13 +38,37 @@ namespace Greyhound.MuJoCo
 
         static JointHierarchyMarker()
         {
-            EditorApplication.hierarchyWindowItemByEntityIdOnGUI += OnHierarchyItem;
+#if UNITY_6000_4_OR_NEWER
+            EditorApplication.hierarchyWindowItemByEntityIdOnGUI += OnHierarchyGUIByEntityId;
+#else
+            EditorApplication.hierarchyWindowItemOnGUI += OnHierarchyGUI;
+#endif
             EditorApplication.projectChanged += () => s_roots = null;
         }
 
-        private static void OnHierarchyItem(EntityId entityId, Rect selectionRect)
+        // Each Unity version gets the handler its hierarchy event expects:
+        // 6000.4+ passes an EntityId; 6000.3 passes an int but has made
+        // InstanceIDToObject obsolete, so the int is cast to an EntityId
+        // (as Unity's shadergraph does); older versions look up the int.
+#if UNITY_6000_4_OR_NEWER
+        private static void OnHierarchyGUIByEntityId(EntityId entityId, Rect selectionRect)
         {
-            GameObject node = EditorUtility.EntityIdToObject(entityId) as GameObject;
+            DrawRow(EditorUtility.EntityIdToObject(entityId) as GameObject, selectionRect);
+        }
+#elif UNITY_6000_3_OR_NEWER
+        private static void OnHierarchyGUI(int instanceId, Rect selectionRect)
+        {
+            DrawRow(EditorUtility.EntityIdToObject((EntityId)instanceId) as GameObject, selectionRect);
+        }
+#else
+        private static void OnHierarchyGUI(int instanceId, Rect selectionRect)
+        {
+            DrawRow(EditorUtility.InstanceIDToObject(instanceId) as GameObject, selectionRect);
+        }
+#endif
+
+        private static void DrawRow(GameObject node, Rect selectionRect)
+        {
             if (node == null || !HasJoint(node.transform))
             {
                 return;

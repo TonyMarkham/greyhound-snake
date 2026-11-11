@@ -4,6 +4,12 @@ tmp/
 # dist
 dist/
 
+# Native payloads the packages' provisioners download at editor load
+# (OCCT/OpenCV libs, host, shims, provenance markers, and the .meta
+# files Unity mints for them) - never committed, always re-fetchable.
+package/*/Runtime/Plugins/
+package/*/Runtime/Plugins.meta
+
 # extern cache (fetched release archives)
 extern/
 

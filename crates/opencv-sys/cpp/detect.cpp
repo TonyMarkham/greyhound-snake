@@ -16,11 +16,21 @@
 #include <cstddef>
 #include <vector>
 
+// Every entry point must be exported. MSVC exports nothing without
+// __declspec(dllexport); g++/clang (ELF, Mach-O) take the visibility
+// attribute instead and reject __declspec. Same rule as the OCCT shim's
+// GREYHOUND_API (crates/occt-sys/cpp/greyhound_abi.h).
+#if defined(_MSC_VER) && !defined(__clang__)
+#define GHCV_API __declspec(dllexport)
+#else
+#define GHCV_API __attribute__((visibility("default")))
+#endif
+
 extern "C" {
 
 // The ABI version of this shim; bump on any signature change. The Rust
 // side pins the same value (src/lib.rs GHCV_ABI_VERSION).
-__declspec(dllexport) int ghcv_abi_version()
+GHCV_API int ghcv_abi_version()
 {
     return 1;
 }
@@ -36,7 +46,7 @@ __declspec(dllexport) int ghcv_abi_version()
 // max_ids are written), or a negative value on failure:
 //   -1  the bytes did not decode to an image (bad/empty input)
 //   -2  internal error (an OpenCV exception escaped detection)
-__declspec(dllexport) int ghcv_aruco_detect(
+GHCV_API int ghcv_aruco_detect(
     const unsigned char* data, std::size_t len,
     int* ids_out, std::size_t max_ids)
 {

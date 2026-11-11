@@ -1,114 +1,38 @@
 # Recipes carry per-OS platform attributes ([linux]/[windows]/[macos])
 # with no fallback: an unexercised platform fails fast instead of
 # silently running a body written for another OS. just runs Windows
-# recipe lines one process per line, so Windows bodies stay single-line
-# launchers (multi-statement logic lives in tools/*.ps1); Linux and
-# macOS bodies are shebang scripts — one shared body where only the
-# cdylib filename differs, branching on `uname`.
+# recipe lines one process per line (in PowerShell, where `cp` is
+# Copy-Item), so every body here is single-line commands that read the
+# same in bash and PowerShell.
 set windows-shell := ["powershell.exe", "-NoLogo", "-Command"]
 
-# Assemble the production packages into dist: stage the authored skeleton
-# sources plus the fetch config each package's C# provisioner reads, then
-# add the host cdylib (step package only — the vision package has none
-# yet); build.rs rebuilds the shims into the packages. The third-party
-# payloads (Runtime/Plugins/occt, Runtime/Plugins/opencv) are NONE of
-# this recipe's business on any platform — not asserted, not read, not
-# written; the packages' C# provisioners own them exclusively.
-[linux]
-[macos]
-assemble-package:
-    #!/usr/bin/env bash
-    set -euo pipefail
-
-    package="dist/package/com.greyhound.step"
-
-    # The cdylib filename and the plugin-architecture directory name
-    # are the only per-OS differences in the staging (Darwin: .dylib
-    # and arm64 — Unity's Apple Silicon plugin folder; an arm64 editor
-    # never loads from the Intel-only x86_64 folder). Host, shim, and
-    # payload directories all carry the same <arch> name; only the
-    # host's is resolved by Unity as a plugin, the other two are
-    # dlopen'd by explicit path.
-    case "$(uname)" in
-        Darwin) extension="dylib"; archdir="arm64" ;;
-        *)      extension="so"; archdir="x86_64" ;;
-    esac
-    host="$package/Runtime/Plugins/$archdir"
-    shim="$package/Runtime/Plugins/shim/$archdir"
-    vision="dist/package/com.greyhound.vision"
-    vision_shim="$vision/Runtime/Plugins/shim/$archdir"
-
-    # Stage the authored skeleton sources wholesale; the provisioned
-    # payload and the shim (cargo build output) survive untouched. The
-    # steps below the shim check are non-destructive, and the host copy
-    # overwrites in place — a failed run must leave the previously
-    # assembled package intact (the Windows body's rule).
-    mkdir -p "$shim" "$host" "$vision_shim"
-
-    cp -r package/com.greyhound.step/. "$package/"
-    cp crates/extern-fetch/config.toml "$package/Editor/occt-fetch.toml"
-
-    touch crates/occt-sys/build.rs
-    cargo build --release -p importer-host
-
-    # The package payload (Runtime/Plugins/occt) is none of this
-    # recipe's business — not asserted, not read, not written; the
-    # package's C# provisioner owns it exclusively. Only the shim is
-    # asserted, because this recipe just built it.
-    if [ ! -e "$shim/libgreyhound_occt.$extension" ]; then
-        echo "missing prerequisite: $shim/libgreyhound_occt.$extension (cargo build produced no shim)" >&2
-        exit 1
-    fi
-
-    cp "target/release/libimporter_host.$extension" "$host/libimporter_host.$extension"
-
-    # The vision package: the same staging model as the step package —
-    # authored skeleton wholesale (the built ghcv shim survives), the
-    # fetch config under the opencv-fetch.toml name its provisioner
-    # reads, then a forced opencv-sys rebuild so the fresh shim lands in
-    # the package. The OpenCV payload (Runtime/Plugins/opencv) is none
-    # of this recipe's business — the vision package's C# provisioner
-    # owns it exclusively. No host cdylib copy: the vision package has
-    # none yet.
-    cp -r package/com.greyhound.vision/. "$vision/"
-    cp crates/extern-fetch/config.toml "$vision/Editor/opencv-fetch.toml"
-
-    touch crates/opencv-sys/build.rs
-    cargo build --release -p opencv-sys
-
-    if [ ! -e "$vision_shim/libghcv.$extension" ]; then
-        echo "missing prerequisite: $vision_shim/libghcv.$extension (cargo build produced no shim)" >&2
-        exit 1
-    fi
-
-    # The listing prunes the provisioned payload dirs entirely (-prune:
-    # no descent, no read inside them) — the recipe's own products are
-    # what it names.
-    echo "dist/package assembled:"
-    find dist/package \( -path '*Runtime/Plugins/occt*' -o -path '*Runtime/Plugins/opencv*' \) -prune -o -type f -print | sort
-
-# Windows counterpart of assemble-package: stages the authored skeletons,
-# the fetch configs, and the host cdylib (step package); build.rs
-# rebuilds the shims into the packages. The body is a script launcher because just runs Windows
-# recipe lines one process per line: cross-line variables and multi-line
-# blocks do not survive in a recipe body; the logic lives in
-# tools/assemble-package.ps1.
+# Copy the fetch config into the two tracked packages, where their C#
+# provisioners read it (Editor/occt-fetch.toml, Editor/opencv-fetch.toml).
+# The provisioners never read crates/extern-fetch/config.toml itself, so
+# run this after every pin change, or the packages keep the old pins
+# (a missing greyhound_* entry silently skips that library's download).
 [windows]
-assemble-package:
-    powershell -NoProfile -ExecutionPolicy Bypass -File tools/assemble-package.ps1
-
-# Verify the assembled package from a copied layout: replays the C# ABI flow
-# (dlopen host -> version -> new -> open STEP -> counts/fill) with ctypes.
-# macOS mirrors the Linux body: python3 plus the script's own per-OS
-# handling of the host filename and the runtime directory.
 [linux]
 [macos]
-verify-package: assemble-package
+sync-fetch-config:
+    cp crates/extern-fetch/config.toml package/com.greyhound.step/Editor/occt-fetch.toml
+    cp crates/extern-fetch/config.toml package/com.greyhound.vision/Editor/opencv-fetch.toml
+
+# Verify the tracked step package from a copied layout: replays the C#
+# ABI flow (dlopen host -> version -> new -> open STEP -> counts/fill)
+# with ctypes. Needs the host and shim the package's provisioner
+# downloads into package/com.greyhound.step/Runtime/Plugins: open a Unity
+# project that uses the package once first. macOS mirrors the Linux
+# body: python3 plus the script's own per-OS handling of the host
+# filename and the runtime directory.
+[linux]
+[macos]
+verify-package:
     python3 tools/verify-package.py
 
 # Windows variant of verify-package: CPython is `python` here, not `python3`.
 [windows]
-verify-package: assemble-package
+verify-package:
     python tools/verify-package.py
 
 # Fetch every pinned group's dev trees into the extern/ cache

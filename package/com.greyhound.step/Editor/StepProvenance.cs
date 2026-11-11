@@ -44,7 +44,7 @@ namespace Greyhound.Step
         public static StepProvenance ForConfig(StepFetchConfig config)
         {
             return new StepProvenance(
-                ToolName, StepFetchConfig.Group, StepFetchConfig.Role,
+                ToolName, config.Group, StepFetchConfig.Role,
                 config.Repo, config.Tag, config.Url, config.Sha256);
         }
 
@@ -76,7 +76,7 @@ namespace Greyhound.Step
 
         public bool Matches(StepFetchConfig config)
         {
-            return Group == StepFetchConfig.Group
+            return Group == config.Group
                 && Role == StepFetchConfig.Role
                 && Repo == config.Repo
                 && Tag == config.Tag

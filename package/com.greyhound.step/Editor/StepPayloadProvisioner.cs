@@ -1,39 +1,50 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
-
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Networking;
 
+#if UNITY_6000_5_OR_NEWER
 using Unity.Scripting.LifecycleManagement;
+#endif
 
 namespace Greyhound.Step
 {
-    // Provisions the OCCT payload — the native shared libraries the
-    // importer dlopen's — into the package's
-    // Runtime/Plugins/occt/<arch>/lib at editor load, <arch> from
-    // NativeMethods.PluginArch(): the UPM package
-    // ships light and downloads the pinned
-    // release archive instead. UPM has no install-time hook, so the
-    // handshake point is editor assembly load; a STEP import that
-    // arrives before provisioning is done fails with a clear message
-    // (StepImporter calls EnsureReady), never with a cryptic loader
-    // error.
+    // Provisions the package's native payloads at editor load, <arch>
+    // from NativeMethods.PluginArch(); the UPM package ships light and
+    // downloads pinned release archives instead:
     //
-    // The archive, its hash, and the destination contract come from the
+    //   group           folder                          missing entry
+    //   occt            Runtime/Plugins/occt/<arch>/lib throws
+    //   greyhound_host  Runtime/Plugins/<arch>          skipped
+    //   greyhound_shim  Runtime/Plugins/shim/<arch>     skipped
+    //
+    // Each folder is owned through its sibling <folder>.provenance.toml
+    // marker. The host and shim folders also accept an unmarked folder
+    // that already holds DLLs: that is a local cargo build, and a
+    // release download never overwrites it. UPM has no install-time
+    // hook, so the handshake point is editor assembly load; a STEP
+    // import that arrives before provisioning is done fails with a
+    // clear message (Importer calls EnsureReady), never with a cryptic
+    // loader error.
+    //
+    // The archives, hashes, and destination contracts come from the
     // staged copy of crates/extern-fetch/config.toml; `just fetch-occt`
-    // provisions the same destination from the
-    // same pins, and the sibling provenance marker keeps the two
-    // provisioners idempotent against each other.
+    // provisions the OCCT destination from the same pins, and the
+    // sibling provenance marker keeps the two provisioners idempotent
+    // against each other.
     // NoAutoStaticsCleanup: the state fields intentionally outlive any
     // scene unload — the payload is provisioned once per editor
     // process, like the shared StepHost; the analyzer requires the
     // partial declaration.
+#if UNITY_6000_5_OR_NEWER
     [NoAutoStaticsCleanup]
+#endif
     internal static partial class StepPayloadProvisioner
     {
         private const string PackageAssetPath = "Packages/com.greyhound.step";
@@ -58,16 +69,16 @@ namespace Greyhound.Step
                     return;
                 case StepProvisionState.Running:
                     throw new InvalidOperationException(
-                        "the OCCT payload is still provisioning "
+                        "the native payload is still provisioning "
                         + $"({status}); wait for it to finish and reimport");
                 case StepProvisionState.Failed:
                     throw new InvalidOperationException(
-                        "the OCCT payload failed to provision: "
+                        "the native payload failed to provision: "
                         + $"{status} — fix the cause (Unity reloads the "
                         + "package on script changes) and reimport");
                 default:
                     throw new InvalidOperationException(
-                        "the OCCT payload has not been provisioned yet");
+                        "the native payload has not been provisioned yet");
             }
         }
 
@@ -86,45 +97,125 @@ namespace Greyhound.Step
             try
             {
                 string packageRoot = PackageRoot();
-                string payloadDir = Path.Combine(
-                    packageRoot, "Runtime", "Plugins", "occt", NativeMethods.PluginArch(), "lib");
-                string markerPath = payloadDir + ".provenance.toml";
-                StepFetchConfig config = StepFetchConfig.Load(packageRoot);
+                string plugins = Path.Combine(packageRoot, "Runtime", "Plugins");
+                string arch = NativeMethods.PluginArch();
+                var pending = new List<(StepFetchConfig config, string payloadDir)>();
 
-                StepProvenance marker = StepProvenance.Read(markerPath);
-                if (marker != null && marker.Matches(config))
+                // OCCT: required, and an unmarked folder is re-provisioned.
+                Plan(pending,
+                    StepFetchConfig.Load(packageRoot, "occt", required: true),
+                    Path.Combine(plugins, "occt", arch, "lib"),
+                    keepUnmarked: false);
+                // Our own host and shim: optional (no entry for this
+                // platform = no download), and a folder that already holds
+                // DLLs without a marker is a local cargo build — kept.
+                Plan(pending,
+                    StepFetchConfig.Load(packageRoot, "greyhound_host", required: false),
+                    Path.Combine(plugins, arch),
+                    keepUnmarked: true);
+                Plan(pending,
+                    StepFetchConfig.Load(packageRoot, "greyhound_shim", required: false),
+                    Path.Combine(plugins, "shim", arch),
+                    keepUnmarked: true);
+
+                if (pending.Count == 0)
                 {
-                    // Cheap domain-reload check: nothing downloads when
-                    // the payload already certifies the pinned archive.
+                    // Cheap domain-reload check: every folder already
+                    // certifies its pin (or is a kept local build).
                     state = StepProvisionState.Ready;
                     return;
                 }
-
-                // A missing marker or a mismatch (another release, a
-                // half-finished run, the pre-provisioning staged
-                // payload) means this directory does not certify the
-                // package's pin: re-extract from the verified archive.
-                // The deletion only happens after the new zip has passed
-                // its hash check, so a failed run cannot leave the
-                // payload destroyed without a path to recovery.
-                BeginDownload(config, payloadDir, markerPath);
+                state = StepProvisionState.Running;
+                _ = RunAsync(pending);
             }
             catch (Exception exception)
             {
                 state = StepProvisionState.Failed;
                 status = exception.Message;
                 Debug.LogError(
-                    "[com.greyhound.step] OCCT payload provisioning could not start: "
+                    "[com.greyhound.step] native payload provisioning could not start: "
                     + exception.Message);
             }
         }
 
-        // The staged zip's name inside download_location (file mode
-        // only; memory mode never names a file).
-        private const string ZipFileName = "occt-payload.zip";
 
-        private static void BeginDownload(
-            StepFetchConfig config, string payloadDir, string markerPath)
+        // Adds payloadDir to pending unless it is already good:
+        //   config null (optional group, no entry for this platform) -> skip
+        //   marker matches the pin                                   -> skip
+        //   no marker, keepUnmarked, folder holds a non-.meta file   -> skip
+        //     (a local cargo build; never overwritten by a release)
+        //   anything else (no marker, or a marker for another pin)   -> download
+        // The deletion of the old folder only happens after the new zip
+        // has passed its hash check (Install), so a failed run cannot
+        // leave the payload destroyed without a path to recovery.
+        private static void Plan(
+            List<(StepFetchConfig config, string payloadDir)> pending,
+            StepFetchConfig config,
+            string payloadDir,
+            bool keepUnmarked)
+        {
+            if (config == null)
+            {
+                return;
+            }
+            StepProvenance marker = StepProvenance.Read(MarkerPath(payloadDir));
+            if (marker != null && marker.Matches(config))
+            {
+                return;
+            }
+            if (marker == null && keepUnmarked && HoldsFiles(payloadDir))
+            {
+                return;
+            }
+            pending.Add((config, payloadDir));
+        }
+
+        private static bool HoldsFiles(string dir)
+        {
+            if (!Directory.Exists(dir))
+            {
+                return false;
+            }
+            foreach (string file in Directory.EnumerateFiles(dir))
+            {
+                if (!file.EndsWith(".meta", StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static string MarkerPath(string payloadDir)
+        {
+            return payloadDir + ".provenance.toml";
+        }
+
+        // Provisions each pending folder in order; the first failure
+        // stops the run and is reported through Fail. One Refresh at the
+        // end imports everything that landed — including a downloaded
+        // importer_host DLL, which Unity must import as a plugin before
+        // [DllImport("importer_host")] can resolve it.
+        private static async Task RunAsync(
+            List<(StepFetchConfig config, string payloadDir)> pending)
+        {
+            try
+            {
+                foreach ((StepFetchConfig config, string payloadDir) in pending)
+                {
+                    status = $"downloading {config.Url}";
+                    await ProvisionAsync(config, payloadDir);
+                }
+                AssetDatabase.Refresh();
+                state = StepProvisionState.Ready;
+            }
+            catch (Exception exception)
+            {
+                Fail(exception);
+            }
+        }
+
+        private static async Task ProvisionAsync(StepFetchConfig config, string payloadDir)
         {
             if (config.DownloadLocation.Length == 0)
             {
@@ -134,14 +225,18 @@ namespace Greyhound.Step
                 // policy locks down temp directories, and there is no
                 // cleanup step. Cost is a transient managed allocation
                 // of the archive size — tens of MB, once per release.
-                var request = new UnityWebRequest(config.Url, UnityWebRequest.kHttpVerbGET)
+                using (var request = new UnityWebRequest(config.Url, UnityWebRequest.kHttpVerbGET)
                 {
                     downloadHandler = new DownloadHandlerBuffer(),
-                };
-                UnityWebRequestAsyncOperation operation = request.SendWebRequest();
-                state = StepProvisionState.Running;
-                status = $"downloading {config.Url}";
-                _ = FinishAsync(request, operation, config, payloadDir, markerPath);
+                })
+                {
+                    await AwaitDownload(request.SendWebRequest());
+                    ThrowIfFailed(request, config);
+                    byte[] zipBytes = request.downloadHandler.data;
+                    VerifyHash(config, Sha256Hex(zipBytes));
+                    int files = Extract(zipBytes, StagingDir(payloadDir));
+                    Install(config, payloadDir, files);
+                }
                 return;
             }
 
@@ -155,74 +250,40 @@ namespace Greyhound.Step
                     $"download_location {config.DownloadLocation} does not exist; "
                     + "the provisioner never creates directories");
             }
-            string zipPath = Path.Combine(config.DownloadLocation, ZipFileName);
-            var fileRequest = new UnityWebRequest(config.Url, UnityWebRequest.kHttpVerbGET)
-            {
-                downloadHandler = new DownloadHandlerFile(zipPath) { removeFileOnAbort = true },
-            };
-            UnityWebRequestAsyncOperation fileOperation = fileRequest.SendWebRequest();
-            state = StepProvisionState.Running;
-            status = $"downloading {config.Url}";
-            _ = FinishFileAsync(fileRequest, fileOperation, config, payloadDir, markerPath, zipPath);
-        }
-
-        private static async Task FinishAsync(
-            UnityWebRequest request,
-            UnityWebRequestAsyncOperation operation,
-            StepFetchConfig config,
-            string payloadDir,
-            string markerPath)
-        {
+            // One zip name per group ("occt-payload.zip",
+            // "greyhound_host-payload.zip", ...): the runs are sequential,
+            // but a distinct name keeps a leftover from one group from
+            // ever being mistaken for another's.
+            string zipPath = Path.Combine(config.DownloadLocation, $"{config.Group}-payload.zip");
             try
             {
-                await AwaitDownload(operation);
-                if (request.result != UnityWebRequest.Result.Success)
+                using (var request = new UnityWebRequest(config.Url, UnityWebRequest.kHttpVerbGET)
                 {
-                    throw new InvalidOperationException(
-                        $"download of {config.Url} failed "
-                        + $"({request.responseCode}): {request.error}");
-                }
-                byte[] zipBytes = request.downloadHandler.data;
-                VerifyHash(config, Sha256Hex(zipBytes));
-                int files = Extract(zipBytes, StagingDir(payloadDir));
-                Install(config, payloadDir, markerPath, files);
-            }
-            catch (Exception exception)
-            {
-                Fail(exception);
-            }
-        }
-
-        private static async Task FinishFileAsync(
-            UnityWebRequest request,
-            UnityWebRequestAsyncOperation operation,
-            StepFetchConfig config,
-            string payloadDir,
-            string markerPath,
-            string zipPath)
-        {
-            try
-            {
-                await AwaitDownload(operation);
-                if (request.result != UnityWebRequest.Result.Success)
+                    downloadHandler = new DownloadHandlerFile(zipPath) { removeFileOnAbort = true },
+                })
                 {
-                    throw new InvalidOperationException(
-                        $"download of {config.Url} failed "
-                        + $"({request.responseCode}): {request.error}");
+                    await AwaitDownload(request.SendWebRequest());
+                    ThrowIfFailed(request, config);
                 }
                 VerifyHash(config, Sha256Hex(zipPath));
                 int files = Extract(zipPath, StagingDir(payloadDir));
-                Install(config, payloadDir, markerPath, files);
-            }
-            catch (Exception exception)
-            {
-                Fail(exception);
+                Install(config, payloadDir, files);
             }
             finally
             {
                 // The staged zip is disposable; failing to delete it
                 // must not fail the provisioning.
                 TryDelete(zipPath);
+            }
+        }
+
+        private static void ThrowIfFailed(UnityWebRequest request, StepFetchConfig config)
+        {
+            if (request.result != UnityWebRequest.Result.Success)
+            {
+                throw new InvalidOperationException(
+                    $"download of {config.Url} failed "
+                    + $"({request.responseCode}): {request.error}");
             }
         }
 
@@ -241,7 +302,7 @@ namespace Greyhound.Step
             if (!string.Equals(actual, config.Sha256, StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidOperationException(
-                    "the downloaded OCCT payload hash " + actual
+                    $"the downloaded {config.Group} payload hash " + actual
                     + " does not match the pinned sha256 " + config.Sha256
                     + "; nothing was extracted");
             }
@@ -262,8 +323,7 @@ namespace Greyhound.Step
             return stagingDir;
         }
 
-        private static void Install(
-            StepFetchConfig config, string payloadDir, string markerPath, int files)
+        private static void Install(StepFetchConfig config, string payloadDir, int files)
         {
             if (Directory.Exists(payloadDir))
             {
@@ -271,11 +331,9 @@ namespace Greyhound.Step
             }
             Directory.Move(StagingDirName(payloadDir), payloadDir);
 
-            StepProvenance.ForConfig(config).Write(markerPath);
-            AssetDatabase.Refresh();
-            state = StepProvisionState.Ready;
+            StepProvenance.ForConfig(config).Write(MarkerPath(payloadDir));
             Debug.Log(
-                "[com.greyhound.step] OCCT payload provisioned: "
+                $"[com.greyhound.step] {config.Group} payload provisioned: "
                 + $"{files} files into {payloadDir}");
         }
 
@@ -289,7 +347,7 @@ namespace Greyhound.Step
             state = StepProvisionState.Failed;
             status = exception.Message;
             Debug.LogError(
-                "[com.greyhound.step] OCCT payload provisioning failed: "
+                "[com.greyhound.step] native payload provisioning failed: "
                 + exception.Message);
         }
 

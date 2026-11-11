@@ -17,12 +17,36 @@ namespace Greyhound.Step
 
         static StepJointHierarchyMarker()
         {
-            EditorApplication.hierarchyWindowItemByEntityIdOnGUI += OnHierarchyItem;
+#if UNITY_6000_4_OR_NEWER
+            EditorApplication.hierarchyWindowItemByEntityIdOnGUI += OnHierarchyGUIByEntityId;
+#else
+            EditorApplication.hierarchyWindowItemOnGUI += OnHierarchyGUI;
+#endif
         }
 
-        private static void OnHierarchyItem(EntityId entityId, Rect selectionRect)
+        // Each Unity version gets the handler its hierarchy event expects:
+        // 6000.4+ passes an EntityId; 6000.3 passes an int but has made
+        // InstanceIDToObject obsolete, so the int is cast to an EntityId
+        // (as Unity's shadergraph does); older versions look up the int.
+#if UNITY_6000_4_OR_NEWER
+        private static void OnHierarchyGUIByEntityId(EntityId entityId, Rect selectionRect)
         {
-            GameObject node = EditorUtility.EntityIdToObject(entityId) as GameObject;
+            DrawRow(EditorUtility.EntityIdToObject(entityId) as GameObject, selectionRect);
+        }
+#elif UNITY_6000_3_OR_NEWER
+        private static void OnHierarchyGUI(int instanceId, Rect selectionRect)
+        {
+            DrawRow(EditorUtility.EntityIdToObject((EntityId)instanceId) as GameObject, selectionRect);
+        }
+#else
+        private static void OnHierarchyGUI(int instanceId, Rect selectionRect)
+        {
+            DrawRow(EditorUtility.InstanceIDToObject(instanceId) as GameObject, selectionRect);
+        }
+#endif
+
+        private static void DrawRow(GameObject node, Rect selectionRect)
+        {
             if (node == null || !TryGetJoint(node, out StepJoint _))
             {
                 return;

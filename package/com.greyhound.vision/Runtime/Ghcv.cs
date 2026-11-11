@@ -2,7 +2,9 @@ using System;
 using System.IO;
 using System.Runtime.InteropServices;
 
+#if UNITY_6000_5_OR_NEWER
 using Unity.Scripting.LifecycleManagement;
+#endif
 
 namespace Greyhound.Vision
 {
@@ -34,7 +36,9 @@ namespace Greyhound.Vision
     // (UAL0010/UAL0013), which demands the choice on every static type
     // holding static state; the analyzer requires the partial
     // declaration alongside it.
+#if UNITY_6000_5_OR_NEWER
     [NoAutoStaticsCleanup]
+#endif
     public static partial class Ghcv
     {
         // The ABI version this surface speaks; the shim reports the

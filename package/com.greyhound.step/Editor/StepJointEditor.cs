@@ -1,10 +1,11 @@
 using UnityEditor;
 using UnityEditor.UIElements;
-
-using Unity.Scripting.LifecycleManagement;
-
 using UnityEngine;
 using UnityEngine.UIElements;
+
+#if UNITY_6000_5_OR_NEWER
+using Unity.Scripting.LifecycleManagement;
+#endif
 
 namespace Greyhound.Step
 {
@@ -20,7 +21,9 @@ namespace Greyhound.Step
     // is selected. Validation covers the cheap field-level rules:
     // nonzero axis and lo < hi when limits are on.
     [CustomEditor(typeof(StepJoint))]
+#if UNITY_6000_5_OR_NEWER
     [NoAutoStaticsCleanup]
+#endif
     internal sealed class StepJointEditor : Editor
     {
         [SerializeField] private VisualTreeAsset m_VisualTreeAsset;
