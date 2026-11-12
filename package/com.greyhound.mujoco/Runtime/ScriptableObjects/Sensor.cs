@@ -1,8 +1,10 @@
+using Greyhound.Utilities;
+
 using UnityEngine;
 
 namespace Greyhound.MuJoCo.ScriptableObjects
 {
-    // One MJCF <framepos> sensor: the counterpart of StepSensor. Every
+    // One MJCF <framepos> sensor. Every
     // step MuJoCo writes the measured object's 3D position into
     // mjData.sensordata, in meters: in world coordinates, or, with a
     // reference, in the reference's frame. It belongs to the Root whose

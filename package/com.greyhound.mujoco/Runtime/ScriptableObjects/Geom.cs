@@ -1,8 +1,10 @@
+using Greyhound.Utilities;
+
 using UnityEngine;
 
 namespace Greyhound.MuJoCo.ScriptableObjects
 {
-    // One geom on a part: the counterpart of StepGeom. It belongs to the
+    // One geom on a part. It belongs to the
     // Root whose `geoms` list holds it. `body` is the GameObject the
     // geom belongs to. The MJCF payload lives in `geom`
     // (Greyhound.MuJoCo.Geom).

@@ -7,8 +7,8 @@ namespace Greyhound.Step
     // The serialized mirror of the MJCF <geom> element — the full
     // 3.15.0 attribute surface, names verbatim, field defaults equal
     // to the spec defaults so a fresh payload is a fresh spec element.
-    // The geom is authored per part as a StepGeom asset in the set
-    // folder (the joint-family pattern); a meshed part with no authored
+    // The geom is authored per part as a MuJoCo Geom asset (a
+    // com.greyhound.mujoco Root's geoms); a meshed part with no authored
     // geom emits no <geom> element at all — absent means absent —
     // while its mesh asset and inertial still export.
     //

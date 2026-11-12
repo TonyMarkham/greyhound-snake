@@ -3,7 +3,9 @@
     "rootNamespace": "Greyhound.MuJoCo",
     "references": [
         "com.greyhound.mujoco.runtime",
-        "com.greyhound.step.runtime"
+        "com.greyhound.step.runtime",
+        "com.greyhound.utilities.runtime",
+        "com.greyhound.utilities.editor"
     ],
     "includePlatforms": [
         "Editor"

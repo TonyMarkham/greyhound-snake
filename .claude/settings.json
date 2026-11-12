@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv",
+            "args": ["run", "${CLAUDE_PROJECT_DIR}/.claude/hooks/remember_request.py"]
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv",
+            "args": ["run", "${CLAUDE_PROJECT_DIR}/.claude/hooks/record_edit.py"]
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv",
+            "args": ["run", "${CLAUDE_PROJECT_DIR}/.claude/hooks/review_on_stop.py"],
+            "timeout": 300
+          }
+        ]
+      }
+    ]
+  }
+}

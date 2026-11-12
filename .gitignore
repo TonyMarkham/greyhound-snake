@@ -28,3 +28,7 @@ __WIP__/
 # MuJoCo
 MJDATA.TXT
 MJMODEL.TXT
+
+# The review hooks' working files: the latest request and the files edited
+# since (.claude/hooks/common.py).
+.claude/review/state/

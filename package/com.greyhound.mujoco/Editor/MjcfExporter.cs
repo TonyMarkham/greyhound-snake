@@ -10,6 +10,8 @@ using System.Xml;
 using Greyhound.Step;
 #endif
 
+using Greyhound.Utilities;
+
 using UnityEditor;
 using UnityEngine;
 
@@ -18,9 +20,9 @@ using SO = Greyhound.MuJoCo.ScriptableObjects;
 namespace Greyhound.MuJoCo
 {
     // The MJCF exporter: writes the MuJoCo model XML and binary STL mesh
-    // files for one Root, into a folder the caller chooses. Ported from
-    // the step package's StepMjcfExporter; the step package is not used
-    // except through the optional GREYHOUND_STEP converters.
+    // files for one Root, into a folder the caller chooses. The step
+    // package is not used except through the optional GREYHOUND_STEP
+    // converters.
     //
     // What is written, per part of Root.root (the model asset), as one
     // <body> each, in hierarchy order:

@@ -1,3 +1,5 @@
+using Greyhound.Utilities;
+
 using UnityEditor;
 using UnityEditor.UIElements;
 
@@ -17,8 +19,8 @@ namespace Greyhound.MuJoCo
     // (open), then Dynamics, Solver, Actuator force and Other
     // (collapsed). Labels are the MJCF attribute names.
     //
-    // Scene tools, duplicated from the step package's StepJointEditor and
-    // drawn through SceneView.duringSceneGui (Unity 6.7 removed the
+    // Scene tools, drawn through
+    // SceneView.duringSceneGui (Unity 6.7 removed the
     // per-editor OnSceneGUI hook), while this joint's editor is the
     // active one (selected, or shown in a locked inspector):
     //   - axis pick: six rays from the target's origin; click one to set
@@ -31,7 +33,7 @@ namespace Greyhound.MuJoCo
     //     is render-only in MJCF; a free joint has none).
     // Frame: MJCF authors pos and axis in the frame of the body the joint
     // is defined in. That body is the GameObject `body` resolves to in
-    // the open scenes (SiblingPathScene), exported with its local pose,
+    // the open scenes (SiblingPath.Resolve), exported with its local pose,
     // so its localToWorldMatrix maps them to world space.
     //
     // Limits are on when `limited` is True, or Auto with a range set
@@ -243,7 +245,7 @@ namespace Greyhound.MuJoCo
             {
                 return;
             }
-            Transform body = SiblingPathScene.Resolve(asset.body);
+            Transform body = asset.body?.Resolve(matchByName: false);
             if (body == null)
             {
                 return;

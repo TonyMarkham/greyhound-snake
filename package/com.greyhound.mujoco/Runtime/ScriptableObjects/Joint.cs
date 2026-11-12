@@ -1,8 +1,10 @@
+using Greyhound.Utilities;
+
 using UnityEngine;
 
 namespace Greyhound.MuJoCo.ScriptableObjects
 {
-    // One joint on a part: the counterpart of StepJoint. It belongs to
+    // One joint on a part. It belongs to
     // the Root whose `joints` list holds it (as a sub-asset of that Root
     // when made with the Root's Add button). `body` is the part the joint
     // is defined in. The MJCF payload lives in `joint`

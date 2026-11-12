@@ -1,11 +1,13 @@
 using System.Collections.Generic;
 
+using Greyhound.Utilities;
+
 using UnityEngine;
 
 namespace Greyhound.MuJoCo.ScriptableObjects
 {
-    // Container asset for the MuJoCo annotation of one model: the
-    // counterpart of StepJointSet. Joints, actuators, sites, geoms and
+    // Container asset for the MuJoCo annotation of one model.
+    // Joints, actuators, sites, geoms and
     // sensors are direct object references to their own .asset files;
     // each of them points back here through its `root`.
     [CreateAssetMenu(fileName = MenuManager.ROOT_FILE_NAME, menuName = MenuManager.ROOT, order = MenuManager.ROOT_ORDER)]

@@ -1,3 +1,5 @@
+using Greyhound.Utilities;
+
 using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine;
@@ -29,7 +31,7 @@ namespace Greyhound.MuJoCo
     // selection: a magenta marker sphere at the site frame's origin, the
     // site's MJCF name, and a position handle for pos. Frame: MJCF
     // authors pos (and fromto) in the frame of the site's body, the
-    // GameObject `body` resolves to in the open scenes (SiblingPathScene),
+    // GameObject `body` resolves to in the open scenes (SiblingPath.Resolve),
     // exported with its local pose, so its localToWorldMatrix maps them
     // to world space; the handle's axes follow that frame. With useFromto
     // on, MuJoCo ignores pos and puts the frame at the midpoint of
@@ -60,7 +62,7 @@ namespace Greyhound.MuJoCo
             {
                 return;
             }
-            Transform body = SiblingPathScene.Resolve(asset.body);
+            Transform body = asset.body?.Resolve(matchByName: false);
             if (body == null)
             {
                 return;

@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace Greyhound.MuJoCo.ScriptableObjects
 {
-    // One actuator: the counterpart of StepActuator. It belongs to the
+    // One actuator. It belongs to the
     // Root whose `actuators` list holds it. The MJCF payload lives in
     // `actuator` (Greyhound.MuJoCo.Actuator).
     //

@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
+using Greyhound.Utilities;
+
 using UnityEditor;
 using UnityEngine;
 
@@ -11,8 +13,7 @@ using Unity.Scripting.LifecycleManagement;
 
 namespace Greyhound.MuJoCo
 {
-    // Hierarchy feedback, duplicated from the step package's
-    // StepJointHierarchyMarker: rows of GameObjects that a Joint targets
+    // Hierarchy feedback: rows of GameObjects that a Joint targets
     // get a faint tint and a marker bar, so jointed bodies are visible
     // without selecting anything. Nothing is stored on the GameObjects.
     //
@@ -80,7 +81,7 @@ namespace Greyhound.MuJoCo
 
         private static bool HasJoint(Transform node)
         {
-            if (!SiblingPathScene.TryFindInstanceRoot(node, out Transform instanceRoot, out GameObject rootAsset))
+            if (!SiblingPath.TryFindInstanceRoot(node, out Transform instanceRoot, out GameObject rootAsset))
             {
                 return false;
             }
@@ -91,7 +92,7 @@ namespace Greyhound.MuJoCo
                 {
                     continue;
                 }
-                indices ??= SiblingPathScene.IndicesOf(node, instanceRoot);
+                indices ??= SiblingPath.IndicesOf(node, instanceRoot);
                 foreach (SO.Joint joint in root.joints)
                 {
                     SiblingPath body = joint != null ? joint.body : null;

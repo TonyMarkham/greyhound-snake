@@ -1,9 +1,11 @@
+using Greyhound.Utilities;
+
 using UnityEngine;
 
 namespace Greyhound.MuJoCo.ScriptableObjects
 {
     // One site on a part, the MJCF <site>: a named point that moves with
-    // its part. The counterpart of StepSite. It belongs to the Root whose
+    // its part. It belongs to the Root whose
     // `sites` list holds it. `body` is the part the site sits on. The
     // MJCF payload lives in `site` (Greyhound.MuJoCo.Site).
     //

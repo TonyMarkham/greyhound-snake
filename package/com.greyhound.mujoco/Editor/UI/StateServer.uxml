@@ -1,0 +1,24 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:ue="UnityEditor.UIElements">
+    <ui:VisualElement class="mujoco-card mujoco-card--server">
+        <ui:Label text="State Server" class="mujoco-card__title" />
+        <ue:PropertyField binding-path="port" label="port" />
+        <ui:Label name="address" class="mujoco-hint" />
+    </ui:VisualElement>
+
+    <ui:Foldout text="Root" value="true" class="mujoco-section">
+        <ue:PropertyField binding-path="root" label="root" />
+        <ue:PropertyField binding-path="instance" label="instance" />
+        <ui:Label text="instance is the model in the scene. Each of the Root's joints gets a driver on its part, found by sibling indices from instance, at Awake, in Play mode only. Nothing is added in the editor." class="mujoco-hint" />
+    </ui:Foldout>
+
+    <ui:Foldout name="status-section" text="Status" value="true" class="mujoco-section">
+        <ui:TextField name="status-listening" label="listening" />
+        <ui:TextField name="status-clients" label="clients" />
+        <ui:TextField name="status-messages" label="messages applied" />
+        <ui:Label name="status-error" class="warning" />
+        <ui:Label text="Driven joints" class="mujoco-subtitle" />
+        <ui:VisualElement name="status-drivers" />
+        <ui:Label name="status-no-drivers" class="mujoco-hint" text="No joint driven (see the Console)." />
+    </ui:Foldout>
+    <ui:Label name="status-edit-hint" class="mujoco-hint" text="Status appears in Play mode." />
+</ui:UXML>

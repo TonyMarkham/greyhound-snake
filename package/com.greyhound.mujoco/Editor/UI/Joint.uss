@@ -39,8 +39,7 @@
     padding: 4px 0 4px 0;
 }
 
-/* Validation messages (JointEditor.UpdateValidation), as in the step
-   package's joint form. */
+/* Validation messages (JointEditor.UpdateValidation). */
 .warning {
     color: rgb(230, 110, 80);
     margin-top: 2px;

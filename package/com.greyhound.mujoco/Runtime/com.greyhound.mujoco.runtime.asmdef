@@ -2,7 +2,8 @@
     "name": "com.greyhound.mujoco.runtime",
     "rootNamespace": "Greyhound.MuJoCo",
     "references": [
-        "com.greyhound.step.runtime"
+        "com.greyhound.step.runtime",
+        "com.greyhound.utilities.runtime"
     ],
     "internalsVisibleTo": [
         "com.greyhound.mujoco.editor"

@@ -36,7 +36,8 @@ x86_64 is exercised end to end.
 | `crates/step-stats` | CLI that prints geometry stats (solids/faces/edges/bbox) for a STEP file |
 | `crates/aruco` | 4x4 ArUco dictionary model: OpenCV's embedded bit tables, rotations, standard Hamming error checks, marker selection, SVG rendering |
 | `crates/aruco-cli` | CLI generating 4x4 ArUco marker SVGs (manual: `crates/aruco-cli/README.md`) |
-| `package/com.greyhound.step` | Tracked UPM package sources: the C# `Runtime/` P/Invoke layer, mass-properties components, the joint/actuator/geom annotation asset family with its `Mj*` MJCF mirrors, and the `Editor/` ScriptedImporter, authoring editors, scene tools, reimport validator, and MJCF exporter |
+| `package/com.greyhound.step` | Tracked UPM package sources: the C# `Runtime/` P/Invoke layer, mass-properties components, the importer's baseline geom (`StepGeomProperties`/`MjGeom`), and the `Editor/` ScriptedImporter, bounds gizmo, and measure window |
+| `package/com.greyhound.mujoco` | Tracked UPM package: the MuJoCo annotation assets (Root, Joint, Actuator, Site, Geom, Sensor), their inspectors and scene tools, and the MJCF exporter; optional step support behind `GREYHOUND_STEP` |
 | `tools/verify-package.py` | End-to-end verification of the step package and its provisioned native libraries against measured constants |
 | `justfile` | `just sync-fetch-config` copies the fetch pins into both packages; `just verify-package` checks the step package from a copied layout |
 | `assets/` | Sample STEP files (single part `rod-clamp-16mm.stp`, assembly `cart-asy.step`) |

@@ -1,8 +1,0 @@
-<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:ue="UnityEditor.UIElements">
-    <ui:VisualElement class="site-form">
-        <ui:Label text="Step Site" class="section-title" />
-        <ue:PropertyField binding-path="root" />
-        <ue:PropertyField binding-path="body" />
-        <ue:PropertyField binding-path="mj.pos" />
-    </ui:VisualElement>
-</ui:UXML>

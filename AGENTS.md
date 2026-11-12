@@ -148,11 +148,11 @@ needs the user's Unity editor, use the dist-first loop.
   sources (`package.json`, `Third Party Notices.md`, and the C# code:
   the `Runtime/` P/Invoke layer with struct mirrors, the
   `StepMassProperties` component and the `StepAssemblyMassProperties`
-  aggregator, the joint/actuator/geom annotation asset family
-  (`StepJointSet`/`StepJoint`/`StepActuator`/`StepGeom` with the `Mj*`
-  MJCF payload mirrors), and the `Editor/` `ScriptedImporter`, authoring
-  editors, scene tools, reimport validator/pruner, and the MJCF
-  exporter).
+  aggregator, the importer's baseline geom (`StepGeomProperties` with
+  its `MjGeom` payload, which `com.greyhound.mujoco` converts), and the
+  `Editor/` `ScriptedImporter`, bounds gizmo, and measure window). The
+  MuJoCo annotation assets, their editors, and the MJCF exporter live
+  in `package/com.greyhound.mujoco/`.
   Unity projects consume it directly (a `file:` manifest entry); its
   C# provisioner downloads every native library (OCCT, the host, the
   shim) into its gitignored `Runtime/Plugins/` at editor load, pinned by

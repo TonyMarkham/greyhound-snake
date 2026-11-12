@@ -1,0 +1,10 @@
+{
+    "name": "com.greyhound.utilities.editor",
+    "rootNamespace": "Greyhound.Utilities",
+    "references": [
+        "com.greyhound.utilities.runtime"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ]
+}
