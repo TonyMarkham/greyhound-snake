@@ -16,6 +16,7 @@ namespace Greyhound.MuJoCo
     //     overrides it.
     //   - Root: the model's Root, whose joints this server drives, and the
     //     model's instance in the scene, the parts' starting point.
+    //   - Camera: m_Camera, the camera a message's cameraTransform moves.
     //   - Status, Play mode only: listening, connected clients, messages
     //     applied, the last socket error, and one row per attached driver:
     //     its MJCF joint name and part, an editable q, and Reset to Rest.

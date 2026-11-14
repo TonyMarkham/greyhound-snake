@@ -11,6 +11,11 @@
         <ui:Label text="instance is the model in the scene. Each of the Root's joints gets a driver on its part, found by sibling indices from instance, at Awake, in Play mode only. Nothing is added in the editor." class="mujoco-hint" />
     </ui:Foldout>
 
+    <ui:Foldout text="Camera" value="true" class="mujoco-section">
+        <ue:PropertyField binding-path="m_Camera" label="camera" />
+        <ui:Label text="The camera a message's cameraTransform moves: world position in meters and Euler rotation in degrees, applied before the reply is rendered. A message without cameraTransform leaves it where it is." class="mujoco-hint" />
+    </ui:Foldout>
+
     <ui:Foldout name="status-section" text="Status" value="true" class="mujoco-section">
         <ui:TextField name="status-listening" label="listening" />
         <ui:TextField name="status-clients" label="clients" />

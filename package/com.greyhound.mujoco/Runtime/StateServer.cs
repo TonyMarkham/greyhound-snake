@@ -57,6 +57,17 @@ namespace Greyhound.MuJoCo
     // A joint left out keeps its last pose. A name no driver has is warned
     // about once per name and skipped; a message that is not valid JSON
     // is warned about and skipped, with no StateApplied (so no reply).
+    //
+    // Camera: a message may also carry the pose of m_Camera (Inspector),
+    // applied before StateApplied so the reply is
+    // rendered from it. World position in meters and Unity Euler angles in
+    // degrees (applied Z, then X, then Y, as Transform.eulerAngles):
+    //   {"cameraTransform": {"position": {"x": 0, "y": 1.1, "z": -2.5},
+    //                        "eulerRotation": {"x": 0, "y": 0, "z": 0}}}
+    // It replaces the camera's pose, and the camera keeps it until another
+    // message moves it. A message without it leaves the camera where it is;
+    // one with any of the six numbers missing is warned about and the
+    // camera is not moved.
     [AddComponentMenu("Greyhound/MuJoCo State Server")]
     public sealed class StateServer : MonoBehaviour
     {
@@ -79,6 +90,9 @@ namespace Greyhound.MuJoCo
 
         // How long a player's Update waits for a message (see Idle wait).
         public int playerIdleWaitMilliseconds = 100;
+
+        // The camera a message's cameraTransform moves (see Camera).
+        [SerializeField] private Camera m_Camera;
 
         private readonly Dictionary<string, JointDriver> m_Drivers = new Dictionary<string, JointDriver>();
         private readonly BlockingCollection<ReceivedMessage> m_Messages = new BlockingCollection<ReceivedMessage>();
@@ -333,9 +347,32 @@ namespace Greyhound.MuJoCo
                     Apply(joint.name, joint.qpos);
                 }
             }
+            ApplyCamera(message.cameraTransform);
             MessagesApplied++;
             request.Id = message.id;
             StateApplied?.Invoke(request);
+        }
+
+        // Moves m_Camera to the message's pose (see Camera). JsonUtility
+        // leaves a number the JSON does not give at its initial value, NaN
+        // here, so a NaN means "not given".
+        private void ApplyCamera(CameraTransform pose)
+        {
+            if (pose == null || pose.IsEmpty)
+            {
+                return;
+            }
+            if (!pose.IsComplete)
+            {
+                Debug.LogWarning("[StateServer] cameraTransform needs position x, y, z and eulerRotation x, y, z; the camera is not moved.", this);
+                return;
+            }
+            if (m_Camera == null)
+            {
+                Debug.LogWarning("[StateServer] cameraTransform given but no Camera is assigned; the camera is not moved.", this);
+                return;
+            }
+            m_Camera.transform.SetPositionAndRotation(pose.position, Quaternion.Euler(pose.eulerRotation));
         }
 
         [Serializable]
@@ -343,6 +380,28 @@ namespace Greyhound.MuJoCo
         {
             public int id;
             public JointState[] joints = new JointState[0];
+            public CameraTransform cameraTransform = new CameraTransform();
+        }
+
+        [Serializable]
+        private sealed class CameraTransform
+        {
+            public Vector3 position = new Vector3(float.NaN, float.NaN, float.NaN);
+            public Vector3 eulerRotation = new Vector3(float.NaN, float.NaN, float.NaN);
+
+            public bool IsEmpty => IsMissing(position) && IsMissing(eulerRotation);
+
+            public bool IsComplete => IsGiven(position) && IsGiven(eulerRotation);
+
+            private static bool IsMissing(Vector3 value)
+            {
+                return float.IsNaN(value.x) && float.IsNaN(value.y) && float.IsNaN(value.z);
+            }
+
+            private static bool IsGiven(Vector3 value)
+            {
+                return !float.IsNaN(value.x) && !float.IsNaN(value.y) && !float.IsNaN(value.z);
+            }
         }
 
         [Serializable]
